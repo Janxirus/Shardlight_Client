@@ -160,7 +160,7 @@ class SecretStoreTest {
         String expectedLine = "add-generic-password -U -s \"Shardlight Client\" -a \"msa.refresh.abc\" -w \""
             + SecretEncoding.encode(TOKEN) + "\"\n";
         assertEquals(expectedLine, add.stdin());
-        assertEquals(List.of("/usr/bin/security", "find-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc", "-w"),
+        assertEquals(List.of(Path.of("/usr/bin/security").toString(), "find-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc", "-w"),
             tool.calls.get(1).command());
         for (FakeTools.Call c : tool.calls) {
             for (String arg : c.command()) {
@@ -173,7 +173,7 @@ class SecretStoreTest {
         }
 
         s.delete("msa.refresh.abc");
-        assertEquals(List.of("/usr/bin/security", "delete-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc"),
+        assertEquals(List.of(Path.of("/usr/bin/security").toString(), "delete-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc"),
             tool.calls.get(tool.calls.size() - 1).command());
         assertEquals(Optional.empty(), s.get("msa.refresh.abc"));
         s.delete("msa.refresh.abc"); // not found is fine
@@ -248,10 +248,10 @@ class SecretStoreTest {
         assertEquals(List.of(Path.of("/usr/bin/secret-tool").toString(), "store", "--label=Shardlight Client", "service", "shardlight-client",
             "account", "mc.session.abc"), tool.calls.get(0).command());
         assertEquals(SecretEncoding.encode(TOKEN), tool.calls.get(0).stdin(), "the value goes to stdin, without a newline");
-        assertEquals(List.of("/usr/bin/secret-tool", "lookup", "service", "shardlight-client", "account", "mc.session.abc"),
+        assertEquals(List.of(Path.of("/usr/bin/secret-tool").toString(), "lookup", "service", "shardlight-client", "account", "mc.session.abc"),
             tool.calls.get(1).command());
         s.delete("mc.session.abc");
-        assertEquals(List.of("/usr/bin/secret-tool", "clear", "service", "shardlight-client", "account", "mc.session.abc"),
+        assertEquals(List.of(Path.of("/usr/bin/secret-tool").toString(), "clear", "service", "shardlight-client", "account", "mc.session.abc"),
             tool.calls.get(2).command());
         assertEquals(Optional.empty(), s.get("mc.session.abc"));
         for (FakeTools.Call c : tool.calls) {

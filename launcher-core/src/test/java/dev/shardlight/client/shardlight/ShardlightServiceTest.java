@@ -79,11 +79,15 @@ class ShardlightServiceTest {
 
     // ---------------------------------------------------------------- files
 
+    private static final long ENTRY_TIME = 1_760_000_000_000L;
+
     static byte[] zip(Map<String, byte[]> entries) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (ZipOutputStream out = new ZipOutputStream(bos)) {
             for (Map.Entry<String, byte[]> e : entries.entrySet()) {
-                out.putNextEntry(new ZipEntry(e.getKey()));
+                ZipEntry entry = new ZipEntry(e.getKey());
+                entry.setTime(ENTRY_TIME); // same bytes for the same content, however slow the machine
+                out.putNextEntry(entry);
                 out.write(e.getValue());
                 out.closeEntry();
             }
