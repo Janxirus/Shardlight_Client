@@ -290,6 +290,15 @@ public final class DownloadsPage implements Page {
             List<Group> all = group(ctx.services().downloads().items());
             int active = (int) all.stream().filter(Group::active).mapToLong(g -> g.items().size() - g.finished()).sum();
             ctx.shell().setBadge("downloads", active);
+            long done = all.stream().filter(Group::active).mapToLong(Group::done).sum();
+            long total = all.stream().filter(Group::active).mapToLong(Group::total).sum();
+            double fraction = total > 0 ? Math.min(1, done / (double) total) : -1;
+            ctx.tools().setDownloads(active, fraction);
+            if (active > 0) {
+                dev.shardlight.client.app.ui.TaskProgress.set("downloads", fraction);
+            } else {
+                dev.shardlight.client.app.ui.TaskProgress.clear("downloads");
+            }
             for (Group g : all) {
                 if (g.active()) {
                     activeGroups.add(g.name());

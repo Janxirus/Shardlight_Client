@@ -5,6 +5,7 @@ import dev.shardlight.client.account.Account;
 import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.flows.PlayFlow;
 import dev.shardlight.client.app.flows.SignInDialog;
+import dev.shardlight.client.app.ui.DesignTokens;
 import dev.shardlight.client.app.ui.Fx;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Page;
@@ -50,8 +51,7 @@ public final class SettingsPage implements Page {
         "updates", "storage", "about");
     /** languages with a full translation; "" follows the system */
     private static final List<String> LANGUAGES = List.of("", "en");
-    private static final List<String> ACCENTS = List.of("#7C6CF2", "#4F8DF7", "#2BB3A3", "#4CAF50", "#E0A030", "#E8663D",
-        "#E04F7A", "#B45CE0");
+    private static final List<String> ACCENTS = DesignTokens.ACCENT_PRESETS;
 
     private final AppContext ctx;
     private final HBox root = new HBox(0);

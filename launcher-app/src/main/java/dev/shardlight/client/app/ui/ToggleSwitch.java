@@ -1,6 +1,5 @@
 package dev.shardlight.client.app.ui;
 
-import javafx.animation.TranslateTransition;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.scene.AccessibleAction;
@@ -9,7 +8,6 @@ import javafx.scene.AccessibleRole;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
-import javafx.util.Duration;
 
 /** An on/off switch: click, Space or Enter toggles it; screen readers see a toggle button. */
 public final class ToggleSwitch extends StackPane {
@@ -30,7 +28,7 @@ public final class ToggleSwitch extends StackPane {
         setAccessibleText(accessibleName);
         selected.set(initial);
         place(false);
-        selected.addListener((o, a, b) -> place(!UiSettings.reducedMotion()));
+        selected.addListener((o, a, b) -> place(true));
         setOnMouseClicked(e -> {
             if (!isDisabled()) {
                 selected.set(!selected.get());
@@ -49,9 +47,7 @@ public final class ToggleSwitch extends StackPane {
         pseudo();
         double x = selected.get() ? 8.5 : -8.5;
         if (animate) {
-            TranslateTransition t = new TranslateTransition(Duration.millis(120), knob);
-            t.setToX(x);
-            t.play();
+            Motion.moveX(knob, Motion.Speed.FAST, x);
         } else {
             knob.setTranslateX(x);
         }

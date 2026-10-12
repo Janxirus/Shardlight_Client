@@ -25,6 +25,8 @@ configurations {
 
 dependencies {
     implementation project(':launcher-core')
+    // the title bar colours and taskbar progress on Windows
+    implementation "net.java.dev.jna:jna-platform:${jna_version}"
     fxModules.each { m -> implementation("org.openjfx:javafx-${m}:${javafx_version}:${hostFx}") { transitive = false } }
     portablePlatforms.each { p ->
         fxModules.each { m -> add("javafx_${p.replace('-', '_')}", "org.openjfx:javafx-${m}:${javafx_version}:${p}") }

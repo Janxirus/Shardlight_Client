@@ -34,6 +34,8 @@ public final class LauncherSettings {
         /** BCP-47 language tag; empty = system */
         public String language = "";
         public boolean highContrast;
+        /** the sidebar shows icons only */
+        public boolean sidebarCollapsed;
     }
 
     public static final class Downloads {

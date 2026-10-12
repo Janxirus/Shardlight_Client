@@ -48,8 +48,9 @@ public final class Tasks {
     public static <T> void withProgress(Overlay overlay, String title, boolean cancellable, Work<T> work,
                                         Consumer<T> ok, Consumer<Throwable> onError) {
         CancellationToken cancel = new CancellationToken();
-        Label stage = UiKit.label(I18n.tr("ui.task.starting"));
-        stage.setStyle("-fx-font-weight: bold;");
+        String source = "task-" + System.identityHashCode(cancel);
+        TaskProgress.set(source, -1);
+        Label stage = UiKit.label(I18n.tr("ui.task.starting"), "strong");
         Label detail = UiKit.label("", "muted", "small");
         detail.setWrapText(false);
         detail.setMaxWidth(460);
@@ -83,16 +84,19 @@ public final class Tasks {
                     detail.setText(s.detail() == null ? "" : s.detail());
                     double f = ProgressListener.fraction(s.done(), s.total());
                     bar.setProgress(f);
+                    TaskProgress.set(source, f);
                     count.setText(s.total() > 0 ? I18n.tr("ui.task.count", s.done(), s.total()) : "");
                 });
             }
         };
         Fx.run(() -> work.run(listener, cancel), result -> {
+            TaskProgress.clear(source);
             dialog.close();
             if (ok != null) {
                 ok.accept(result);
             }
         }, err -> {
+            TaskProgress.clear(source);
             dialog.close();
             if (isCancelled(err)) {
                 overlay.toast("info", I18n.tr("ui.task.cancelled"));

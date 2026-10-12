@@ -10,13 +10,20 @@ import dev.shardlight.client.app.pages.NewProjectWizard;
 import dev.shardlight.client.app.pages.ProjectPage;
 import dev.shardlight.client.app.pages.SettingsPage;
 import dev.shardlight.client.app.pages.ShardlightPage;
+import dev.shardlight.client.app.pages.GalleryPage;
 import dev.shardlight.client.app.ui.AccountChip;
+import dev.shardlight.client.app.ui.CommandPalette;
 import dev.shardlight.client.app.ui.Fx;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Overlay;
+import dev.shardlight.client.app.ui.PlayBar;
 import dev.shardlight.client.app.ui.Shell;
+import dev.shardlight.client.app.ui.SidebarProject;
+import dev.shardlight.client.app.ui.TaskProgress;
 import dev.shardlight.client.app.ui.ThemeManager;
+import dev.shardlight.client.app.ui.TopBarTools;
 import dev.shardlight.client.app.ui.UiSettings;
+import dev.shardlight.client.app.ui.WindowsChrome;
 import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.project.Project;
@@ -24,7 +31,12 @@ import dev.shardlight.client.services.LauncherServices;
 import dev.shardlight.client.settings.LauncherSettings;
 import dev.shardlight.client.storage.AppPaths;
 import javafx.application.HostServices;
+import javafx.application.Platform;
+import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Labeled;
+import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 import java.awt.Desktop;
@@ -47,6 +59,8 @@ public final class AppContext {
     private final HostServices host;
     private final Shell shell;
     private final PlayFlow play;
+    private final TopBarTools tools;
+    private final CommandPalette palette;
     private final List<Runnable> projectListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> accountListeners = new CopyOnWriteArrayList<>();
     private Scene scene;
@@ -58,6 +72,7 @@ public final class AppContext {
         LauncherSettings.Appearance a = services.settings().get().appearance;
         applyLanguage(a.language);
         UiSettings.setReducedMotion(a.reducedMotion);
+        ThemeManager.setScale(a.scale);
         this.shell = new Shell(ThemeManager.accent(a));
         this.play = new PlayFlow(this);
         shell.addNav(new Shell.NavItem("home", "ui.nav.home", Icons.HOME, () -> new HomePage(this)));
@@ -66,8 +81,22 @@ public final class AppContext {
         shell.addNav(new Shell.NavItem("shardlight", "ui.nav.shardlight", Icons.SHARD, () -> new ShardlightPage(this)));
         shell.addNav(new Shell.NavItem("multiplayer", "ui.nav.multiplayer", Icons.SERVERS, () -> new MultiplayerPage(this)));
         shell.addNav(new Shell.NavItem("downloads", "ui.nav.downloads", Icons.DOWNLOAD, () -> new DownloadsPage(this)));
-        shell.addNav(new Shell.NavItem("settings", "ui.nav.settings", Icons.GEAR, () -> new SettingsPage(this)));
+        shell.addFooterNav(new Shell.NavItem("settings", "ui.nav.settings", Icons.GEAR, () -> new SettingsPage(this)));
+        shell.addHidden("gallery", () -> new GalleryPage(this));
+        shell.setCollapsed(a.sidebarCollapsed);
+        shell.onCollapsedChanged(c -> {
+            try {
+                services.settings().update(s -> s.appearance.sidebarCollapsed = c);
+            } catch (LauncherException e) {
+                LOG.log(Level.WARNING, "Couldn't save the sidebar choice", e);
+            }
+        });
         shell.sidebarFooter().getChildren().add(new AccountChip(this).view());
+        shell.setPinned(new SidebarProject(this).view());
+        this.tools = new TopBarTools(this);
+        this.palette = new CommandPalette(this);
+        shell.setPalette(palette::show);
+        shell.setPlayBar(new PlayBar(this).view());
 
         services.projects().addListener(() -> Fx.ui(() -> projectListeners.forEach(Runnable::run)));
         services.accounts().addListener(() -> Fx.ui(() -> accountListeners.forEach(Runnable::run)));
@@ -100,6 +129,14 @@ public final class AppContext {
 
     public PlayFlow play() {
         return play;
+    }
+
+    public TopBarTools tools() {
+        return tools;
+    }
+
+    public CommandPalette palette() {
+        return palette;
     }
 
     public void onProjectsChanged(Runnable r) {
@@ -152,6 +189,24 @@ public final class AppContext {
 
     public void openProject(String projectId) {
         shell.push(new ProjectPage(this, projectId));
+    }
+
+    /** open a project on one of its tabs: overview, content, worlds, backups, screenshots, performance, settings, logs */
+    public void openProjectTab(String projectId, String tab) {
+        if (!(shell.current() instanceof ProjectPage pp && projectId.equals(pp.projectId()))) {
+            openProject(projectId);
+        }
+        if (shell.current() instanceof ProjectPage page && PROJECT_TABS.contains(tab)) {
+            page.select(PROJECT_TABS.indexOf(tab));
+        }
+    }
+
+    /** go to Settings, opened on {@code section} */
+    public void openSettings(String section) {
+        shell.navigate("settings");
+        if (shell.current() instanceof SettingsPage sp) {
+            sp.open(section);
+        }
     }
 
     public void newProject(String templateId) {
@@ -219,14 +274,33 @@ public final class AppContext {
         services.settings().addListener(st -> Fx.ui(() -> {
             UiSettings.setReducedMotion(st.appearance.reducedMotion);
             ThemeManager.apply(s, st.appearance);
+            shell.setCollapsed(st.appearance.sidebarCollapsed);
+            applyTitleBar();
         }));
     }
 
     void afterShow() {
+        TaskProgress.attach(stage);
+        Platform.runLater(this::applyTitleBar);
         play.checkForUpdatesQuietly();
     }
 
-    /** pages saved by --capture, in order */
+    /** on Windows, colour the native title bar like the window: its background and primary text */
+    void applyTitleBar() {
+        if (!WindowsChrome.supported() || scene == null) {
+            return;
+        }
+        Region root = (Region) scene.getRoot();
+        root.applyCss();
+        Color bg = root.getBackground() != null && !root.getBackground().getFills().isEmpty()
+            && root.getBackground().getFills().get(0).getFill() instanceof Color c ? c : null;
+        Node title = root.lookup(".page-title");
+        Color text = title instanceof Labeled l && l.getTextFill() instanceof Color c ? c : null;
+        if (bg != null && text != null) {
+            WindowsChrome.titleBar(stage, bg.getBrightness() < 0.5, bg, text);
+        }
+    }
+
     /** the pages, tabs, sections and dialogs --capture saves, in order */
     List<String> captureSteps() {
         List<String> steps = new ArrayList<>(List.of("home", "library"));
@@ -238,8 +312,79 @@ public final class AppContext {
             "storage", "about")) {
             steps.add("settings-" + section);
         }
-        steps.addAll(List.of("signin", "crash", "home-light", "project-light"));
+        steps.addAll(List.of("signin", "crash", "home-light", "library-light", "project-light", "discover-light",
+            "settings-light"));
+        // Part 2: the shell and the component gallery
+        steps.addAll(List.of("gallery", "gallery-full", "palette", "notifications", "collapsed"));
+        for (String page : List.of("home", "gallery")) {
+            for (String theme : List.of("dark", "light", "contrast")) {
+                for (String scale : List.of("100", "150")) {
+                    steps.add("look-" + page + "-" + theme + "-" + scale);
+                }
+            }
+        }
+        steps.addAll(List.of("gallery-full-light", "gallery-full-contrast"));
         return steps;
+    }
+
+    /** show the app in {@code theme} (dark, light or contrast) at {@code scale} for --capture, not saved */
+    private void captureLook(String theme, double scale) {
+        LauncherSettings.Appearance a = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
+            LauncherSettings.Appearance.class);
+        a.theme = theme.equals("light") ? "light" : "dark";
+        a.highContrast = theme.equals("contrast");
+        a.scale = scale;
+        ThemeManager.apply(scene, a);
+    }
+
+    private boolean showShellCapture(String id) {
+        if (!id.equals("notifications")) {
+            overlay().clearToasts();
+        }
+        if (id.startsWith("look-")) {
+            String[] parts = id.split("-");
+            captureLook(parts[2], Integer.parseInt(parts[3]) / 100.0);
+            shell.setCollapsed(false);
+            shell.navigate(parts[1]);
+            return true;
+        }
+        switch (id) {
+            case "gallery", "gallery-full" -> {
+                captureLook("dark", 1);
+                shell.navigate("gallery");
+            }
+            case "gallery-full-light", "gallery-full-contrast" -> {
+                captureLook(id.substring("gallery-full-".length()), 1);
+                shell.navigate("gallery");
+            }
+            case "palette" -> {
+                captureLook("dark", 1);
+                shell.navigate("home");
+                palette.show();
+                Platform.runLater(() -> {
+                    if (scene.getFocusOwner() instanceof javafx.scene.control.TextField tf) {
+                        tf.setText("ul");
+                    }
+                });
+            }
+            case "notifications" -> {
+                shell.navigate("library");
+                selectedProject().ifPresent(p -> overlay().toast("success", I18n.tr("ui.play.started", p.name)));
+                overlay().toast("warning", I18n.tr("ui.signin.notRemembered"));
+                overlay().toast("danger", I18n.tr("ui.downloads.toastFailed", I18n.tr("ui.downloads.other")),
+                    new Overlay.Action(I18n.tr("ui.state.retry"), () -> { }));
+                Platform.runLater(tools::showNotifications);
+            }
+            case "collapsed" -> {
+                overlay().closePopover();
+                shell.setCollapsed(true);
+                shell.navigate("home");
+            }
+            default -> {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static final List<String> PROJECT_TABS = List.of("overview", "content", "worlds", "backups", "screenshots",
@@ -249,11 +394,15 @@ public final class AppContext {
         while (overlay().hasOpenDialog()) {
             overlay().closeTop();
         }
+        overlay().closePopover();
+        if (showShellCapture(id)) {
+            return;
+        }
         if (id.startsWith("project-") && PROJECT_TABS.contains(id.substring(8))) {
             showProjectTab(PROJECT_TABS.indexOf(id.substring(8)));
             return;
         }
-        if (id.startsWith("settings-")) {
+        if (id.startsWith("settings-") && !id.endsWith("-light")) {
             shell.navigate("settings");
             if (shell.current() instanceof SettingsPage sp) {
                 sp.open(id.substring(9));
@@ -273,15 +422,20 @@ public final class AppContext {
                 shell.navigate("home");
                 selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services)));
             }
-            case "home-light", "project-light" -> {
+            case "home-light", "library-light", "project-light", "discover-light", "settings-light" -> {
                 LauncherSettings.Appearance light = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
                     LauncherSettings.Appearance.class);
                 light.theme = "light";
                 ThemeManager.apply(scene, light);
-                if (id.equals("home-light")) {
-                    shell.navigate("home");
-                } else {
-                    showProjectTab(1);
+                switch (id) {
+                    case "project-light" -> showProjectTab(1);
+                    case "settings-light" -> {
+                        shell.navigate("settings");
+                        if (shell.current() instanceof SettingsPage sp) {
+                            sp.open("appearance");
+                        }
+                    }
+                    default -> shell.navigate(id.substring(0, id.length() - "-light".length()));
                 }
             }
             default -> shell.navigate(id);

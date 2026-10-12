@@ -74,7 +74,7 @@ public final class ProjectIcons {
     public static Node glyphTile(Builtin b, double size) {
         Color c = Color.web(b.color());
         Node glyph = Icons.of(b.glyph(), size * 0.55);
-        glyph.lookupAll(".icon").forEach(n -> n.setStyle("-fx-fill: rgba(255,255,255,0.95);"));
+        glyph.lookupAll(".icon").forEach(n -> n.setStyle("-sl-icon: rgba(255,255,255,0.95);"));
         StackPane p = new StackPane(glyph);
         p.setMinSize(size, size);
         p.setPrefSize(size, size);
