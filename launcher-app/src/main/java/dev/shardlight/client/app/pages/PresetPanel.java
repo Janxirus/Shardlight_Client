@@ -12,6 +12,7 @@ import dev.shardlight.client.preset.ApplyReport;
 import dev.shardlight.client.preset.Preset;
 import dev.shardlight.client.preset.SettingChange;
 import dev.shardlight.client.preset.SettingDef;
+import dev.shardlight.client.preset.VanillaOptions;
 import dev.shardlight.client.project.Project;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -325,7 +326,10 @@ public final class PresetPanel {
         ToggleSwitch vanilla = new ToggleSwitch(p.preset.applyVanillaVideoSettings);
         vanilla.selectedProperty().addListener((o, a, b) -> Tasks.quiet(ctx.overlay(),
             () -> ctx.services().projects().update(p.id, x -> x.preset.applyVanillaVideoSettings = b), x -> refresh()));
-        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.vanillaOptIn"), I18n.tr("ui.preset.vanillaOptInHint"), vanilla));
+        boolean videoOk = ctx.services().presets().vanillaVideoAvailable(p);
+        vanilla.setDisable(!videoOk);
+        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.vanillaOptIn"), videoOk ? I18n.tr("ui.preset.vanillaOptInHint")
+            : I18n.tr("ui.preset.vanillaUnverified", VanillaOptions.VERIFIED_FOR, String.valueOf(p.minecraftVersion)), vanilla));
         ToggleSwitch adaptive = new ToggleSwitch(false);
         adaptive.setDisable(true);
         box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.adaptive"), I18n.tr("ui.preset.adaptiveHint"), adaptive));

@@ -133,7 +133,7 @@ public final class LauncherServices implements AutoCloseable {
             content, downloads, catalogs);
 
         this.shardlightCatalog = ShardlightCatalog.load();
-        this.shardlightLibrary = new ShardlightContentLibrary(paths, http, downloads, shardlightCatalog);
+        this.shardlightLibrary = new ShardlightContentLibrary(paths, http, downloads, shardlightCatalog, modrinth);
         this.shardlight = new ShardlightService(paths, projects, shardlightCatalog, shardlightLibrary);
         this.presets = new PresetEngine(projects);
         this.updates = UpdateService.fromBundledConfig(http, BuildInfo.VERSION, downloads);

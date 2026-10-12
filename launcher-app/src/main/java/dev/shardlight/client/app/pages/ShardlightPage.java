@@ -10,6 +10,7 @@ import dev.shardlight.client.app.ui.Tasks;
 import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.ToggleSwitch;
 import dev.shardlight.client.app.ui.UiKit;
+import dev.shardlight.client.error.ErrorCode;
 import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.loader.LoaderType;
@@ -216,10 +217,20 @@ public final class ShardlightPage implements Page {
     private void download(ShardlightModule m) {
         var lib = ctx.services().shardlightLibrary();
         Tasks.withProgress(ctx.overlay(), I18n.tr("ui.shardlight.downloading", I18n.tr(m.nameKey())), true,
-            (pr, c) -> lib.downloadLatestRelease(m.id(), pr, c), item -> {
+            (pr, c) -> lib.downloadLatest(m.id(), pr, c), item -> {
                 ctx.overlay().toast(item.isPresent() ? "success" : "info", item.map(i -> I18n.tr("ui.shardlight.downloaded", i.version()))
                     .orElse(I18n.tr("ui.shardlight.nothingNew")));
                 render();
+            }, err -> {
+                if (err instanceof LauncherException e && e.code() == ErrorCode.NOT_FOUND
+                    && "shardlight.download.notPublished".equals(e.messageKey())) {
+                    // neither a Modrinth project nor a public GitHub release exists yet: say so and offer the local jar
+                    ctx.overlay().confirm(I18n.tr("ui.shardlight.notPublishedTitle"),
+                        I18n.tr("ui.shardlight.notPublished", I18n.tr(m.nameKey())), List.of(),
+                        I18n.tr("ui.shardlight.import"), false, this::importFiles);
+                } else {
+                    Tasks.showError(ctx.overlay(), I18n.tr("ui.shardlight.downloading", I18n.tr(m.nameKey())), err);
+                }
             });
     }
 
@@ -381,12 +392,7 @@ public final class ShardlightPage implements Page {
         downloads.getStyleClass().add("button-row");
         for (ShardlightModule m : ctx.services().shardlightCatalog().modules()) {
             downloads.getChildren().add(UiKit.button(I18n.tr("ui.shardlight.downloadLatest", I18n.tr(m.nameKey())), Icons.DOWNLOAD,
-                () -> Tasks.withProgress(ctx.overlay(), I18n.tr("ui.shardlight.downloading", I18n.tr(m.nameKey())), true,
-                    (pr, c) -> lib.downloadLatestRelease(m.id(), pr, c), item -> {
-                        ctx.overlay().toast("success", item.map(i -> I18n.tr("ui.shardlight.downloaded", i.version()))
-                            .orElse(I18n.tr("ui.shardlight.nothingNew")));
-                        render();
-                    })));
+                () -> download(m)));
         }
         HBox bar = new HBox(importFiles, UiKit.spacer(), folder);
         bar.getStyleClass().add("button-row");

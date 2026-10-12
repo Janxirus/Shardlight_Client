@@ -35,3 +35,42 @@ tasks.named('processResources') {
         expand(values)
     }
 }
+
+// Contract tests against the real Modrinth, CurseForge, GitHub and Mojang services. They are never part of
+// `./gradlew build`; CI runs them with `./gradlew :launcher-core:liveTest -PliveTests` in a separate job.
+if (project.hasProperty('liveTests')) {
+    tasks.register('liveTest', Test) {
+        group = 'verification'
+        description = 'Runs the tests tagged "live" against the real services.'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform { includeTags 'live' }
+        maxParallelForks = 1
+        outputs.upToDateWhen { false }
+        testLogging {
+            events 'passed', 'failed', 'skipped'
+            exceptionFormat 'full'
+            showStandardStreams = true
+        }
+    }
+}
+
+// Runs the real Forge and NeoForge installers (see LoaderInstallersLiveTest). Heavy: it downloads the game, a Java
+// runtime and the loader libraries, so CI runs it as its own job with
+// `./gradlew :launcher-core:installerTest -PinstallerTests`.
+if (project.hasProperty('installerTests')) {
+    tasks.register('installerTest', Test) {
+        group = 'verification'
+        description = 'Installs Forge and NeoForge with their real installers and checks the result.'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform { includeTags 'installer' }
+        maxParallelForks = 1
+        outputs.upToDateWhen { false }
+        testLogging {
+            events 'passed', 'failed', 'skipped'
+            exceptionFormat 'full'
+            showStandardStreams = true
+        }
+    }
+}

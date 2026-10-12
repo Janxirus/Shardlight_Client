@@ -368,6 +368,14 @@ public final class PresetEngine {
         return out;
     }
 
+    /**
+     * true when presets may write this project's Minecraft video options: only for a Minecraft version whose
+     * {@code options.txt} keys were checked ({@link VanillaOptions#verifiedFor}); the opt-in is ignored otherwise
+     */
+    public boolean vanillaVideoAvailable(Project project) {
+        return project != null && VanillaOptions.verifiedFor(project.minecraftVersion);
+    }
+
     /** turn Minecraft video options on or off for this project's presets (off by default) */
     public void setApplyVanillaVideoSettings(Project project, boolean on) throws LauncherException {
         Objects.requireNonNull(project, "project");
@@ -673,7 +681,7 @@ public final class PresetEngine {
                 out.add(t);
             }
         }
-        if (state(project).applyVanillaVideoSettings) {
+        if (state(project).applyVanillaVideoSettings && VanillaOptions.verifiedFor(project.minecraftVersion)) {
             out.add(Target.VANILLA);
         }
         return List.copyOf(out);

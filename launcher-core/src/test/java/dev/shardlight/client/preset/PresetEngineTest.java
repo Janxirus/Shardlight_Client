@@ -542,6 +542,20 @@ class PresetEngineTest {
     }
 
     @Test
+    void vanillaVideoSettingsAreIgnoredForVersionsWhoseKeysWereNotChecked() throws Exception {
+        Project p = projects.create("old" + System.nanoTime(), "1.21.4", LoaderType.FABRIC, "0.16.10");
+        Path options = game(p).resolve("options.txt");
+        Files.createDirectories(options.getParent());
+        String original = "version:4189\nrenderDistance:16\n";
+        Files.writeString(options, original);
+        engine.setApplyVanillaVideoSettings(p, true);
+        assertFalse(engine.vanillaVideoAvailable(reload(p)));
+        assertTrue(engine.preview(reload(p), Preset.ULTRA_PERFORMANCE).isEmpty());
+        engine.apply(reload(p), Preset.ULTRA_PERFORMANCE);
+        assertEquals(original, Files.readString(options), "options.txt of an unchecked version is never touched");
+    }
+
+    @Test
     void vanillaSettingsWaitForTheGamesOwnOptionsFile() throws Exception {
         Project p = project();
         engine.setApplyVanillaVideoSettings(p, true);
