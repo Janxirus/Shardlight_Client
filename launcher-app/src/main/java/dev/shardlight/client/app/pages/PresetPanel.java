@@ -330,9 +330,14 @@ public final class PresetPanel {
         vanilla.setDisable(!videoOk);
         box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.vanillaOptIn"), videoOk ? I18n.tr("ui.preset.vanillaOptInHint")
             : I18n.tr("ui.preset.vanillaUnverified", VanillaOptions.VERIFIED_FOR, String.valueOf(p.minecraftVersion)), vanilla));
-        ToggleSwitch adaptive = new ToggleSwitch(false);
-        adaptive.setDisable(true);
-        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.adaptive"), I18n.tr("ui.preset.adaptiveHint"), adaptive));
+        ToggleSwitch adaptive = new ToggleSwitch(p.preset.adaptiveQuality);
+        adaptive.selectedProperty().addListener((o, a, b) -> Tasks.quiet(ctx.overlay(), () -> {
+            ctx.services().presets().setAdaptiveQuality(ctx.services().projects().get(p.id).orElse(p), b, p.preset.adaptiveTargetFps);
+            return Boolean.TRUE;
+        }, x -> refresh()));
+        HBox adaptiveControl = new HBox(8, UiKit.chip(I18n.tr("ui.preset.preview"), "accent"), adaptive);
+        adaptiveControl.setAlignment(Pos.CENTER_RIGHT);
+        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.adaptive"), I18n.tr("ui.preset.adaptiveHint"), adaptiveControl));
         if (p.preset.lastApplied != null) {
             Button revert = UiKit.button(I18n.tr("ui.preset.revert"), Icons.REFRESH, () -> Tasks.quiet(ctx.overlay(),
                 () -> ctx.services().presets().revertLast(ctx.services().projects().get(p.id).orElse(p)), r -> {

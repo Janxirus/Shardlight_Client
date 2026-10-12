@@ -628,6 +628,23 @@ class PresetEngineTest {
         JsonObject rec = readJson(game(p).resolve(PresetEngine.RECORD_FILE));
         assertTrue(rec.getAsJsonObject("adaptiveQuality").get("enabled").getAsBoolean());
         assertFalse(rec.getAsJsonObject("adaptiveQuality").get("implementedInGame").getAsBoolean());
+
+        // the file the mod will read, as documented in docs/ADAPTIVE_QUALITY.md
+        JsonObject file = readJson(game(p).resolve(PresetEngine.ADAPTIVE_FILE));
+        assertEquals(1, file.get("schemaVersion").getAsInt());
+        assertTrue(file.get("enabled").getAsBoolean());
+        assertEquals(90, file.get("targetFps").getAsInt());
+        assertTrue(file.get("writtenBy").getAsString().startsWith("Shardlight Client "));
+        engine.setAdaptiveQuality(reload(p), false, 90);
+        assertFalse(readJson(game(p).resolve(PresetEngine.ADAPTIVE_FILE)).get("enabled").getAsBoolean(),
+            "turning it off updates the file the mod reads");
+    }
+
+    @Test
+    void adaptiveQualityLeavesNoFileWhileItHasNeverBeenTurnedOn() throws Exception {
+        Project p = project("ui");
+        engine.setAdaptiveQuality(p, false, 60);
+        assertFalse(Files.exists(game(p).resolve(PresetEngine.ADAPTIVE_FILE)));
     }
 
     @Test

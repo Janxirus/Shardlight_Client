@@ -66,6 +66,10 @@ public final class PresetEngine {
     public static final int RECORD_SCHEMA_VERSION = 1;
     /** the record of the last apply, relative to the game directory */
     public static final String RECORD_FILE = "config/shardlight/launcher-preset.json";
+    /** the file the Shardlight UI mod will read for adaptive quality (see docs/ADAPTIVE_QUALITY.md) */
+    public static final String ADAPTIVE_FILE = "config/shardlight/adaptive-quality.json";
+    /** the adaptive-quality.json format this launcher writes */
+    public static final int ADAPTIVE_SCHEMA_VERSION = 1;
     /** where config files are backed up before a preset writes them */
     public static final String BACKUP_DIR = "config/shardlight/backups";
     /** backups kept per config file */
@@ -396,8 +400,9 @@ public final class PresetEngine {
     }
 
     /**
-     * Store the adaptive quality choice (recorded in launcher-preset.json on the next apply). It stays off
-     * unless the user turns it on; no mod acts on it yet.
+     * Store the adaptive quality choice (recorded in launcher-preset.json on the next apply) and write
+     * {@link #ADAPTIVE_FILE} for the mod. It stays off unless the user turns it on; no mod acts on it yet, so
+     * the file is only created when it is turned on (and kept up to date once it exists).
      */
     public void setAdaptiveQuality(Project project, boolean enabled, int targetFps) throws LauncherException {
         Objects.requireNonNull(project, "project");
@@ -412,9 +417,25 @@ public final class PresetEngine {
             s.adaptiveQuality = enabled;
             s.adaptiveTargetFps = targetFps;
             savePresetState(project);
+            writeAdaptiveFile(project, enabled, targetFps);
         } finally {
             lock.unlock();
         }
+    }
+
+    /** {@code config/shardlight/adaptive-quality.json}: the contract in docs/ADAPTIVE_QUALITY.md */
+    private void writeAdaptiveFile(Project project, boolean enabled, int targetFps) throws LauncherException {
+        Path file = PathSafety.resolveInside(projects.gameDir(project), ADAPTIVE_FILE);
+        if (!enabled && !Files.exists(file)) {
+            return;
+        }
+        JsonObject o = new JsonObject();
+        o.addProperty("schemaVersion", ADAPTIVE_SCHEMA_VERSION);
+        o.addProperty("enabled", enabled);
+        o.addProperty("targetFps", targetFps);
+        o.addProperty("writtenBy", "Shardlight Client " + BuildInfo.VERSION);
+        o.addProperty("writtenAt", Instant.now().toString());
+        ModConfigFiles.write(file, o);
     }
 
     private static int clampFps(int fps) {
