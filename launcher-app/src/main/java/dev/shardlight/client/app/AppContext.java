@@ -227,22 +227,77 @@ public final class AppContext {
     }
 
     /** pages saved by --capture, in order */
+    /** the pages, tabs, sections and dialogs --capture saves, in order */
     List<String> captureSteps() {
-        return List.of("home", "library", "project", "wizard", "discover", "shardlight", "multiplayer", "downloads",
-            "settings");
+        List<String> steps = new ArrayList<>(List.of("home", "library"));
+        for (String tab : PROJECT_TABS) {
+            steps.add("project-" + tab);
+        }
+        steps.addAll(List.of("wizard", "discover", "shardlight", "multiplayer", "downloads"));
+        for (String section : List.of("accounts", "appearance", "java", "downloads", "content", "privacy", "updates",
+            "storage", "about")) {
+            steps.add("settings-" + section);
+        }
+        steps.addAll(List.of("signin", "crash", "home-light", "project-light"));
+        return steps;
     }
+
+    private static final List<String> PROJECT_TABS = List.of("overview", "content", "worlds", "backups", "screenshots",
+        "performance", "settings", "logs");
 
     void showForCapture(String id) {
         while (overlay().hasOpenDialog()) {
             overlay().closeTop();
         }
+        if (id.startsWith("project-") && PROJECT_TABS.contains(id.substring(8))) {
+            showProjectTab(PROJECT_TABS.indexOf(id.substring(8)));
+            return;
+        }
+        if (id.startsWith("settings-")) {
+            shell.navigate("settings");
+            if (shell.current() instanceof SettingsPage sp) {
+                sp.open(id.substring(9));
+            }
+            return;
+        }
         switch (id) {
-            case "project" -> selectedProject().ifPresent(p -> openProject(p.id));
             case "wizard" -> {
                 shell.navigate("library");
                 newProject("shardlight-default");
             }
+            case "signin" -> {
+                shell.navigate("home");
+                dev.shardlight.client.app.flows.SignInDialog.show(this, a -> { });
+            }
+            case "crash" -> {
+                shell.navigate("home");
+                selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services)));
+            }
+            case "home-light", "project-light" -> {
+                LauncherSettings.Appearance light = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
+                    LauncherSettings.Appearance.class);
+                light.theme = "light";
+                ThemeManager.apply(scene, light);
+                if (id.equals("home-light")) {
+                    shell.navigate("home");
+                } else {
+                    showProjectTab(1);
+                }
+            }
             default -> shell.navigate(id);
+        }
+    }
+
+    private void showProjectTab(int index) {
+        Optional<Project> p = selectedProject();
+        if (p.isEmpty()) {
+            return;
+        }
+        if (!(shell.current() instanceof ProjectPage)) {
+            openProject(p.get().id);
+        }
+        if (shell.current() instanceof ProjectPage page) {
+            page.select(index);
         }
     }
 

@@ -155,7 +155,7 @@
     -fx-font-weight: bold;
 }
 .nav-button:selected .icon { -fx-fill: -sl-accent; }
-.nav-button:focused {
+.nav-button:focus-visible {
     -fx-background-color: -sl-surface-2;
     -fx-border-color: -sl-focus;
     -fx-border-radius: 0.65em;
@@ -210,7 +210,7 @@
 .card.selectable { -fx-cursor: hand; }
 .card.selectable:hover { -fx-border-color: -sl-border-strong; -fx-background-color: -sl-surface-2; }
 .card.selected { -fx-border-color: -sl-accent; -fx-border-width: 1.6; }
-.card:focused { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
+.card:focus-visible { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
 
 .hero {
     -fx-background-radius: 1.2em;
@@ -265,7 +265,7 @@
 .button .icon { -fx-fill: -sl-text-2; }
 .button:hover { -fx-background-color: -sl-surface-3; -fx-border-color: -sl-border-strong; }
 .button:pressed { -fx-background-color: derive(-sl-surface-3, -8%); }
-.button:focused { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
+.button:focus-visible { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
 .button:disabled { -fx-opacity: 0.45; }
 
 .button.primary {
@@ -276,7 +276,7 @@
 }
 .button.primary .icon { -fx-fill: -sl-accent-text; }
 .button.primary:hover { -fx-background-color: derive(-sl-accent, 12%); }
-.button.primary:focused { -fx-border-color: -sl-text; }
+.button.primary:focus-visible { -fx-border-color: -sl-text; }
 
 .button.danger { -fx-background-color: derive(-sl-danger, -10%); -fx-border-color: transparent; -fx-text-fill: white; -fx-font-weight: bold; }
 .button.danger .icon { -fx-fill: white; }
@@ -300,7 +300,7 @@
 }
 .play-button .icon { -fx-fill: -sl-accent-text; }
 .play-button:hover { -fx-effect: dropshadow(gaussian, -sl-accent, 32, 0.28, 0, 4); }
-.play-button:focused { -fx-border-color: -sl-text; -fx-border-width: 2; -fx-border-radius: 0.9em; }
+.play-button:focus-visible { -fx-border-color: -sl-text; -fx-border-width: 2; -fx-border-radius: 0.9em; }
 .play-button.running { -fx-background-color: -sl-surface-3; -fx-text-fill: -sl-text; -fx-effect: null; }
 .play-button.running .icon { -fx-fill: -sl-danger; }
 
@@ -317,7 +317,7 @@
 }
 .ultra-button .icon { -fx-fill: #1a1206; }
 .ultra-button:hover { -fx-background-color: linear-gradient(to right, #f7c463, #f78c5c); }
-.ultra-button:focused { -fx-border-color: -sl-text; -fx-border-width: 2; -fx-border-radius: 0.8em; }
+.ultra-button:focus-visible { -fx-border-color: -sl-text; -fx-border-width: 2; -fx-border-radius: 0.8em; }
 .ultra-button.active { -fx-background-color: -sl-surface-3; -fx-text-fill: -sl-warning; }
 .ultra-button.active .icon { -fx-fill: -sl-warning; }
 
@@ -368,7 +368,7 @@
 }
 .check-box:selected .box { -fx-background-color: -sl-accent; -fx-border-color: -sl-accent; }
 .check-box:selected .mark { -fx-background-color: -sl-accent-text; }
-.check-box:focused .box { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
+.check-box:focus-visible .box { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
 
 .radio-button .radio { -fx-background-color: -sl-surface-2; -fx-border-color: -sl-border-strong; -fx-border-radius: 1em; -fx-background-radius: 1em; }
 .radio-button:selected .dot { -fx-background-color: -sl-accent; }
@@ -384,7 +384,7 @@
 }
 .toggle-switch.on { -fx-background-color: -sl-accent; }
 .toggle-switch .knob { -fx-fill: white; }
-.toggle-switch:focused { -fx-border-color: -sl-focus; -fx-border-radius: 1em; -fx-border-width: 1.6; }
+.toggle-switch:focus-visible { -fx-border-color: -sl-focus; -fx-border-radius: 1em; -fx-border-width: 1.6; }
 
 .slider .track { -fx-background-color: -sl-surface-3; -fx-background-radius: 1em; }
 .slider .thumb { -fx-background-color: -sl-accent; -fx-background-radius: 1em; }
@@ -438,7 +438,7 @@
 .tab-pane > .tab-header-area > .tab-header-background { -fx-background-color: transparent; -fx-border-color: transparent transparent -sl-border transparent; }
 .tab .tab-label { -fx-text-fill: -sl-text-2; }
 .tab:selected .tab-label { -fx-text-fill: -sl-text; -fx-font-weight: bold; }
-.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator { -fx-border-color: -sl-focus; }
+.tab-pane:focus-visible > .tab-header-area > .headers-region > .tab:selected .focus-indicator { -fx-border-color: -sl-focus; }
 
 .segmented {
     -fx-background-color: -sl-surface-2;
@@ -454,7 +454,7 @@
     -fx-cursor: hand;
 }
 .segmented .toggle-button:selected { -fx-background-color: -sl-surface; -fx-text-fill: -sl-text; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, -sl-shadow, 6, 0, 0, 1); }
-.segmented .toggle-button:focused { -fx-border-color: -sl-focus; -fx-border-radius: 0.55em; }
+.segmented .toggle-button:focus-visible { -fx-border-color: -sl-focus; -fx-border-radius: 0.55em; }
 
 .scroll-bar { -fx-background-color: transparent; }
 .scroll-bar .thumb { -fx-background-color: -sl-surface-3; -fx-background-radius: 1em; }
@@ -481,10 +481,10 @@
     -fx-padding: 0.9em;
     -fx-spacing: 0.55em;
     -fx-cursor: hand;
-    -fx-pref-width: 15em;
+    -fx-pref-width: 18em;
 }
 .project-tile:hover { -fx-border-color: -sl-border-strong; -fx-background-color: -sl-surface-2; }
-.project-tile:focused { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
+.project-tile:focus-visible { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
 .project-tile.selected { -fx-border-color: -sl-accent; -fx-border-width: 1.6; }
 .project-name { -fx-font-size: 1.05em; -fx-font-weight: bold; }
 
@@ -576,7 +576,7 @@
 }
 .preset-card:hover { -fx-border-color: -sl-border-strong; }
 .preset-card.selected { -fx-border-color: -sl-accent; -fx-border-width: 1.8; -fx-background-color: -sl-surface-2; }
-.preset-card:focused { -fx-border-color: -sl-focus; }
+.preset-card:focus-visible { -fx-border-color: -sl-focus; }
 .preset-card .preset-name { -fx-font-weight: bold; }
 
 .theme-swatch {
@@ -589,7 +589,7 @@
     -fx-pref-width: 12em;
 }
 .theme-swatch.selected { -fx-border-color: -sl-accent; -fx-border-width: 2; }
-.theme-swatch:focused { -fx-border-color: -sl-focus; }
+.theme-swatch:focus-visible { -fx-border-color: -sl-focus; }
 
 .code-block {
     -fx-background-color: -sl-bg-2;
@@ -634,7 +634,7 @@
     -fx-text-fill: -sl-text;
 }
 .root.light .source-toggle:selected, .root.light .chip-toggle:selected { -fx-background-color: derive(-sl-accent, 82%); }
-.source-toggle:focused, .chip-toggle:focused { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
+.source-toggle:focus-visible, .chip-toggle:focus-visible { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
 .source-toggle:disabled { -fx-opacity: 0.5; }
 
 .result-row, .content-row, .server-row { -fx-padding: 0.75em 0.9em; }
@@ -651,7 +651,7 @@
 }
 .icon-choice:hover { -fx-border-color: -sl-border-strong; }
 .icon-choice.selected { -fx-border-color: -sl-accent; }
-.icon-choice:focused { -fx-border-color: -sl-focus; }
+.icon-choice:focus-visible { -fx-border-color: -sl-focus; }
 
 /* Downloads */
 .download-details {
@@ -674,7 +674,7 @@
 .settings-nav-button:hover { -fx-background-color: -sl-surface; -fx-text-fill: -sl-text; }
 .settings-nav-button.selected { -fx-background-color: -sl-surface-2; -fx-text-fill: -sl-text; -fx-font-weight: bold; }
 .settings-nav-button.selected .icon { -fx-fill: -sl-accent; }
-.settings-nav-button:focused { -fx-border-color: -sl-focus; -fx-border-radius: 0.6em; }
+.settings-nav-button:focus-visible { -fx-border-color: -sl-focus; -fx-border-radius: 0.6em; }
 
 .accent-swatch {
     -fx-min-width: 1.9em;
@@ -689,7 +689,7 @@
     -fx-cursor: hand;
 }
 .accent-swatch.selected { -fx-border-color: -sl-text; }
-.accent-swatch:focused { -fx-border-color: -sl-focus; }
+.accent-swatch:focus-visible { -fx-border-color: -sl-focus; }
 
 /* Settings > Appearance: compact layout and effects off */
 .root.compact .page { -fx-padding: 0.2em 1.1em 1.1em 1.1em; -fx-spacing: 0.8em; }

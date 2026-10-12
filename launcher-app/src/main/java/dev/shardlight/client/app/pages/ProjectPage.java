@@ -152,7 +152,7 @@ public final class ProjectPage implements Page {
             return;
         }
         Project p = found.get();
-        title = p.name;
+        title = I18n.tr("ui.nav.library");
         ctx.shell().refreshChrome();
         Node icon = ProjectIcons.tile(p.icon, ctx.services().projects().projectDir(p.id), 56);
         FlowPane chips = new FlowPane(6, 6,
@@ -353,9 +353,21 @@ public final class ProjectPage implements Page {
     private Node loaderControl(Project p) {
         ComboBox<LoaderType> type = new ComboBox<>();
         type.getItems().setAll(LoaderType.values());
+        type.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(LoaderType t) {
+                return t == null ? "" : t.displayName();
+            }
+
+            @Override
+            public LoaderType fromString(String s) {
+                return null;
+            }
+        });
         type.setValue(p.loader.isVanilla() ? LoaderType.VANILLA : p.loader.type);
         ComboBox<String> version = new ComboBox<>();
         version.setPrefWidth(150);
+        version.setAccessibleText(I18n.tr("ui.projectPage.loaderVersion"));
         Runnable loadVersions = () -> {
             LoaderType t = type.getValue();
             version.getItems().clear();
@@ -363,13 +375,25 @@ public final class ProjectPage implements Page {
             if (t == LoaderType.VANILLA) {
                 return;
             }
-            Tasks.quiet(ctx.overlay(), () -> ctx.services().loaders().versions(t, p.minecraftVersion,
+            // show the project's own version straight away; the full list needs the loader's website
+            if (t == p.loader.type && p.loader.version != null) {
+                version.getItems().setAll(p.loader.version);
+                version.setValue(p.loader.version);
+            }
+            // offline, the list simply keeps the project's own version
+            dev.shardlight.client.app.ui.Fx.run(() -> ctx.services().loaders().versions(t, p.minecraftVersion,
                 new dev.shardlight.client.task.CancellationToken()), list -> {
-                version.getItems().setAll(list.stream().map(LoaderVersion::version).toList());
-                String want = t == p.loader.type ? p.loader.version : list.stream().filter(LoaderVersion::recommended)
-                    .map(LoaderVersion::version).findFirst().orElse(list.isEmpty() ? null : list.get(0).version());
+                List<String> ids = new ArrayList<>(list.stream().map(LoaderVersion::version).toList());
+                String want = t == p.loader.type && p.loader.version != null ? p.loader.version
+                    : list.stream().filter(LoaderVersion::recommended).map(LoaderVersion::version).findFirst()
+                        .orElse(list.isEmpty() ? null : list.get(0).version());
+                if (want != null && !ids.contains(want)) {
+                    ids.add(0, want);
+                }
+                version.getItems().setAll(ids);
                 version.setValue(want);
-            });
+            }, err -> java.util.logging.Logger.getLogger(ProjectPage.class.getName())
+                .fine("Couldn't load the " + t.displayName() + " versions: " + err));
         };
         loadVersions.run();
         Button apply = UiKit.button(I18n.tr("common.save"), Icons.CHECK, () -> {
@@ -465,8 +489,9 @@ public final class ProjectPage implements Page {
         Button analyze = UiKit.button(I18n.tr("ui.logs.analyze"), Icons.SEARCH, () -> analyze(latest));
         Button folder = UiKit.button(I18n.tr("ui.logs.openFolder"), Icons.FOLDER, () -> ctx.openFolder(gameDir.resolve("logs")));
         Button export = UiKit.button(I18n.tr("ui.diagnostics.export"), Icons.ARCHIVE, () -> PlayFlow.exportDiagnostics(ctx, p));
-        logs.getChildren().addAll(new HBox(10, UiKit.label(I18n.tr("ui.logs.latest"), "h3"), UiKit.spacer(), analyze, folder,
-            export), view);
+        HBox logBar = new HBox(10, UiKit.label(I18n.tr("ui.logs.latest"), "h3"), UiKit.spacer(), analyze, folder, export);
+        logBar.setAlignment(Pos.CENTER_LEFT);
+        logs.getChildren().addAll(logBar, view);
 
         VBox crashes = new VBox(6);
         Path crashDir = gameDir.resolve("crash-reports");

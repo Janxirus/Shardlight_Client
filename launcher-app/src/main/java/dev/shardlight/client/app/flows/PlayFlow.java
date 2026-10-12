@@ -97,7 +97,7 @@ public final class PlayFlow {
                 LOG.log(Level.WARNING, "Couldn't read how the game ended", err);
                 return;
             }
-            ended(project, exit);
+            showEnded(project, exit);
         }));
     }
 
@@ -117,7 +117,8 @@ public final class PlayFlow {
         Tasks.showError(ctx.overlay(), I18n.tr("ui.play.failedTitle"), err);
     }
 
-    private void ended(Project project, GameExit exit) {
+    /** tell the player how a game ended: a short note, or for a crash what was found and what to do */
+    public void showEnded(Project project, GameExit exit) {
         if (!exit.crashed()) {
             ctx.overlay().toast("info", I18n.tr("ui.play.ended", project.name,
                 UiKit.duration(exit.playTime().toMillis())));

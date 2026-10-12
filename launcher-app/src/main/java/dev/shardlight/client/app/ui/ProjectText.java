@@ -9,6 +9,7 @@ import javafx.scene.control.ListCell;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 /** Short, consistent descriptions of a project for chips and subtitles. */
 public final class ProjectText {
@@ -44,11 +45,11 @@ public final class ProjectText {
         return p.content.stream().filter(e -> e.kind == kind && (!enabledOnly || e.enabled)).count();
     }
 
-    /** "12 mods, 2 resource packs" */
+    /** "12 mods, 2 resource packs": what the project holds, switched on or not (the Overview counts what is on) */
     public static String contentSummary(Project p) {
-        long mods = count(p, ContentKind.MOD, true);
-        long packs = count(p, ContentKind.RESOURCE_PACK, true);
-        long shaders = count(p, ContentKind.SHADER_PACK, true);
+        long mods = count(p, ContentKind.MOD, false);
+        long packs = count(p, ContentKind.RESOURCE_PACK, false);
+        long shaders = count(p, ContentKind.SHADER_PACK, false);
         return I18n.tr("ui.project.contentSummary", mods, packs, shaders);
     }
 
@@ -85,8 +86,12 @@ public final class ProjectText {
         if (!p.hasShardlight()) {
             return I18n.tr("ui.shardlight.none");
         }
+        // always UI, Map, Party, Companion, whatever order the project file lists them in
+        List<String> order = dev.shardlight.client.project.ProjectTemplates.MODULE_ORDER;
+        List<String> ids = new java.util.ArrayList<>(p.shardlightModules);
+        ids.sort(java.util.Comparator.comparingInt(m -> order.contains(m) ? order.indexOf(m) : order.size()));
         StringBuilder b = new StringBuilder();
-        for (String m : p.shardlightModules) {
+        for (String m : ids) {
             if (!b.isEmpty()) {
                 b.append(", ");
             }

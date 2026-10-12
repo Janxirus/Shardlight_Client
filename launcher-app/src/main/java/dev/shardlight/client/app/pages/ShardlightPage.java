@@ -74,7 +74,9 @@ public final class ShardlightPage implements Page {
 
     @Override
     public Node actions() {
-        return new HBox(8, UiKit.label(I18n.tr("ui.shardlight.project"), "muted"), target);
+        HBox box = new HBox(8, UiKit.label(I18n.tr("ui.shardlight.project"), "muted"), target);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
     }
 
     @Override
@@ -107,8 +109,7 @@ public final class ShardlightPage implements Page {
     }
 
     private Node intro() {
-        VBox v = new VBox(6, UiKit.label(I18n.tr("ui.shardlight.introTitle"), "h2"),
-            UiKit.label(I18n.tr("ui.shardlight.intro"), "muted"));
+        VBox v = new VBox(6, UiKit.label(I18n.tr("ui.shardlight.intro"), "muted"));
         v.setMaxWidth(860);
         return v;
     }
