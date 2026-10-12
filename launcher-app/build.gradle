@@ -105,7 +105,7 @@ def jpackageCommon = { String type, File dest ->
                 '--input', jpackageInput.get().asFile.absolutePath,
                 '--main-jar', tasks.named('jar').get().archiveFileName.get(),
                 '--main-class', 'dev.shardlight.client.app.Main',
-                '--add-modules', 'java.base,java.desktop,java.logging,java.net.http,java.naming,java.sql,java.xml,java.management,jdk.crypto.ec,jdk.unsupported,jdk.zipfs,jdk.charsets,jdk.localedata,jdk.jfr',
+                '--add-modules', 'java.base,java.desktop,java.logging,java.net.http,java.naming,java.sql,java.xml,java.management,jdk.management,jdk.naming.dns,jdk.crypto.ec,jdk.unsupported,jdk.zipfs,jdk.charsets,jdk.localedata,jdk.jfr',
                 '--jlink-options', '--strip-debug --no-man-pages --no-header-files']
     appJvmArgs.each { args += ['--java-options', it] }
     if (os.contains('win')) {

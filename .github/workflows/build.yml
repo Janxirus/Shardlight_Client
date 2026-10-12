@@ -15,6 +15,15 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+# Distributor values baked into the build (all optional; see docs/SIGN_IN.md and docs/RELEASING.md).
+# Set them under the repository's Settings > Secrets and variables > Actions. Without them the app still
+# builds and runs; sign-in, CurseForge and update checks then explain what is missing.
+env:
+  SHARDLIGHT_MSA_CLIENT_ID: ${{ vars.SHARDLIGHT_MSA_CLIENT_ID }}
+  SHARDLIGHT_UPDATE_MANIFEST_URL: ${{ vars.SHARDLIGHT_UPDATE_MANIFEST_URL }}
+  SHARDLIGHT_UPDATE_PUBLIC_KEY: ${{ vars.SHARDLIGHT_UPDATE_PUBLIC_KEY }}
+  SHARDLIGHT_CURSEFORGE_API_KEY: ${{ secrets.SHARDLIGHT_CURSEFORGE_API_KEY }}
+
 jobs:
   linux:
     name: Linux build, tests and screenshots
