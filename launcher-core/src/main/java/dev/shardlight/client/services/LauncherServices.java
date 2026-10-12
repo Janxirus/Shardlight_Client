@@ -3,6 +3,7 @@ package dev.shardlight.client.services;
 import dev.shardlight.client.BuildInfo;
 import dev.shardlight.client.account.AccountService;
 import dev.shardlight.client.auth.MicrosoftAuthService;
+import dev.shardlight.client.auth.MicrosoftClientIds;
 import dev.shardlight.client.auth.SecretStore;
 import dev.shardlight.client.auth.SecretStores;
 import dev.shardlight.client.catalog.CatalogProvider;
@@ -157,13 +158,9 @@ public final class LauncherServices implements AutoCloseable {
         return new LauncherServices(paths, endpoints, http, secrets);
     }
 
-    /** the Microsoft application id: Settings first, then the one baked into this build; empty when neither */
+    /** the Microsoft application id: Settings, then the system property, then this build's own; empty when none */
     public String microsoftClientId() {
-        String fromSettings = settings.get().auth.microsoftClientId;
-        if (fromSettings != null && !fromSettings.isBlank()) {
-            return fromSettings.trim();
-        }
-        return BuildInfo.microsoftClientId().orElse("");
+        return MicrosoftClientIds.fromSettings(settings).get();
     }
 
     /** the CurseForge API key the user stored, else the build's own; empty when CurseForge is switched off */
