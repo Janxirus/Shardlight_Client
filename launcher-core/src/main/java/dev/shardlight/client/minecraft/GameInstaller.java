@@ -150,6 +150,61 @@ public final class GameInstaller {
         }
     }
 
+    /**
+     * What installing {@code versionId} would still download: the client jar, libraries and assets that are not
+     * on disk yet, from the sizes in Mojang's own files. Fetches only the small version files and the asset
+     * index, which the install needs anyway; nothing else is downloaded or written.
+     */
+    public InstallEstimate estimate(String versionId, CancellationToken cancel) throws LauncherException {
+        CancellationToken c = cancel == null ? CancellationToken.NONE : cancel;
+        lock(c);
+        try {
+            String group = I18n.tr("install.group", versionId);
+            ensureMetadata(versionId, versionId, group, ProgressListener.NONE, c, new LinkedHashSet<>());
+            InstallPlan plan = planner.plan(resolver.resolve(versionId));
+            List<PlannedFile> wanted = new ArrayList<>();
+            wanted.add(plan.clientSource() != null ? plan.clientSource() : plan.client());
+            wanted.addAll(plan.libraries());
+            if (plan.loggingFile() != null) {
+                wanted.add(plan.loggingFile());
+            }
+            PlannedFile indexFile = plan.assetIndex();
+            if (indexFile != null) {
+                if (indexFile.downloadable()) {
+                    downloads.downloadAll(group, List.of(indexFile.request()), STAGE_ASSETS, ProgressListener.NONE, c);
+                }
+                wanted.addAll(Assets.objects(Assets.read(indexFile.path()), paths.assets(), endpoints.resources()));
+            }
+            long bytes = 0;
+            int files = 0;
+            boolean exact = true;
+            for (PlannedFile f : wanted) {
+                if (!f.downloadable() || f.presentWithSize()) {
+                    continue;
+                }
+                files++;
+                if (f.size() >= 0) {
+                    bytes += f.size();
+                } else {
+                    exact = false;
+                }
+            }
+            return new InstallEstimate(bytes, files, exact);
+        } catch (LauncherException e) {
+            throw cancelledWins(e, c);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * @param bytes the size of the files still to download
+     * @param files how many files that is
+     * @param exact false when some file's size is not listed, so {@code bytes} is a lower bound
+     */
+    public record InstallEstimate(long bytes, int files, boolean exact) {
+    }
+
     /** the merged version of an installed version (no network) */
     public ResolvedVersion resolve(String versionId) throws LauncherException {
         return resolver.resolve(versionId);

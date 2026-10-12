@@ -87,6 +87,11 @@ class CatalogTest {
         assertTrue(q.contains("index=downloads"), q);
         assertTrue(q.contains("limit=100"), "the page size is capped: " + q);
 
+        modrinth.search(new SearchQuery("sodium", ContentKind.MOD, null, null, List.of(), SortOrder.RELEVANCE, 0, 20,
+            SearchQuery.Environment.SERVER), CancellationToken.NONE);
+        String server = decoded(last("/modrinth/v2/search"));
+        assertTrue(server.contains("[\"server_side:required\",\"server_side:optional\"]"), server);
+
         assertEquals(1, page.total());
         CatalogProject p = page.hits().get(0);
         assertEquals("AANobbMI", p.id());

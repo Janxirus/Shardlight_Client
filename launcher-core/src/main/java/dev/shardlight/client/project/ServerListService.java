@@ -401,7 +401,7 @@ public final class ServerListService {
             LOG.fine("No pong from " + target.host() + ": " + e.getMessage());
         }
         return new ServerStatus(true, parsed.playersOnline(), parsed.playersMax(), parsed.motd(), parsed.versionName(),
-            parsed.protocol(), latency, parsed.faviconBase64(), null);
+            parsed.protocol(), latency, parsed.faviconBase64(), null, parsed.motdSpans());
     }
 
     /** parse the status JSON ({@code version}, {@code players}, {@code description}, {@code favicon}) */
@@ -424,9 +424,10 @@ public final class ServerListService {
         if (text.length() > 2048) {
             text = text.substring(0, 2048);
         }
+        List<MotdSpan> spans = MotdSpan.fromComponent(o.get("description"));
         return new ServerStatus(true, integer(players, "online", 0), integer(players, "max", 0), text.strip(),
             FORMATTING.matcher(string(version, "name")).replaceAll(""), integer(version, "protocol", -1), -1,
-            cleanFavicon(string(o, "favicon")), null);
+            cleanFavicon(string(o, "favicon")), null, spans);
     }
 
     /** a chat component (string, object with text/translate/extra, or array) as plain text */

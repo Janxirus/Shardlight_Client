@@ -10,24 +10,34 @@ import dev.shardlight.client.modpack.MrpackExportOptions;
 import dev.shardlight.client.project.Project;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.nio.file.Path;
 import java.util.List;
 
 /** Export a project as a Modrinth .mrpack or a CurseForge modpack zip. */
-final class ModpackExportDialog {
+public final class ModpackExportDialog {
     private ModpackExportDialog() {
     }
 
-    static void show(AppContext ctx, Project p) {
-        HBox format = UiKit.segmented(List.of(I18n.tr("ui.modpack.modrinth"), I18n.tr("ui.modpack.curseforge")), 0, i -> { });
+    public static void show(AppContext ctx, Project p) {
+        Label curseHint = UiKit.label(I18n.tr("ui.modpack.curseHint"), "muted", "small");
+        curseHint.setWrapText(true);
+        curseHint.setVisible(false);
+        curseHint.setManaged(false);
+        HBox format = UiKit.segmented(List.of(I18n.tr("ui.modpack.modrinth"), I18n.tr("ui.modpack.curseforge")), 0, i -> {
+            curseHint.setVisible(i == 1);
+            curseHint.setManaged(i == 1);
+        });
         TextField name = new TextField(p.name);
         name.setAccessibleText(I18n.tr("ui.modpack.name"));
         TextField version = new TextField("1.0.0");
         version.setAccessibleText(I18n.tr("ui.modpack.version"));
+        version.setPrefColumnCount(8);
         TextField summary = new TextField();
         summary.setAccessibleText(I18n.tr("ui.modpack.summary"));
         CheckBox config = new CheckBox(I18n.tr("ui.modpack.includeConfig"));
@@ -38,14 +48,17 @@ final class ModpackExportDialog {
         shaders.setSelected(true);
         CheckBox local = new CheckBox(I18n.tr("ui.modpack.includeLocal"));
         local.setWrapText(true);
-        VBox body = new VBox(8, format,
-            UiKit.label(I18n.tr("ui.modpack.name"), "small"), name,
-            UiKit.label(I18n.tr("ui.modpack.version"), "small"), version,
-            UiKit.label(I18n.tr("ui.modpack.summary"), "small"), summary,
-            config, packs, shaders, local,
-            UiKit.label(I18n.tr("ui.modpack.localHint"), "faint", "small"),
-            UiKit.label(I18n.tr("ui.modpack.curseHint"), "faint", "small"));
-        body.setPrefWidth(500);
+        Label localHint = UiKit.label(I18n.tr("ui.modpack.localHint"), "muted", "small");
+        localHint.setWrapText(true);
+        VBox nameBox = new VBox(4, UiKit.label(I18n.tr("ui.modpack.name"), "strong"), name);
+        VBox versionBox = new VBox(4, UiKit.label(I18n.tr("ui.modpack.version"), "strong"), version);
+        HBox.setHgrow(nameBox, Priority.ALWAYS);
+        VBox body = new VBox(14,
+            new VBox(6, UiKit.label(I18n.tr("ui.modpack.format"), "strong"), format, curseHint),
+            new HBox(12, nameBox, versionBox),
+            new VBox(4, UiKit.label(I18n.tr("ui.modpack.summary"), "strong"), summary),
+            new VBox(8, UiKit.label(I18n.tr("ui.modpack.include"), "strong"), config, packs, shaders, local, localHint));
+        body.setPrefWidth(520);
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);
         Button export = UiKit.primary(I18n.tr("ui.modpack.export"), null, () -> { });

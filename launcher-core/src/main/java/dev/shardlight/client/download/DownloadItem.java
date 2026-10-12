@@ -21,6 +21,8 @@ public final class DownloadItem {
     private volatile LauncherException error;
     private volatile URI currentUrl;
     private volatile long finishedAt;
+    /** true while this item holds one of the manager's download slots */
+    volatile boolean slotHeld;
 
     DownloadItem(String id, String group, DownloadRequest request) {
         this.id = id;
@@ -28,6 +30,21 @@ public final class DownloadItem {
         this.request = request;
         this.bytesTotal = request.size();
         this.currentUrl = request.url();
+    }
+
+    /**
+     * An item in a given state with no transfer behind it, so a screen can be shown (and captured for the
+     * documentation) without downloading anything. Never added to a {@link DownloadManager}.
+     */
+    public static DownloadItem example(String id, String group, String label, DownloadState state, long done, long total,
+                                       long bytesPerSecond, LauncherException error) {
+        DownloadItem item = new DownloadItem(id, group, DownloadRequest.of(URI.create("https://example.invalid/" + id),
+            java.nio.file.Path.of(id)).withLabel(label));
+        item.bytes(done, total);
+        item.state(state);
+        item.speed(bytesPerSecond);
+        item.error(error);
+        return item;
     }
 
     public String id() {

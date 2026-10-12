@@ -31,6 +31,7 @@ public final class Icons {
     // actions
     public static final String PLAY = "M7.5 4.8v14.4L19 12z";
     public static final String STOP = "M7 7h10v10H7z";
+    public static final String PAUSE = "M8 5v14M16 5v14";
     public static final String PLUS = "M12 5v14M5 12h14";
     public static final String SEARCH = "M10.5 3.5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20.5 20.5l-5-5";
     public static final String FILTER = "M3.5 5h17l-6.5 7.5V19l-4 2v-8.5z";

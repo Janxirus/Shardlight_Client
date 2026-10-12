@@ -317,8 +317,7 @@ public final class AppContext {
             steps.add("project-" + tab);
         }
         steps.addAll(List.of("wizard", "discover", "shardlight", "multiplayer", "downloads"));
-        for (String section : List.of("accounts", "appearance", "java", "downloads", "content", "privacy", "updates",
-            "storage", "about")) {
+        for (String section : SettingsPage.SECTIONS) {
             steps.add("settings-" + section);
         }
         steps.addAll(List.of("crash", "home-light", "library-light", "discover-light", "settings-light"));
@@ -338,7 +337,123 @@ public final class AppContext {
                 steps.add("p3-" + id + suffix);
             }
         }
+        // Part 4: Discover, the mod page, Shardlight, Multiplayer, Downloads, Settings, the wizard, dialogs and the crash screen
+        for (String suffix : List.of("", "-light")) {
+            for (String id : part4Views()) {
+                steps.add("p4-" + id + suffix);
+            }
+        }
         return steps;
+    }
+
+    private static List<String> part4Views() {
+        List<String> ids = new ArrayList<>(List.of("discover", "discover-loading", "discover-empty", "discover-offline",
+            "discover-offline-empty", "catalog", "shardlight", "multiplayer", "multiplayer-add", "downloads", "downloads-empty",
+            "downloads-error"));
+        for (String section : SettingsPage.SECTIONS) {
+            ids.add("settings-" + section);
+        }
+        ids.addAll(List.of("settings-search", "settings-undo", "wizard-0", "wizard-1", "wizard-1-advanced", "wizard-1-loading",
+            "wizard-2", "confirm", "confirm-danger", "text-dialog", "modpack-export", "crash", "crash-unknown"));
+        return ids;
+    }
+
+    /** one Part 4 capture ("p4-<view>", optionally ending in "-light"); false when {@code raw} is not one */
+    private boolean showPart4Capture(String raw) {
+        if (!raw.startsWith("p4-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        String id = raw.substring(3, light ? raw.length() - "-light".length() : raw.length());
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        overlay().clearToasts();
+        if (id.startsWith("discover")) {
+            shell.navigate("discover");
+            if (shell.current() instanceof DiscoverPage dp) {
+                switch (id) {
+                    case "discover-loading" -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.SLOW), true);
+                    case "discover-empty" -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.EMPTY), true);
+                    case "discover-offline" -> {
+                        dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OK), true);
+                        after(300, () -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OFFLINE), false));
+                    }
+                    case "discover-offline-empty" -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OFFLINE), true);
+                    default -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OK), true);
+                }
+            }
+        } else if (id.equals("catalog")) {
+            shell.navigate("discover");
+            CaptureCatalog catalog = new CaptureCatalog(CaptureCatalog.Mode.OK);
+            try {
+                var item = catalog.search(new dev.shardlight.client.catalog.SearchQuery("", dev.shardlight.client.content.ContentKind.MOD,
+                    null, null, List.of(), dev.shardlight.client.catalog.SortOrder.RELEVANCE, 0, 10, null),
+                    dev.shardlight.client.task.CancellationToken.NONE).hits().get(0);
+                shell.push(new dev.shardlight.client.app.pages.CatalogProjectPage(this, catalog, item, selectedProject().orElse(null)));
+            } catch (LauncherException e) {
+                LOG.log(Level.WARNING, "Capture catalog failed", e);
+            }
+        } else if (id.equals("shardlight")) {
+            shell.navigate("shardlight");
+        } else if (id.startsWith("multiplayer")) {
+            shell.navigate("multiplayer");
+            if (shell.current() instanceof MultiplayerPage mp) {
+                mp.previewServers();
+                if (id.equals("multiplayer-add")) {
+                    after(300, mp::previewAdd);
+                }
+            }
+        } else if (id.startsWith("downloads")) {
+            shell.navigate("downloads");
+            if (shell.current() instanceof DownloadsPage dp) {
+                dp.previewItems(CaptureSeed.exampleDownloads(id.substring(9)));
+            }
+        } else if (id.startsWith("settings-")) {
+            shell.navigate("settings");
+            if (shell.current() instanceof SettingsPage sp) {
+                String what = id.substring(9);
+                switch (what) {
+                    case "search" -> sp.previewSearch("mem");
+                    case "undo" -> sp.previewUndo();
+                    default -> sp.open(what);
+                }
+            }
+        } else if (id.startsWith("wizard-")) {
+            shell.navigate("library");
+            if (shell.current() instanceof LibraryPage lp) {
+                lp.previewEmpty(false);
+                lp.previewView(false);
+            }
+            String[] parts = id.split("-");
+            int step = Integer.parseInt(parts[1]);
+            NewProjectWizard.preview(this, step == 0 ? null : "shardlight-default", step, id.endsWith("advanced"), !id.endsWith("loading"));
+        } else {
+            shell.navigate("library");
+            if (shell.current() instanceof LibraryPage lp) {
+                lp.previewEmpty(false);
+                lp.previewView(false);
+            }
+            switch (id) {
+                case "confirm" -> overlay().confirm(I18n.tr("ui.settings.signOutTitle", "Player"), I18n.tr("ui.settings.signOutMessage"),
+                    List.of(), I18n.tr("ui.settings.signOut"), false, () -> { });
+                case "confirm-danger" -> overlay().confirm(I18n.tr("ui.backup.restoreTitle"), I18n.tr("ui.backup.restoreMessage",
+                    "Survival island"), List.of(I18n.tr("ui.backup.restoreSafety")), I18n.tr("ui.backup.restore"), true, () -> { });
+                case "text-dialog" -> dev.shardlight.client.app.ui.Dialogs.text(overlay(), I18n.tr("ui.project.renameTitle"),
+                    I18n.tr("ui.project.nameLabel"), "Shardlight Survival", I18n.tr("ui.project.rename"), v -> null, v -> { });
+                case "modpack-export" -> selectedProject().ifPresent(p -> dev.shardlight.client.app.pages.ModpackExportDialog.show(this, p));
+                case "crash", "crash-unknown" -> selectedProject().ifPresent(p -> play.showEnded(p,
+                    CaptureSeed.exampleCrash(services, id.equals("crash"))));
+                default -> { }
+            }
+        }
+        return true;
+    }
+
+    /** run {@code r} on the UI thread after {@code millis} (--capture only) */
+    private static void after(int millis, Runnable r) {
+        javafx.animation.PauseTransition t = new javafx.animation.PauseTransition(javafx.util.Duration.millis(millis));
+        t.setOnFinished(e -> r.run());
+        t.play();
     }
 
     private static List<String> part3Views() {
@@ -463,7 +578,7 @@ public final class AppContext {
             overlay().closeTop();
         }
         overlay().closePopover();
-        if (showPart3Capture(id) || showShellCapture(id)) {
+        if (showPart3Capture(id) || showPart4Capture(id) || showShellCapture(id)) {
             return;
         }
         if (id.startsWith("project-") && PROJECT_TABS.contains(id.substring(8))) {
@@ -484,7 +599,7 @@ public final class AppContext {
             }
             case "crash" -> {
                 shell.navigate("home");
-                selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services)));
+                selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services, true)));
             }
             case "home-light", "library-light", "discover-light", "settings-light" -> {
                 LauncherSettings.Appearance light = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,

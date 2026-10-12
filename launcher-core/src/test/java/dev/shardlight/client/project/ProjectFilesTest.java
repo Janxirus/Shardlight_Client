@@ -469,7 +469,34 @@ class ProjectFilesTest {
         ServerStatus s = ServerListService.parseStatus("{\"description\":[{\"translate\":\"multiplayer.status\"},{\"text\":\"§lBold\"}]}");
         assertEquals("multiplayer.statusBold", s.motd());
         assertEquals(-1, s.protocol());
+        assertEquals("multiplayer.statusBold", MotdSpan.plain(s.motdSpans()));
         assertNull(ServerListService.cleanFavicon("data:image/png;base64"));
         assertNull(ServerListService.cleanFavicon(" "));
+    }
+
+    @Test
+    void messageOfTheDayKeepsItsColoursAndStyles() throws Exception {
+        ServerStatus legacy = ServerListService.parseStatus("{\"description\":\"§6Gold §lbold§r plain §cred§n line\\n§aSecond\"}");
+        var spans = legacy.motdSpans();
+        assertEquals("#FFAA00", spans.get(0).colour());
+        assertEquals("Gold ", spans.get(0).text());
+        assertTrue(spans.get(1).bold() && "#FFAA00".equals(spans.get(1).colour()));
+        assertNull(spans.get(2).colour());
+        assertFalse(spans.get(2).bold());
+        assertTrue(spans.get(3).colour().equals("#FF5555") && !spans.get(3).bold());
+        assertTrue(spans.get(4).underlined(), "a format code after a colour keeps the colour");
+        assertEquals("#55FF55", spans.get(spans.size() - 1).colour());
+        assertEquals("Gold bold plain red line\nSecond", MotdSpan.plain(spans));
+
+        ServerStatus json = ServerListService.parseStatus("{\"description\":{\"text\":\"A\",\"color\":\"aqua\",\"bold\":true,"
+            + "\"extra\":[{\"text\":\"B\",\"color\":\"#ff00aa\"},{\"text\":\"C\",\"bold\":false}]}}");
+        var js = json.motdSpans();
+        assertEquals(3, js.size());
+        assertEquals("#55FFFF", js.get(0).colour());
+        assertTrue(js.get(0).bold());
+        assertEquals("#FF00AA", js.get(1).colour());
+        assertTrue(js.get(1).bold(), "children inherit bold");
+        assertFalse(js.get(2).bold());
+        assertEquals("#55FFFF", js.get(2).colour(), "and the colour");
     }
 }

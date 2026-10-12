@@ -452,6 +452,14 @@ public final class UiKit {
         return String.format(I18n.locale(), v >= 100 ? "%.0f %s" : "%.1f %s", v, u[i]);
     }
 
+    /** time left: seconds under a minute, else minutes and hours */
+    public static String eta(long millis) {
+        if (millis < 60_000) {
+            return I18n.tr("ui.duration.seconds", Math.max(1, (millis + 500) / 1000));
+        }
+        return duration(millis);
+    }
+
     public static String duration(long millis) {
         long minutes = millis / 60_000;
         if (minutes < 60) {

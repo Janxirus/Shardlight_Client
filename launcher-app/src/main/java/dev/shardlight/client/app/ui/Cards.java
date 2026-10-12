@@ -27,17 +27,29 @@ public final class Cards {
         card.getStyleClass().add("interactive");
         card.setFocusTraversable(true);
         card.setOnMouseClicked(e -> {
-            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) {
+            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY && !fromButton(e.getTarget(), card)) {
                 open.run();
             }
         });
         card.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
+            if ((e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) && !fromButton(e.getTarget(), card)) {
                 open.run();
                 e.consume();
             }
         });
         return card;
+    }
+
+    /** true when the event started on a button (or a menu) inside {@code card}, which handles it itself */
+    private static boolean fromButton(Object target, Node card) {
+        Node n = target instanceof Node t ? t : null;
+        while (n != null && n != card) {
+            if (n instanceof javafx.scene.control.ButtonBase || n instanceof javafx.scene.control.CheckBox) {
+                return true;
+            }
+            n = n.getParent();
+        }
+        return false;
     }
 
     private static VBox base(String kind) {

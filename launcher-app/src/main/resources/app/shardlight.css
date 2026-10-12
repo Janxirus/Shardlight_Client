@@ -71,6 +71,9 @@
     -sl-art-chip: rgba(8, 10, 16, 0.62);
     -sl-art-chip-hover: rgba(8, 10, 16, 0.80);
     -sl-art-chip-pressed: rgba(8, 10, 16, 0.92);
+    /* a server's message of the day is drawn on the dark panel the game uses, in both light and dark */
+    -sl-motd-bg: #121214;
+    -sl-motd-text: #e8e8ee;
     /* names kept from before the design system */
     -sl-bg-2: -sl-sunken;
     -sl-surface-2: -sl-raised;
@@ -999,7 +1002,12 @@
 }
 .modal.wide { -fx-max-width: 56em; }
 .modal-title { -fx-font-size: 1.429em; -fx-font-weight: bold; }
-.modal-actions { -fx-spacing: 0.571em; -fx-alignment: center-right; }
+.modal-actions { -fx-spacing: 0.571em; -fx-alignment: center; }
+.modal-lost {
+    -fx-background-color: -sl-danger-subtle;
+    -fx-background-radius: 0.714em;
+    -fx-padding: 0.857em;
+}
 
 .device-code {
     -fx-font-size: 2.143em;
@@ -1514,3 +1522,180 @@
 
 /* cards of unequal height line up at the top of their row */
 .preset-grid, .firstrun-cards, .world-grid, .library-grid, .jump-row { -fx-row-valignment: top; }
+
+/* ============================================================ Part 4: Discover, Shardlight, Multiplayer, Downloads, Settings, wizard, dialogs */
+
+/* ---- Discover ---- */
+.discover-search-row { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+.discover-search { -fx-min-height: 3.143em; -fx-font-size: 1.143em; }
+.discover-body { -fx-spacing: 1.143em; -fx-alignment: top-left; }
+.filter-rail { -fx-pref-width: 17em; -fx-min-width: 17em; -fx-max-width: 17em; -fx-spacing: 0.857em; }
+.filter-list { -fx-spacing: 0.571em; }
+.discover-main { -fx-spacing: 0.857em; }
+.discover-results { -fx-spacing: 0.857em; }
+.discover-results .mod-result-card, .discover-result { -fx-pref-width: 20em; -fx-max-width: 100em; -fx-padding: 1.143em; }
+.discover-more { -fx-alignment: center; }
+.split-button { -fx-spacing: 0; -fx-alignment: center; -fx-fill-height: true; }
+.split-button > .split-main { -fx-background-radius: 0.714em 0 0 0.714em, 0.643em 0 0 0.643em; }
+.split-button > .split-arrow {
+    -fx-background-color: -sl-border-strong, -sl-raised;
+    -fx-background-insets: 0, 1 1 1 0;
+    -fx-background-radius: 0 0.714em 0.714em 0, 0 0.643em 0.643em 0;
+    -fx-padding: 0.429em 0.571em;
+}
+.split-button > .split-arrow:hover { -fx-background-color: -sl-border-strong, -sl-fill; }
+.split-button.primary-split > .split-arrow { -fx-background-color: -sl-accent-pressed, -sl-accent; -sl-icon: -sl-accent-text; }
+.split-button.primary-split > .split-arrow:hover { -fx-background-color: -sl-accent-pressed, -sl-accent-hover; }
+.split-button > .split-main.installed { -sl-icon: -sl-success; }
+
+/* ---- a catalog project ---- */
+.catalog-title { -fx-spacing: 1.143em; -fx-alignment: top-left; }
+.catalog-action { -fx-alignment: top-right; }
+.catalog-body { -fx-spacing: 1.714em; -fx-alignment: top-left; }
+.catalog-main { -fx-spacing: 0.571em; }
+.catalog-side { -fx-pref-width: 24em; -fx-min-width: 24em; -fx-max-width: 24em; -fx-spacing: 0.857em; }
+.catalog-description { -fx-max-width: 52em; }
+.gallery-hero {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 1em;
+    -fx-pref-height: 20em; -fx-min-height: 20em; -fx-max-height: 20em;
+    -fx-alignment: center;
+}
+.gallery-hero.empty { -fx-pref-height: 8em; -fx-min-height: 8em; -fx-max-height: 8em; }
+.gallery-thumbs { -fx-spacing: 0.571em; -fx-padding: 0.571em 0 0 0; }
+.gallery-thumb {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 0.571em;
+    -fx-border-color: transparent;
+    -fx-border-radius: 0.571em;
+    -fx-border-width: 2;
+    -fx-cursor: hand;
+    -fx-opacity: 0.75;
+}
+.gallery-thumb:hover { -fx-opacity: 1; }
+.gallery-thumb.selected { -fx-border-color: -sl-accent-fg; -fx-opacity: 1; }
+.gallery-thumb:focus-visible { -fx-border-color: -sl-focus; }
+.plan-row { -fx-spacing: 0.714em; -fx-alignment: center-left; }
+.version-row { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+
+/* ---- Shardlight page ---- */
+.page-intro { -fx-max-width: 52em; }
+.module-grid { -fx-hgap: 1.143em; -fx-vgap: 1.143em; -fx-row-valignment: top; }
+.module-card { -fx-pref-width: 32em; -fx-min-height: 12em; -fx-spacing: 0.857em; }
+.module-head { -fx-spacing: 1.143em; -fx-alignment: top-left; }
+.module-art { -fx-background-color: -sl-sunken; -fx-background-radius: 1em; -fx-padding: 0.286em; }
+.card-foot-row { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.theme-grid { -fx-hgap: 1em; -fx-vgap: 1em; -fx-row-valignment: top; }
+.theme-tile { -fx-pref-width: 12.5em; -fx-spacing: 0.429em; }
+.theme-tile .theme-preview { -fx-pref-height: 7em; -fx-background-color: -sl-sunken; -fx-background-radius: 0.714em; }
+.theme-tile.selected { -fx-background-color: -sl-accent-subtle; }
+
+/* ---- Multiplayer: server cards, message of the day, ping bars ---- */
+.server-list { -fx-spacing: 0.857em; }
+.server-card-row { -fx-spacing: 1.143em; -fx-alignment: center-left; -fx-padding: 1.143em; }
+.server-text { -fx-spacing: 0.286em; }
+.server-stats { -fx-spacing: 0.429em; -fx-alignment: center-right; -fx-min-width: 8em; }
+.server-ping { -fx-spacing: 0.571em; -fx-alignment: center-right; }
+.motd-box {
+    -fx-background-color: -sl-motd-bg;
+    -fx-background-radius: 0.429em;
+    -fx-padding: 0.429em 0.714em;
+}
+.motd { -fx-line-spacing: 0.071em; }
+.motd-text { -fx-font-family: "JetBrains Mono"; -fx-font-size: 0.857em; }
+.ping-bars { -fx-spacing: 0.143em; -fx-alignment: bottom-left; -fx-min-width: 2.286em; }
+.ping-bar { -fx-background-color: -sl-fill-strong; -fx-background-radius: 0.071em; -fx-pref-width: 0.286em; -fx-min-width: 0.286em; }
+.ping-bar.bar-1 { -fx-pref-height: 0.429em; -fx-min-height: 0.429em; }
+.ping-bar.bar-2 { -fx-pref-height: 0.714em; -fx-min-height: 0.714em; }
+.ping-bar.bar-3 { -fx-pref-height: 1em; -fx-min-height: 1em; }
+.ping-bar.bar-4 { -fx-pref-height: 1.286em; -fx-min-height: 1.286em; }
+.ping-bar.bar-5 { -fx-pref-height: 1.571em; -fx-min-height: 1.571em; }
+.ping-bar.on.good { -fx-background-color: -sl-success; }
+.ping-bar.on.fair { -fx-background-color: -sl-warning; }
+.ping-bar.on.poor { -fx-background-color: -sl-danger; }
+.server-offline .ping-bars { -fx-opacity: 0.6; }
+.add-server { -fx-spacing: 1.143em; -fx-pref-width: 32em; }
+.ping-result { -fx-spacing: 0.571em; }
+.ping-result-row { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+
+/* ---- disclosure (collapsed sections) ---- */
+.disclosure { -fx-spacing: 0.286em; }
+.disclosure-header { -fx-alignment: center-left; -fx-content-display: left; -fx-graphic-text-gap: 0.571em; }
+.disclosure-content { -fx-padding: 0.571em 0 0 0; }
+
+/* ---- Downloads ---- */
+.downloads-summary { -fx-padding: 0 0 0.286em 0; }
+.download-hero { -fx-spacing: 1.143em; -fx-padding: 1.429em; }
+.download-hero-top { -fx-spacing: 1.429em; -fx-alignment: center-left; }
+.download-ring { -fx-alignment: center; }
+.progress-ring.large {
+    -fx-min-width: 5.143em; -fx-min-height: 5.143em;
+    -fx-pref-width: 5.143em; -fx-pref-height: 5.143em;
+    -fx-max-width: 5.143em; -fx-max-height: 5.143em;
+}
+.progress-ring.large .ring-track, .progress-ring.large .ring-bar { -fx-stroke-width: 6; }
+.download-title { -fx-spacing: 0.714em; -fx-alignment: center-left; }
+.download-row { -fx-spacing: 0.714em; }
+.download-row-head { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+.download-file-row { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.download-details { -fx-padding: 0.571em 0 0 0; }
+
+/* Settings: search hits, the setting a search jumped to, and the Appearance preview */
+.settings-side { -fx-border-color: transparent; }
+.setting-hit { -fx-cursor: hand; }
+.setting-hit:hover { -fx-background-color: -sl-hover; }
+.setting-found {
+    -fx-background-color: -sl-accent-subtle;
+    -fx-background-radius: 0.714em;
+    -fx-background-insets: 0 -0.571em 0 -0.571em;
+}
+.appearance-preview {
+    -fx-background-color: -sl-bg;
+    -fx-background-radius: 1em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1em;
+    -fx-max-width: 34em;
+}
+.preview-side {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 1em 0 0 1em;
+    -fx-padding: 0.857em;
+    -fx-min-width: 8em;
+}
+.preview-pill {
+    -fx-padding: 0.357em 0.714em;
+    -fx-background-radius: 0.714em;
+    -fx-text-fill: -sl-text-2;
+}
+.preview-pill.selected { -fx-background-color: -sl-accent-subtle; -fx-text-fill: -sl-accent-fg; -fx-font-weight: bold; }
+.preview-main { -fx-padding: 1.143em; }
+.preview-dot {
+    -fx-background-color: -sl-accent;
+    -fx-background-radius: 1em;
+    -fx-min-width: 0.714em; -fx-min-height: 0.714em; -fx-max-width: 0.714em; -fx-max-height: 0.714em;
+}
+
+/* New project wizard */
+.wizard-body { -fx-spacing: 0.857em; }
+.wizard-page { -fx-padding: 0 0.571em 0.571em 0; }
+.template-grid { -fx-hgap: 0.714em; -fx-vgap: 0.714em; }
+.template-card { -fx-pref-width: 24em; -fx-min-height: 7.5em; }
+.download-preview {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 1em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1em;
+    -fx-padding: 0.286em 0.857em;
+}
+.download-preview-row { -fx-padding: 0.571em 0; }
+.download-preview-row.ruled { -fx-border-color: -sl-border transparent transparent transparent; }
+
+/* Crash screen */
+.crash-cause {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 1em;
+    -fx-padding: 1.143em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1em;
+}
+.crash-cause.known { -fx-border-color: -sl-danger; }

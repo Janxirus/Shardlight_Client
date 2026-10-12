@@ -1,11 +1,13 @@
 package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
+import dev.shardlight.client.app.ui.Cards;
 import dev.shardlight.client.app.ui.Dialogs;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Page;
 import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.ToggleSwitch;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.error.LauncherException;
@@ -20,6 +22,8 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -35,23 +39,25 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The optional Shardlight add-ons for one project: pick modules and a theme, apply them (deselected
- * modules are removed from the project), tune performance presets, and manage the local module library.
+ * The optional Shardlight add-ons for one project. The four modules are feature cards with a switch for the
+ * current project, and the fifteen themes are large tiles grouped Classic and New; both apply as soon as you
+ * choose, with an Undo toast. Below them sit the performance presets and the local module library.
  */
 public final class ShardlightPage implements Page {
     private final AppContext ctx;
-    private final VBox root = new VBox(18);
+    private final VBox root = new VBox();
+    private final StackPane view = new StackPane(root);
     private final ComboBox<Project> target = new ComboBox<>();
-    private final Set<String> pending = new LinkedHashSet<>();
-    private String pendingTheme;
     private String loadedFor;
     private PresetPanel presets;
 
     public ShardlightPage(AppContext ctx) {
         this.ctx = ctx;
+        root.getStyleClass().addAll("shardlight-page", "page-column", "stack");
+        StackPane.setAlignment(root, Pos.TOP_CENTER);
         target.setCellFactory(l -> ProjectText.cell(I18n.tr("ui.discover.noProject")));
         target.setButtonCell(ProjectText.cell(I18n.tr("ui.discover.noProject")));
-        target.setPrefWidth(300);
+        target.setPrefWidth(ThemeManager.em(21));
         target.setAccessibleText(I18n.tr("ui.shardlight.project"));
         target.setOnAction(e -> {
             Project p = target.getValue();
@@ -69,13 +75,13 @@ public final class ShardlightPage implements Page {
 
     @Override
     public Region view() {
-        return root;
+        return view;
     }
 
     @Override
     public Node actions() {
-        HBox box = new HBox(8, UiKit.label(I18n.tr("ui.shardlight.project"), "muted"), target);
-        box.setAlignment(Pos.CENTER_LEFT);
+        HBox box = new HBox(UiKit.label(I18n.tr("ui.shardlight.project"), "muted"), target);
+        box.getStyleClass().add("button-row");
         return box;
     }
 
@@ -91,9 +97,6 @@ public final class ShardlightPage implements Page {
 
     private void load(Project p) {
         loadedFor = p.id;
-        pending.clear();
-        pending.addAll(p.shardlightModules);
-        pendingTheme = p.shardlightTheme;
         presets = new PresetPanel(ctx, p.id);
         render();
     }
@@ -109,9 +112,7 @@ public final class ShardlightPage implements Page {
     }
 
     private Node intro() {
-        VBox v = new VBox(6, UiKit.label(I18n.tr("ui.shardlight.intro"), "muted"));
-        v.setMaxWidth(860);
-        return v;
+        return UiKit.label(I18n.tr("ui.shardlight.intro"), "muted", "page-intro");
     }
 
     private void render() {
@@ -128,161 +129,234 @@ public final class ShardlightPage implements Page {
             root.getChildren().add(UiKit.banner("info", I18n.tr("ui.shardlight.needsFabric", p.name, ProjectText.loader(p)),
                 UiKit.button(I18n.tr("ui.shardlight.createProject"), Icons.PLUS, () -> ctx.newProject("shardlight-default"))));
         } else {
-            root.getChildren().addAll(modules(p), themes(p), applyBar(p));
+            root.getChildren().add(modules(p));
+            root.getChildren().addAll(report(p));
+            root.getChildren().add(themes(p));
         }
-        VBox perf = new VBox(10, UiKit.label(I18n.tr("ui.shardlight.performance"), "h2"),
+        VBox perf = new VBox(UiKit.label(I18n.tr("ui.shardlight.performance"), "h2"),
             UiKit.label(I18n.tr("ui.shardlight.performanceIntro"), "muted"), presets.view());
+        perf.getStyleClass().add("stack-tight");
         presets.refresh();
         root.getChildren().addAll(perf, library());
     }
 
+    // ------------------------------------------------------------------ modules
+
     private Node modules(Project p) {
-        FlowPane cards = new FlowPane(12, 12);
+        FlowPane cards = new FlowPane();
+        cards.getStyleClass().add("module-grid");
         var library = ctx.services().shardlightLibrary();
         for (ShardlightModule m : ctx.services().shardlightCatalog().modules()) {
-            ToggleSwitch sw = new ToggleSwitch(pending.contains(m.id()));
-            sw.setAccessibleText(I18n.tr(m.nameKey()));
-            sw.selectedProperty().addListener((o, a, b) -> {
-                if (b) {
-                    pending.add(m.id());
-                } else {
-                    pending.remove(m.id());
-                }
-                render();
-            });
-            Label name = UiKit.label(I18n.tr(m.nameKey()), "h3");
-            HBox head = new HBox(10, name, UiKit.spacer(), sw);
-            head.setAlignment(Pos.CENTER_LEFT);
-            Label desc = UiKit.label(I18n.tr(m.descriptionKey()), "muted", "small");
-            FlowPane chips = new FlowPane(5, 5);
-            boolean installed = p.shardlightModules.contains(m.id());
-            if (installed) {
-                chips.getChildren().add(UiKit.chip(I18n.tr("ui.shardlight.inProject"), "success", Icons.CHECK));
-            }
+            boolean on = p.shardlightModules.contains(m.id());
             Optional<LibraryItem> jar;
             try {
                 jar = library.moduleJar(m.id(), p.minecraftVersion);
             } catch (LauncherException e) {
                 jar = Optional.empty();
             }
-            chips.getChildren().add(jar.isPresent()
-                ? UiKit.chip(I18n.tr("ui.shardlight.ready", jar.get().version()), null, Icons.PACKAGE)
-                : UiKit.chip(I18n.tr("ui.shardlight.notImported"), "warning", Icons.WARNING));
-            VBox card = new VBox(8, head, desc, chips);
-            card.getStyleClass().add("card");
-            if (pending.contains(m.id())) {
-                card.getStyleClass().add("selected");
-            }
-            card.setPrefWidth(300);
-            cards.getChildren().add(card);
+            cards.getChildren().add(moduleCard(p, m, on, jar));
         }
         return UiKit.section(I18n.tr("ui.shardlight.modules"), UiKit.label(I18n.tr("ui.shardlight.modulesHint"), "faint", "small"),
             cards);
     }
 
-    private Node themes(Project p) {
-        if (!pending.contains("ui")) {
-            return UiKit.section(I18n.tr("ui.shardlight.themes"), UiKit.label(I18n.tr("ui.shardlight.themesNeedUi"), "muted"));
-        }
-        FlowPane grid = new FlowPane(10, 10);
-        grid.getChildren().add(swatch(null, I18n.tr("ui.wizard.noTheme"), I18n.tr("ui.shardlight.noThemeHint"), null));
-        for (ShardlightTheme t : ctx.services().shardlightCatalog().themes()) {
-            grid.getChildren().add(swatch(t.id(), t.displayName(), t.packTitle() + (t.classic() ? "  ·  " + I18n.tr("ui.shardlight.classic") : ""),
-                t));
-        }
-        return UiKit.section(I18n.tr("ui.shardlight.themes"), UiKit.label(I18n.tr("ui.shardlight.themesHint"), "faint", "small"), grid);
-    }
+    private Node moduleCard(Project p, ShardlightModule m, boolean on, Optional<LibraryItem> jar) {
+        String name = I18n.tr(m.nameKey());
+        ImageView art = new ImageView(new Image(getClass().getResource("/app/modules/" + m.id() + ".png").toExternalForm(),
+            ThemeManager.em(5.5) * 2, 0, true, true));
+        art.setFitWidth(ThemeManager.em(5.5));
+        art.setFitHeight(ThemeManager.em(5.5));
+        art.setPreserveRatio(true);
+        StackPane artBox = new StackPane(art);
+        artBox.getStyleClass().add("module-art");
+        VBox titles = new VBox(UiKit.label(name, "h3"), UiKit.label(I18n.tr("ui.shardlight.module." + m.id() + ".about"), "muted"));
+        titles.getStyleClass().add("card-head-text");
+        HBox.setHgrow(titles, Priority.ALWAYS);
+        HBox head = new HBox(artBox, titles);
+        head.getStyleClass().add("module-head");
 
-    private Node swatch(String id, String name, String sub, ShardlightTheme t) {
-        StackPane colour = new StackPane();
-        colour.setPrefHeight(52);
-        colour.setMinHeight(52);
-        if (t != null) {
-            colour.setStyle("-fx-background-radius: 0.6em; -fx-background-color: linear-gradient(to bottom right, "
-                + safe(t.panel()) + " 0%, " + safe(t.accent()) + " 70%, " + safe(t.edge()) + " 100%);");
+        FlowPane chips = new FlowPane();
+        chips.getStyleClass().add("chip-row");
+        if (on) {
+            chips.getChildren().add(UiKit.chip(I18n.tr("ui.shardlight.inProject"), "success", Icons.CHECK));
+        }
+        chips.getChildren().add(jar.isPresent()
+            ? UiKit.chip(I18n.tr("ui.shardlight.version", jar.get().version()), null, Icons.PACKAGE)
+            : UiKit.chip(I18n.tr("ui.shardlight.notImported"), "warning", Icons.WARNING));
+
+        ToggleSwitch sw = new ToggleSwitch(on, I18n.tr("ui.shardlight.useIn", name, p.name));
+        Label state = UiKit.label(I18n.tr(on ? "ui.shardlight.on" : "ui.shardlight.off"), "strong");
+        HBox toggle = new HBox(sw, state);
+        toggle.getStyleClass().add("button-row");
+        Node switchNode = toggle;
+        if (jar.isEmpty() && !on) {
+            sw.setDisable(true);
+            switchNode = new HBox(UiKit.button(I18n.tr("ui.shardlight.getModule"), Icons.DOWNLOAD, () -> download(m)));
         } else {
-            colour.getStyleClass().add("icon-box");
-            colour.getChildren().add(Icons.of(Icons.CLOSE, 18));
+            sw.selectedProperty().addListener((o, a, b) -> setModule(p, m, b));
         }
-        VBox box = new VBox(6, colour, UiKit.label(name, "preset-name"), UiKit.label(sub, "faint", "small"));
-        box.getStyleClass().add("theme-swatch");
-        if (Objects.equals(id, pendingTheme)) {
-            box.getStyleClass().add("selected");
+        Button whatsNew = UiKit.button(I18n.tr("ui.shardlight.whatsNew"), Icons.EXTERNAL, () -> ctx.openUrl(releasesUrl(m)), "ghost");
+        UiKit.tooltip(whatsNew, I18n.tr("ui.shardlight.whatsNewTip"));
+        whatsNew.setAccessibleText(I18n.tr("ui.shardlight.whatsNewFor", name));
+        HBox foot = new HBox(switchNode, UiKit.spacer(), whatsNew);
+        foot.getStyleClass().add("card-foot-row");
+        VBox card = new VBox(head, chips, foot);
+        card.getStyleClass().addAll("card", "module-card");
+        if (on) {
+            card.getStyleClass().add("selected");
         }
-        box.setFocusTraversable(true);
-        box.setAccessibleText(name + ". " + sub);
-        Runnable pick = () -> {
-            pendingTheme = id;
-            render();
-        };
-        box.setOnMouseClicked(e -> pick.run());
-        box.setOnKeyPressed(e -> {
-            if (e.getCode() == javafx.scene.input.KeyCode.ENTER || e.getCode() == javafx.scene.input.KeyCode.SPACE) {
-                pick.run();
-            }
-        });
-        if (t != null && t.description() != null) {
-            UiKit.tooltip(box, t.description());
-        }
-        return box;
+        return card;
     }
 
-    private static String safe(String hex) {
-        return hex != null && hex.matches("#[0-9a-fA-F]{6}") ? hex : "#444444";
+    private static String releasesUrl(ShardlightModule m) {
+        String page = m.pageUrl() == null ? "https://github.com/Janxirus" : m.pageUrl();
+        return page.endsWith("/") ? page + "releases" : page + "/releases";
     }
 
-    private Node applyBar(Project p) {
-        boolean changed = !pending.equals(new LinkedHashSet<>(p.shardlightModules)) || !Objects.equals(pendingTheme, p.shardlightTheme)
-            || pending.stream().anyMatch(m -> p.content.stream().noneMatch(e -> e.source.name().equals("SHARDLIGHT")
-            && m.equals(e.projectId)));
-        VBox box = new VBox(8);
-        box.getStyleClass().add("card");
+    private void download(ShardlightModule m) {
+        var lib = ctx.services().shardlightLibrary();
+        Tasks.withProgress(ctx.overlay(), I18n.tr("ui.shardlight.downloading", I18n.tr(m.nameKey())), true,
+            (pr, c) -> lib.downloadLatestRelease(m.id(), pr, c), item -> {
+                ctx.overlay().toast(item.isPresent() ? "success" : "info", item.map(i -> I18n.tr("ui.shardlight.downloaded", i.version()))
+                    .orElse(I18n.tr("ui.shardlight.nothingNew")));
+                render();
+            });
+    }
+
+    /** problems and notes about the project's current set of modules */
+    private List<Node> report(Project p) {
+        List<Node> out = new java.util.ArrayList<>();
         try {
-            var report = ctx.services().shardlight().check(p, Set.copyOf(pending));
-            for (var e : report.errors()) {
-                box.getChildren().add(UiKit.banner("danger", e.text()));
+            var r = ctx.services().shardlight().check(p, Set.copyOf(p.shardlightModules));
+            for (var e : r.errors()) {
+                out.add(UiKit.banner("danger", e.text()));
             }
-            for (var w : report.warnings()) {
-                box.getChildren().add(UiKit.banner("warning", w.text()));
-            }
-            for (var i : report.infos()) {
-                box.getChildren().add(UiKit.label("• " + i.text(), "muted", "small"));
+            for (var w : r.warnings()) {
+                out.add(UiKit.banner("warning", w.text()));
             }
         } catch (Exception e) {
-            box.getChildren().add(UiKit.banner("danger", Tasks.message(e)));
+            out.add(UiKit.banner("danger", Tasks.message(e)));
         }
-        Label summary = UiKit.label(pending.isEmpty() ? I18n.tr("ui.shardlight.applyNone")
-            : I18n.tr("ui.shardlight.applySome", String.join(", ", pending.stream().map(m -> I18n.tr("ui.shardlight.module." + m)).toList())),
-            "muted");
-        HBox.setHgrow(summary, Priority.ALWAYS);
-        Button apply = UiKit.primary(I18n.tr("ui.shardlight.apply"), Icons.CHECK, () -> apply(p));
-        apply.setDisable(!changed);
-        Button reset = UiKit.button(I18n.tr("ui.shardlight.undoChanges"), null, () -> load(p));
-        reset.setDisable(!changed);
-        HBox row = new HBox(10, summary, reset, apply);
-        row.setAlignment(Pos.CENTER_LEFT);
-        box.getChildren().addAll(row, UiKit.label(I18n.tr("ui.shardlight.applyHint"), "faint", "small"));
-        return box;
+        return out;
     }
 
-    private void apply(Project p) {
-        Set<String> chosen = Set.copyOf(pending);
-        String theme = chosen.contains("ui") ? pendingTheme : null;
-        if (ctx.play().isRunning(p.id)) {
-            ctx.overlay().message(I18n.tr("ui.shardlight.apply"), I18n.tr("ui.project.closeGameFirst"));
+    private void setModule(Project p, ShardlightModule m, boolean enable) {
+        Set<String> before = new LinkedHashSet<>(p.shardlightModules);
+        Set<String> next = new LinkedHashSet<>(before);
+        if (enable) {
+            next.add(m.id());
+        } else {
+            next.remove(m.id());
+        }
+        try {
+            var r = ctx.services().shardlight().check(p, Set.copyOf(next));
+            if (!r.errors().isEmpty()) {
+                ctx.overlay().message(I18n.tr("ui.shardlight.cantUse", I18n.tr(m.nameKey())),
+                    String.join("\n", r.errors().stream().map(e -> e.text()).toList()));
+                render();
+                return;
+            }
+        } catch (Exception e) {
+            Tasks.showError(ctx.overlay(), I18n.tr(m.nameKey()), e);
+            render();
             return;
         }
+        String theme = next.contains("ui") ? p.shardlightTheme : null;
+        applyNow(p, next, theme, before, p.shardlightTheme,
+            I18n.tr(enable ? "ui.shardlight.turnedOn" : "ui.shardlight.turnedOff", I18n.tr(m.nameKey()), p.name));
+    }
+
+    // ------------------------------------------------------------------ themes
+
+    private Node themes(Project p) {
+        if (!p.shardlightModules.contains("ui")) {
+            return UiKit.section(I18n.tr("ui.shardlight.themes"), UiKit.label(I18n.tr("ui.shardlight.themesNeedUi"), "muted"));
+        }
+        List<ShardlightTheme> all = ctx.services().shardlightCatalog().themes();
+        FlowPane classic = new FlowPane();
+        classic.getStyleClass().add("theme-grid");
+        classic.getChildren().add(themeTile(p, null, I18n.tr("ui.wizard.noTheme"), I18n.tr("ui.shardlight.noThemeHint"), null));
+        FlowPane fresh = new FlowPane();
+        fresh.getStyleClass().add("theme-grid");
+        for (ShardlightTheme t : all) {
+            (t.classic() ? classic : fresh).getChildren().add(themeTile(p, t.id(), t.displayName(), t.packTitle(), t));
+        }
+        VBox box = new VBox(UiKit.label(I18n.tr("ui.shardlight.classicThemes"), "h3"), classic,
+            UiKit.label(I18n.tr("ui.shardlight.newThemes"), "h3"), fresh);
+        box.getStyleClass().add("stack");
+        return UiKit.section(I18n.tr("ui.shardlight.themes"), UiKit.label(I18n.tr("ui.shardlight.themesHint"), "faint", "small"), box);
+    }
+
+    private Node themeTile(Project p, String id, String name, String sub, ShardlightTheme t) {
+        Node picture;
+        if (t != null) {
+            Image logo = new Image(getClass().getResource("/app/themes/" + t.id().toLowerCase(java.util.Locale.ROOT) + ".png")
+                .toExternalForm(), ThemeManager.em(5) * 2, 0, true, false);
+            ImageView v = new ImageView(logo);
+            v.setFitWidth(ThemeManager.em(5));
+            v.setFitHeight(ThemeManager.em(5));
+            v.setPreserveRatio(true);
+            v.setSmooth(false);
+            picture = v;
+        } else {
+            picture = Icons.of(Icons.SPARKLE, 32);
+            picture.getStyleClass().add("faint");
+        }
+        boolean selected = Objects.equals(id, p.shardlightTheme);
+        VBox card = Cards.theme(name, picture, selected);
+        card.getStyleClass().add("theme-tile");
+        card.getChildren().add(UiKit.label(sub, "faint", "small"));
+        card.setAccessibleText(name + ", " + sub + (selected ? ", " + I18n.tr("ui.shardlight.selected") : ""));
+        if (t != null && t.description() != null) {
+            UiKit.tooltip(card, t.description());
+        }
+        Cards.onOpen(card, () -> {
+            if (!selected) {
+                setTheme(p, id, name);
+            }
+        });
+        return card;
+    }
+
+    private void setTheme(Project p, String id, String name) {
+        applyNow(p, new LinkedHashSet<>(p.shardlightModules), id, new LinkedHashSet<>(p.shardlightModules), p.shardlightTheme,
+            I18n.tr("ui.shardlight.themeApplied", name, p.name));
+    }
+
+    // ------------------------------------------------------------------ applying
+
+    /** apply at once; the toast offers Undo, which applies the previous modules and theme the same way */
+    private void applyNow(Project p, Set<String> modules, String theme, Set<String> undoModules, String undoTheme, String doneText) {
+        if (ctx.play().isRunning(p.id)) {
+            ctx.overlay().message(I18n.tr("ui.shardlight.changeBlocked"), I18n.tr("ui.project.closeGameFirst"));
+            render();
+            return;
+        }
+        Set<String> chosen = Set.copyOf(modules);
         Tasks.withProgress(ctx.overlay(), I18n.tr("ui.shardlight.applying", p.name), true,
             (pr, c) -> ctx.services().setup().applyShardlight(p, chosen, theme, pr, c), outcome -> {
-                var r = outcome.result();
-                ctx.overlay().toast("success", I18n.tr("ui.shardlight.applied", r.added().size(), r.removed().size()));
                 if (!outcome.installedDependencies().isEmpty()) {
                     ctx.overlay().toast("info", I18n.tr("ui.shardlight.depsInstalled", String.join(", ", outcome.installedDependencies())));
                 }
                 for (String w : outcome.warnings()) {
                     ctx.overlay().toast("warning", w);
                 }
+                ctx.overlay().undo(doneText, () -> {
+                    Set<String> back = Set.copyOf(undoModules);
+                    Tasks.withProgress(ctx.overlay(), I18n.tr("ui.shardlight.applying", p.name), true,
+                        (pr2, c2) -> ctx.services().setup().applyShardlight(p, back, back.contains("ui") ? undoTheme : null, pr2, c2),
+                        o2 -> {
+                            ctx.projectsChanged();
+                            ctx.services().projects().get(p.id).ifPresent(this::load);
+                        }, err -> {
+                            Tasks.showError(ctx.overlay(), p.name, err);
+                            ctx.services().projects().get(p.id).ifPresent(this::load);
+                        });
+                });
                 ctx.projectsChanged();
+                ctx.services().projects().get(p.id).ifPresent(this::load);
+            }, err -> {
+                Tasks.showError(ctx.overlay(), p.name, err);
                 ctx.services().projects().get(p.id).ifPresent(this::load);
             });
     }
@@ -290,7 +364,8 @@ public final class ShardlightPage implements Page {
     // ------------------------------------------------------------------ library
 
     private Node library() {
-        VBox box = new VBox(10);
+        VBox box = new VBox();
+        box.getStyleClass().add("stack-tight");
         var lib = ctx.services().shardlightLibrary();
         List<LibraryItem> items;
         try {
@@ -302,7 +377,8 @@ public final class ShardlightPage implements Page {
         Button importFiles = UiKit.primary(I18n.tr("ui.shardlight.import"), Icons.ARCHIVE, this::importFiles);
         Button folder = UiKit.iconButton(Icons.FOLDER, I18n.tr("ui.library.openFolder"),
             () -> ctx.openFolder(ctx.services().paths().content()));
-        FlowPane downloads = new FlowPane(8, 8);
+        FlowPane downloads = new FlowPane();
+        downloads.getStyleClass().add("button-row");
         for (ShardlightModule m : ctx.services().shardlightCatalog().modules()) {
             downloads.getChildren().add(UiKit.button(I18n.tr("ui.shardlight.downloadLatest", I18n.tr(m.nameKey())), Icons.DOWNLOAD,
                 () -> Tasks.withProgress(ctx.overlay(), I18n.tr("ui.shardlight.downloading", I18n.tr(m.nameKey())), true,
@@ -312,8 +388,8 @@ public final class ShardlightPage implements Page {
                         render();
                     })));
         }
-        HBox bar = new HBox(8, importFiles, UiKit.spacer(), folder);
-        bar.setAlignment(Pos.CENTER_LEFT);
+        HBox bar = new HBox(importFiles, UiKit.spacer(), folder);
+        bar.getStyleClass().add("button-row");
         box.getChildren().addAll(UiKit.label(I18n.tr("ui.shardlight.libraryTitle"), "h2"),
             UiKit.label(I18n.tr("ui.shardlight.libraryIntro"), "muted"), bar, downloads);
         if (items.isEmpty()) {
@@ -323,7 +399,8 @@ public final class ShardlightPage implements Page {
             Label name = UiKit.label(itemName(i), "project-name");
             Label sub = UiKit.label(I18n.tr("ui.shardlight.itemRow", i.version() == null ? "-" : i.version(), UiKit.bytes(i.size()),
                 ProjectText.ago(i.importedAt())), "faint", "small");
-            VBox text = new VBox(2, name, sub);
+            VBox text = new VBox(name, sub);
+            text.getStyleClass().add("row-text");
             HBox.setHgrow(text, Priority.ALWAYS);
             Button remove = UiKit.iconButton(Icons.TRASH, I18n.tr("ui.shardlight.removeItem"), () -> ctx.overlay().confirm(
                 I18n.tr("ui.shardlight.removeItemTitle"), I18n.tr("ui.shardlight.removeItemMessage", itemName(i)), List.of(),
@@ -331,10 +408,9 @@ public final class ShardlightPage implements Page {
                     lib.remove(i.id());
                     return true;
                 }, x -> render())));
-            HBox row = new HBox(10, UiKit.iconBox(Icons.of("module".equals(i.kind()) ? Icons.PACKAGE : Icons.PALETTE, 16), 34), text,
+            HBox row = new HBox(UiKit.iconBox(Icons.of("module".equals(i.kind()) ? Icons.PACKAGE : Icons.PALETTE, 16), 34), text,
                 remove);
-            row.setAlignment(Pos.CENTER_LEFT);
-            row.getStyleClass().addAll("card", "flat");
+            row.getStyleClass().addAll("card", "flat", "library-row");
             box.getChildren().add(row);
         }
         return box;

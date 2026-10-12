@@ -108,7 +108,7 @@ public final class SignInDialog {
     }
 
     private void setActions(Node... nodes) {
-        actions.getChildren().setAll(nodes);
+        Overlay.fillActions(actions, nodes);
     }
 
     private void gettingCode() {

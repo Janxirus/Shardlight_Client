@@ -18,6 +18,7 @@ public final class LauncherSettings {
     public Downloads downloads = new Downloads();
     public JavaDefaults java = new JavaDefaults();
     public Privacy privacy = new Privacy();
+    public Performance performance = new Performance();
     public Catalog catalog = new Catalog();
     public Auth auth = new Auth();
     public Updates updates = new Updates();
@@ -69,6 +70,11 @@ public final class LauncherSettings {
         public int minMemoryMb = 512;
         /** prefer Mojang's runtime for each version (recommended) */
         public boolean preferMojangRuntime = true;
+    }
+
+    public static final class Performance {
+        /** the {@code Preset} a new project starts with when its template does not pick one (enum name) */
+        public String defaultPreset = "BALANCED";
     }
 
     public static final class Privacy {
