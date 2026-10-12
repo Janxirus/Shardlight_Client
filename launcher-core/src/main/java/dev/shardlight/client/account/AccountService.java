@@ -552,8 +552,8 @@ public final class AccountService {
             try {
                 readOnly = MIGRATOR.isNewer(o);
                 migrated = MIGRATOR.migrate(o);
-            } catch (NumberFormatException | UnsupportedOperationException | IllegalStateException e) {
-                // a schemaVersion that isn't a number
+            } catch (JsonParseException | NumberFormatException | UnsupportedOperationException | IllegalStateException e) {
+                // a schemaVersion that isn't a whole number
                 readOnly = false;
                 setAside();
                 return;

@@ -144,7 +144,7 @@ class SettingsServiceTest {
     @Test
     void unreadableFilesAreMovedAsideAndDefaultsUsed() throws Exception {
         for (String broken : new String[] {"{ this is not json", "", "[1, 2, 3]", "\"just a string\"",
-            "{\"downloads\": \"six\"}", "{\"recentProjects\": {\"a\": 1}}"}) {
+            "{\"downloads\": \"six\"}", "{\"recentProjects\": {\"a\": 1}}", "{\"schemaVersion\": \"one\"}"}) {
             write(broken);
             SettingsService s = new SettingsService(paths());
             assertNotNull(s.recoveredFrom(), "recovered from: " + broken);
@@ -155,12 +155,12 @@ class SettingsServiceTest {
             s.update(v -> v.firstRunDone = true);
             assertTrue(new SettingsService(paths()).get().firstRunDone, "a fresh file is written on the next change");
         }
-        assertEquals(6, asideFiles("settings.json.corrupt-").size(), "each broken file is kept under its own name");
+        assertEquals(7, asideFiles("settings.json.corrupt-").size(), "each broken file is kept under its own name");
     }
 
     @Test
     void oddValuesInAReadableFileFallBackToDefaults() throws Exception {
-        write("{\"schemaVersion\": \"one\", \"appearance\": {\"theme\": null, \"accent\": null, \"scale\": NaN},"
+        write("{\"appearance\": {\"theme\": null, \"accent\": null, \"scale\": NaN},"
             + " \"catalog\": {\"defaultSource\": null}, \"updates\": {\"channel\": null},"
             + " \"auth\": {\"microsoftClientId\": null}, \"recentProjects\": [\"a\", null, \"b\"],"
             + " \"java\": null}");
@@ -175,7 +175,6 @@ class SettingsServiceTest {
         assertEquals("", v.auth.microsoftClientId);
         assertEquals(List.of("a", "b"), v.recentProjects);
         assertEquals(4096, v.java.maxMemoryMb);
-        assertEquals(LauncherSettings.SCHEMA_VERSION, onDisk().get("schemaVersion").getAsInt(),
-            "a non-numeric version is treated as unversioned and migrated");
+        assertEquals(LauncherSettings.SCHEMA_VERSION, onDisk().get("schemaVersion").getAsInt(), "migrated");
     }
 }

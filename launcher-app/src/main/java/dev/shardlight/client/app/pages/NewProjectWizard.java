@@ -378,7 +378,8 @@ public final class NewProjectWizard {
                     return;
                 }
                 setText(v.id());
-                setGraphic(v.isRelease() ? null : UiKit.chip(I18n.tr("ui.wizard.snapshot"), "warning"));
+                setGraphic(v.isRelease() ? null
+                    : UiKit.chip(I18n.tr(v.isSnapshot() ? "ui.wizard.snapshot" : "ui.wizard.oldVersion"), "warning"));
                 setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
             }
         });

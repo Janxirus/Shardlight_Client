@@ -1,6 +1,7 @@
 package dev.shardlight.client.storage;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import dev.shardlight.client.util.OsInfo;
 import org.junit.jupiter.api.AfterEach;
@@ -14,6 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StorageTest {
@@ -108,13 +110,15 @@ class StorageTest {
     }
 
     @Test
-    void oddVersionValuesCountAsUnversioned() {
-        for (String json : new String[] {"{}", "{\"schemaVersion\": \"two\"}", "{\"schemaVersion\": null}",
-            "{\"schemaVersion\": [1]}", "{\"schemaVersion\": 1.5}", "{\"schemaVersion\": -3}",
-            "{\"schemaVersion\": 99999999999}", "{\"schemaVersion\": true}"}) {
-            assertEquals(0, JsonMigrator.versionOf(JsonParser.parseString(json).getAsJsonObject()), json);
+    void versionValuesAreWholeNumbersOrTheFileIsUnreadable() {
+        assertEquals(0, JsonMigrator.versionOf(JsonParser.parseString("{}").getAsJsonObject()));
+        assertEquals(0, JsonMigrator.versionOf(JsonParser.parseString("{\"schemaVersion\": null}").getAsJsonObject()));
+        for (String ok : new String[] {"2", "2.0", "\"2\""}) {
+            assertEquals(2, JsonMigrator.versionOf(JsonParser.parseString("{\"schemaVersion\": " + ok + "}").getAsJsonObject()), ok);
         }
-        assertEquals(2, JsonMigrator.versionOf(JsonParser.parseString("{\"schemaVersion\": 2}").getAsJsonObject()));
-        assertEquals(2, JsonMigrator.versionOf(JsonParser.parseString("{\"schemaVersion\": 2.0}").getAsJsonObject()));
+        for (String bad : new String[] {"\"two\"", "[1]", "{}", "1.5", "-3", "99999999999", "true"}) {
+            JsonObject o = JsonParser.parseString("{\"schemaVersion\": " + bad + "}").getAsJsonObject();
+            assertThrows(JsonParseException.class, () -> JsonMigrator.versionOf(o), bad);
+        }
     }
 }

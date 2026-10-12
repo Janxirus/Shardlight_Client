@@ -89,7 +89,7 @@ The launcher looks for the client ID in this order and uses the first one it fin
 | **Settings > Accounts** in the app | paste the client ID; it is saved in `settings.json` as `auth.microsoftClientId` |
 | `settings.json` | `"auth": { "microsoftClientId": "4f2b1a9c-..." }` in the data folder (see below) |
 | Build default: system property | `-Dshardlight.msaClientId=4f2b1a9c-...`, for example through jpackage `--java-options` |
-| Build default: bundled properties | a line `shardlight.msaClientId=4f2b1a9c-...` in `launcher-core/src/main/resources/shardlight-client-build.properties` before building |
+| Build default: baked into the build | `-Pshardlight.msaClientId=4f2b1a9c-...` on the Gradle command line, or the `SHARDLIGHT_MSA_CLIENT_ID` environment variable (in CI, the Actions variable of that name; see [RELEASING.md](RELEASING.md)) |
 
 The setting is read every time sign-in starts, so a change takes effect without a restart.
 `MicrosoftClientIds.looksValid` checks that a typed value has the shape of a GUID.

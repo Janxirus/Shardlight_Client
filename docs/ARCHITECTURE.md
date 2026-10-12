@@ -23,6 +23,7 @@ launcher-core   every service and model; no UI code; unit-tested with JUnit 5
 launcher-app    the JavaFX desktop shell (pages, dialogs, theme), talks to core only through LauncherServices
 schemas/        versioned JSON contracts shared with the Shardlight mods (preset bridge)
 packaging/      icons, portable start scripts, installer resources
+tools/          icon generator, update manifest signing (tools/release/update_manifest.py)
 ```
 
 Packages in `launcher-core` (`dev.shardlight.client.*`):
@@ -59,8 +60,10 @@ deleted by an uninstall).
 
 - **Errors**: throw `LauncherException(ErrorCode, messageKey, args...)`. The key is in an i18n bundle; the
   UI shows `userMessage()`. Never show raw exception text to users.
-- **Strings**: every user-visible string is a key in `launcher-core/src/main/resources/i18n/<area>.properties`.
-  Areas: `common`, `install`, `auth`, `project`, `content`, `shardlight`, `ui`. Each area owns its file.
+- **Strings**: every user-visible string is a key in an i18n bundle. Services use
+  `launcher-core/src/main/resources/i18n/<area>.properties` (one file per area, such as `install`, `auth`,
+  `project`, `content`, `shardlight`); the app's own strings are in
+  `launcher-app/src/main/resources/i18n/ui.properties`. Values are `MessageFormat` patterns.
 - **Files**: write with `AtomicFiles` (temp file + fsync + atomic move); read JSON with corruption recovery.
   Paths from outside (archives, manifests, catalog file names, user names) go through `PathSafety`.
 - **Network**: only through `HttpService` (HTTPS only, User-Agent, retries, rate limits) and

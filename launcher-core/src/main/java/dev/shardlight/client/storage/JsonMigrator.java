@@ -2,6 +2,7 @@ package dev.shardlight.client.storage;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -35,17 +36,26 @@ public final class JsonMigrator {
         return this;
     }
 
-    /** the document's {@code schemaVersion}; 0 when it is missing or not a whole number */
+    /**
+     * The document's {@code schemaVersion}, 0 when it has none. Throws {@link JsonParseException} when the
+     * value isn't a whole number of zero or more, so callers treat the file as unreadable.
+     */
     public static int versionOf(JsonObject o) {
         JsonElement v = o.get("schemaVersion");
-        if (v == null || !v.isJsonPrimitive() || !v.getAsJsonPrimitive().isNumber()) {
+        if (v == null || v.isJsonNull()) {
             return 0;
         }
-        try {
-            return Math.max(0, new BigDecimal(v.getAsString()).intValueExact());
-        } catch (NumberFormatException | ArithmeticException e) {
-            return 0;
+        if (v.isJsonPrimitive() && !v.getAsJsonPrimitive().isBoolean()) {
+            try {
+                int n = new BigDecimal(v.getAsString().trim()).intValueExact();
+                if (n >= 0) {
+                    return n;
+                }
+            } catch (NumberFormatException | ArithmeticException e) {
+                // reported below
+            }
         }
+        throw new JsonParseException("schemaVersion is not a whole number: " + v);
     }
 
     /** true when the document was written by a newer launcher */
