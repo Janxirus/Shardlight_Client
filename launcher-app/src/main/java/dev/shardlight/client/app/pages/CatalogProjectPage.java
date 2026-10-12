@@ -296,8 +296,8 @@ public final class CatalogProjectPage implements Page {
             }
             preview.getChildren().setAll(UiKit.label(I18n.tr("ui.catalog.previewVersion", got.version().versionNumber(), t.name),
                 "muted", "small"));
-            preview.getChildren().add(CatalogInstall.files(got.plan()));
             preview.getChildren().addAll(CatalogInstall.issues(got.plan()));
+            preview.getChildren().add(CatalogInstall.files(got.plan()));
         }, err -> {
             if (token.isCancelled() || Tasks.isCancelled(err)) {
                 return;

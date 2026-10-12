@@ -117,17 +117,23 @@ public final class CatalogInstall {
         rows.getStyleClass().add("stack-tight");
         for (PlannedFile f : plan.files()) {
             total += Math.max(0, f.file().size());
-            Label title = UiKit.label(f.title() + "  " + f.version().versionNumber(), "project-name");
+            HBox title = new HBox(UiKit.label(f.title() + "  " + f.version().versionNumber(), "project-name"));
+            title.getStyleClass().add("card-title-row");
+            if (f.dependency()) {
+                title.getChildren().add(UiKit.chip(I18n.tr("ui.install.dependency"), "info"));
+            }
             Label sub = UiKit.label(f.file().fileName() + "  ·  " + UiKit.bytes(f.file().size())
                 + (f.dependency() ? "  ·  " + I18n.tr("ui.install.requiredBy", f.requiredBy()) : ""), "faint", "small");
             VBox t = new VBox(title, sub);
             t.getStyleClass().add("row-text");
             HBox.setHgrow(t, Priority.ALWAYS);
             HBox row = new HBox(UiKit.iconBox(Icons.of(f.dependency() ? Icons.PACKAGE : Icons.DOWNLOAD, 16), 32), t);
-            row.getStyleClass().add("plan-row");
+            row.getStyleClass().addAll("card", "flat", "plan-row");
             rows.getChildren().add(row);
         }
-        box.getChildren().addAll(UiKit.label(I18n.tr("ui.install.willDownload", plan.files().size(), UiKit.bytes(total)), "h3"), rows);
+        HBox head = new HBox(UiKit.label(I18n.tr("ui.install.willDownload", plan.files().size(), UiKit.bytes(total)), "h3"));
+        head.getStyleClass().add("card-title-row");
+        box.getChildren().addAll(head, rows);
         return box;
     }
 
@@ -159,14 +165,15 @@ public final class CatalogInstall {
     private static void showPlan(AppContext ctx, CatalogProvider provider, CatalogProject item, Project target,
                                  CatalogVersion version, InstallPlan plan, boolean overridden, Runnable after,
                                  Runnable release) {
-        VBox body = new VBox(10);
+        VBox body = new VBox();
+        body.getStyleClass().add("stack-tight");
         body.setPrefWidth(640);
         body.getChildren().add(UiKit.label(I18n.tr("ui.install.into", target.name, target.minecraftVersion,
             target.loader.isVanilla() ? I18n.tr("ui.project.vanilla") : target.loader.type.displayName()), "muted"));
-        body.getChildren().add(files(plan));
         boolean anyOverridable = plan.issues().stream()
             .anyMatch(i -> i.overridable() && i.severity() == dev.shardlight.client.catalog.Severity.ERROR);
         body.getChildren().addAll(issues(plan));
+        body.getChildren().add(files(plan));
         boolean restricted = plan.files().stream().map(PlannedFile::file).anyMatch(CatalogFile::distributionRestricted)
             || plan.issues().stream().anyMatch(i -> i.messageKey().contains("restricted"));
         body.getChildren().add(UiKit.label(I18n.tr("ui.install.disclaimer"), "faint", "small"));

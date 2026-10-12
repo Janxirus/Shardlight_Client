@@ -104,6 +104,35 @@ public final class CrashScreen {
         close.setOnAction(e -> dialog[0].close());
     }
 
+    /**
+     * The findings of a log or crash report analysis, most serious first: a likely cause with its fix button, then
+     * the other findings, each with the tab that fixes it. Findings that are only notes are listed without a cause.
+     */
+    public static VBox analysis(AppContext ctx, Project project, List<Finding> found, Overlay.Dialog[] dialog) {
+        List<Finding> findings = new ArrayList<>(found);
+        findings.sort((a, b) -> b.severity().compareTo(a.severity()));
+        Finding likely = findings.isEmpty() || findings.get(0).severity() == Severity.INFO ? null : findings.get(0);
+        VBox body = new VBox(14);
+        body.setPrefWidth(620);
+        if (likely != null) {
+            VBox cause = new VBox(8);
+            cause.getStyleClass().addAll("crash-cause", "known");
+            cause.getChildren().addAll(UiKit.label(I18n.tr("ui.crash.likely"), "eyebrow"), finding(likely),
+                fixButton(ctx, project, likely, dialog, true));
+            body.getChildren().add(cause);
+        }
+        VBox list = new VBox(10);
+        for (Finding f : findings) {
+            if (f != likely) {
+                list.getChildren().addAll(finding(f), fixButton(ctx, project, f, dialog, false));
+            }
+        }
+        if (!list.getChildren().isEmpty()) {
+            body.getChildren().add(likely == null ? list : new Disclosure(I18n.tr("ui.crash.others", findings.size() - 1), true, list));
+        }
+        return body;
+    }
+
     /** a cause: a short title and what it means, in the analysis' own words */
     private static Node finding(Finding f) {
         Object[] args = f.argArray();

@@ -1,6 +1,7 @@
 package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
+import dev.shardlight.client.app.flows.CrashScreen;
 import dev.shardlight.client.app.flows.PlayFlow;
 import dev.shardlight.client.app.ui.Fields;
 import dev.shardlight.client.app.ui.Fx;
@@ -10,11 +11,11 @@ import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
 import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
-import dev.shardlight.client.diagnostics.Finding;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.log.Redactor;
 import dev.shardlight.client.project.Project;
 import javafx.application.Platform;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -228,21 +229,17 @@ final class LogsTab {
 
     private void analyze(Path file) {
         Tasks.quiet(ctx.overlay(), () -> ctx.services().crashAnalyzer().analyze(file), findings -> {
-            VBox body = new VBox();
-            body.getStyleClass().addAll("stack-tight", "analysis");
-            if (findings.isEmpty()) {
-                body.getChildren().add(UiKit.label(I18n.tr("ui.logs.nothingFound"), "muted"));
-            }
-            for (Finding f : findings) {
-                Object[] args = f.args() == null ? new Object[0] : f.args().toArray();
-                VBox text = new VBox(UiKit.label(I18n.tr(f.titleKey(), args), "h3"),
-                    UiKit.label(I18n.tr(f.detailKey(), args), "muted"));
-                body.getChildren().add(UiKit.banner(f.severity().name().equals("ERROR") ? "danger"
-                    : f.severity().name().equals("WARNING") ? "warning" : "info", text));
-            }
             Button ok = UiKit.primary(I18n.tr("common.close"), null, () -> { });
-            var d = ctx.overlay().show(Overlay.modal(I18n.tr("ui.logs.analysisTitle", file.getFileName()), body, ok), true, true);
-            ok.setOnAction(e -> d.close());
+            Overlay.Dialog[] dialog = new Overlay.Dialog[1];
+            Node body;
+            Optional<Project> found = project();
+            if (findings.isEmpty() || found.isEmpty()) {
+                body = UiKit.banner("success", I18n.tr("ui.logs.nothingFound"));
+            } else {
+                body = CrashScreen.analysis(ctx, found.get(), findings, dialog);
+            }
+            dialog[0] = ctx.overlay().show(Overlay.modal(I18n.tr("ui.logs.analysisTitle", file.getFileName()), body, ok), true, true);
+            ok.setOnAction(e -> dialog[0].close());
         });
     }
 

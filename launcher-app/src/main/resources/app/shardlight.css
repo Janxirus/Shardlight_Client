@@ -1575,7 +1575,7 @@
 .gallery-thumb:hover { -fx-opacity: 1; }
 .gallery-thumb.selected { -fx-border-color: -sl-accent-fg; -fx-opacity: 1; }
 .gallery-thumb:focus-visible { -fx-border-color: -sl-focus; }
-.plan-row { -fx-spacing: 0.714em; -fx-alignment: center-left; }
+.plan-row { -fx-spacing: 0.714em; -fx-alignment: center-left; -fx-padding: 0.571em 0.857em; }
 .version-row { -fx-spacing: 0.857em; -fx-alignment: center-left; }
 
 /* ---- Shardlight page ---- */
