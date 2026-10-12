@@ -1,7 +1,9 @@
 package dev.shardlight.client.storage;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -33,8 +35,17 @@ public final class JsonMigrator {
         return this;
     }
 
+    /** the document's {@code schemaVersion}; 0 when it is missing or not a whole number */
     public static int versionOf(JsonObject o) {
-        return o.has("schemaVersion") && o.get("schemaVersion").isJsonPrimitive() ? o.get("schemaVersion").getAsInt() : 0;
+        JsonElement v = o.get("schemaVersion");
+        if (v == null || !v.isJsonPrimitive() || !v.getAsJsonPrimitive().isNumber()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, new BigDecimal(v.getAsString()).intValueExact());
+        } catch (NumberFormatException | ArithmeticException e) {
+            return 0;
+        }
     }
 
     /** true when the document was written by a newer launcher */

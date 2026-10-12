@@ -2,6 +2,7 @@ package dev.shardlight.client.update;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import dev.shardlight.client.BuildInfo;
 import dev.shardlight.client.error.ErrorCode;
 import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.i18n.I18n;
@@ -344,12 +345,15 @@ class UpdateServiceTest {
     }
 
     @Test
-    void productionBuildHasNoKeyYet() throws Exception {
+    void bundledConfigComesFromTheBuild() throws Exception {
+        // a developer build has no values; a distributor's CI build may bake them in (docs/RELEASING.md)
         UpdateConfig bundled = UpdateConfig.bundled();
-        assertTrue(bundled.manifestUrl().isEmpty());
-        assertTrue(bundled.publicKey().isEmpty());
-        UpdateService s = UpdateService.fromBundledConfig(http, "0.1.0");
-        assertFalse(s.isConfigured());
+        assertEquals(BuildInfo.updateManifestUrl().orElse(""), bundled.manifestUrlText());
+        assertEquals(BuildInfo.updatePublicKey().orElse(""), bundled.publicKeyText());
+        if (bundled.manifestUrl().isEmpty() || bundled.publicKey().isEmpty()) {
+            assertFalse(UpdateService.fromBundledConfig(http, "0.1.0").isConfigured());
+        }
+        assertFalse(new UpdateService(http, null, null, "0.1.0").isConfigured());
         // a configured one is read from properties
         String text = "manifestUrl=https://example.org/u/{channel}.json\npublicKey=" + UpdateKeys.toBase64(keys.getPublic()) + "\n";
         UpdateConfig c = UpdateConfig.read(new StringReader(text));

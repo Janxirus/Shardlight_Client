@@ -79,8 +79,6 @@ public final class UpdateService {
     public static final String CHANNEL_PLACEHOLDER = "{channel}";
     /** the placeholder as it appears in a {@link URI} (braces percent-encoded) */
     public static final String CHANNEL_PLACEHOLDER_ENCODED = "%7Bchannel%7D";
-    /** the bundled configuration resource */
-    public static final String CONFIG_RESOURCE = "/update/update.properties";
 
     private static final Logger LOG = Logger.getLogger(UpdateService.class.getName());
     private static final int MAX_MANIFEST_BYTES = 1 << 20;
@@ -129,12 +127,18 @@ public final class UpdateService {
     }
 
     /**
-     * The service configured from the bundled {@value #CONFIG_RESOURCE} ({@code manifestUrl} and
-     * {@code publicKey}); a blank or missing value leaves it disabled with the reason.
+     * The service configured with the manifest URL and public key baked into this build
+     * ({@link UpdateConfig#bundled()}); a blank or invalid value leaves it disabled with the reason.
      */
     public static UpdateService fromBundledConfig(HttpService http, String currentVersion) {
+        return fromBundledConfig(http, currentVersion, null);
+    }
+
+    /** {@link #fromBundledConfig(HttpService, String)} downloading through a shared {@link DownloadManager} */
+    public static UpdateService fromBundledConfig(HttpService http, String currentVersion, DownloadManager downloads) {
         UpdateConfig c = UpdateConfig.bundled();
-        return new UpdateService(http, c.manifestUrl().orElse(null), c.publicKey().orElse(null), currentVersion);
+        return new UpdateService(http, c.manifestUrl().orElse(null), c.publicKey().orElse(null), currentVersion,
+            downloads);
     }
 
     private static String reason(HttpService http, URI url, PublicKey key, SemVer current) {

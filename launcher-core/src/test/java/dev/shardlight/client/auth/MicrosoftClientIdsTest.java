@@ -1,11 +1,14 @@
 package dev.shardlight.client.auth;
 
+import dev.shardlight.client.BuildInfo;
 import dev.shardlight.client.settings.SettingsService;
 import dev.shardlight.client.storage.AppPaths;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Supplier;
 
@@ -26,11 +29,15 @@ class MicrosoftClientIdsTest {
     }
 
     @Test
-    void noBuiltInId() {
+    void noBuiltInId() throws IOException {
         System.clearProperty(MicrosoftClientIds.PROPERTY);
-        assertEquals("", MicrosoftClientIds.buildDefault(), "there is no built-in client id");
-        assertEquals("", MicrosoftClientIds.of(() -> "").get());
-        assertEquals("", MicrosoftClientIds.of(() -> null).get());
+        // the source tree bakes in no id; only a distributor's build does (SHARDLIGHT_MSA_CLIENT_ID)
+        String template = Files.readString(Path.of("src/main/resources/shardlight-client-build.properties"));
+        assertTrue(template.contains("msaClientId=${msaClientId}"), "there is no built-in client id");
+        String baked = BuildInfo.microsoftClientId().orElse("");
+        assertEquals(baked, MicrosoftClientIds.buildDefault());
+        assertEquals(baked, MicrosoftClientIds.of(() -> "").get());
+        assertEquals(baked, MicrosoftClientIds.of(() -> null).get());
     }
 
     @Test

@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -62,8 +63,11 @@ public final class SettingsService {
                 save();
             }
         } catch (JsonParseException | IllegalStateException | UnsupportedOperationException e) {
-            Path aside = file.resolveSibling("settings.json.corrupt-"
-                + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")));
+            String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+            Path aside = file.resolveSibling("settings.json.corrupt-" + stamp);
+            for (int i = 2; Files.exists(aside); i++) {
+                aside = file.resolveSibling("settings.json.corrupt-" + stamp + "-" + i);
+            }
             try {
                 Files.move(file, aside);
             } catch (IOException io) {
@@ -87,9 +91,16 @@ public final class SettingsService {
         if (s.auth == null) s.auth = d.auth;
         if (s.updates == null) s.updates = d.updates;
         if (s.recentProjects == null) s.recentProjects = d.recentProjects;
+        s.recentProjects.removeIf(Objects::isNull);
+        if (s.appearance.theme == null) s.appearance.theme = d.appearance.theme;
+        if (s.appearance.accent == null) s.appearance.accent = d.appearance.accent;
+        if (s.appearance.language == null) s.appearance.language = d.appearance.language;
+        if (s.catalog.defaultSource == null) s.catalog.defaultSource = d.catalog.defaultSource;
+        if (s.auth.microsoftClientId == null) s.auth.microsoftClientId = d.auth.microsoftClientId;
+        if (s.updates.channel == null) s.updates.channel = d.updates.channel;
         s.downloads.maxConcurrent = Math.max(1, Math.min(16, s.downloads.maxConcurrent));
         s.downloads.maxRetries = Math.max(0, Math.min(10, s.downloads.maxRetries));
-        s.appearance.scale = Math.max(0.8, Math.min(1.6, s.appearance.scale));
+        s.appearance.scale = Double.isFinite(s.appearance.scale) ? Math.max(0.8, Math.min(1.6, s.appearance.scale)) : 1.0;
         return s;
     }
 

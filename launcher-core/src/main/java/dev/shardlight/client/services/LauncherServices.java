@@ -42,11 +42,6 @@ import dev.shardlight.client.update.UpdateService;
 import dev.shardlight.client.util.OsInfo;
 
 import java.io.IOException;
-import java.net.URI;
-import java.security.KeyFactory;
-import java.security.PublicKey;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -141,8 +136,7 @@ public final class LauncherServices implements AutoCloseable {
         this.shardlightLibrary = new ShardlightContentLibrary(paths, http, downloads, shardlightCatalog);
         this.shardlight = new ShardlightService(paths, projects, shardlightCatalog, shardlightLibrary);
         this.presets = new PresetEngine(projects);
-        this.updates = new UpdateService(http, updateManifestUrl().orElse(null), updatePublicKey().orElse(null),
-            BuildInfo.VERSION);
+        this.updates = UpdateService.fromBundledConfig(http, BuildInfo.VERSION, downloads);
 
         this.diagnostics = new DiagnosticsExporter();
         this.setup = new ProjectSetup(this);
@@ -204,29 +198,6 @@ public final class LauncherServices implements AutoCloseable {
         } else {
             Redactor.register(key.trim());
             secrets.put(CURSEFORGE_KEY_SECRET, key.trim());
-        }
-    }
-
-    private static Optional<URI> updateManifestUrl() {
-        try {
-            return BuildInfo.updateManifestUrl().map(URI::create);
-        } catch (IllegalArgumentException e) {
-            LOG.warning("The update manifest URL in this build isn't valid; updates are off");
-            return Optional.empty();
-        }
-    }
-
-    private static Optional<PublicKey> updatePublicKey() {
-        try {
-            Optional<String> b64 = BuildInfo.updatePublicKey();
-            if (b64.isEmpty()) {
-                return Optional.empty();
-            }
-            byte[] der = Base64.getDecoder().decode(b64.get().replaceAll("\\s", ""));
-            return Optional.of(KeyFactory.getInstance("Ed25519").generatePublic(new X509EncodedKeySpec(der)));
-        } catch (java.security.GeneralSecurityException | IllegalArgumentException e) {
-            LOG.warning("The update public key in this build isn't valid; updates are off");
-            return Optional.empty();
         }
     }
 
