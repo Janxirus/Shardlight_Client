@@ -1,0 +1,3 @@
+rootProject.name = 'shardlight-client'
+
+include 'launcher-core', 'launcher-app'

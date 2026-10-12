@@ -1,0 +1,21 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Shardlight Client services: storage, accounts, installs, launching, catalogs, projects, presets.'
+
+dependencies {
+    api "com.google.code.gson:gson:${gson_version}"
+    // Windows Data Protection API (token encryption) through JNA; only loaded on Windows
+    implementation "net.java.dev.jna:jna-platform:${jna_version}"
+    testImplementation "com.google.code.gson:gson:${gson_version}"
+}
+
+// version info the launcher reads at runtime
+tasks.named('processResources') {
+    def v = project.version
+    inputs.property('version', v)
+    filesMatching('shardlight-client-build.properties') {
+        expand(version: v)
+    }
+}
