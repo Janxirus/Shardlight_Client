@@ -690,3 +690,11 @@
 }
 .accent-swatch.selected { -fx-border-color: -sl-text; }
 .accent-swatch:focused { -fx-border-color: -sl-focus; }
+
+/* Settings > Appearance: compact layout and effects off */
+.root.compact .page { -fx-padding: 0.2em 1.1em 1.1em 1.1em; -fx-spacing: 0.8em; }
+.root.compact .card { -fx-padding: 0.7em 0.9em; -fx-spacing: 0.45em; }
+.root.compact .nav-button { -fx-padding: 0.45em 0.7em; }
+.root.compact .button { -fx-padding: 0.38em 0.85em; }
+.root.no-effects .card.raised, .root.no-effects .modal, .root.no-effects .toast,
+.root.no-effects .segmented .toggle-button:selected, .root.no-effects .shard-logo { -fx-effect: null; }

@@ -528,7 +528,7 @@ public final class SettingsPage implements Page {
     private void privacy() {
         heading("privacy");
         VBox list = new VBox(8);
-        for (String k : List.of("signin", "game", "catalog", "servers", "updates", "images")) {
+        for (String k : List.of("signin", "game", "catalog", "github", "servers", "updates", "images")) {
             HBox row = new HBox(10, UiKit.iconBox(Icons.of(Icons.INFO, 14), 24),
                 UiKit.label(I18n.tr("ui.settings.privacy." + k)));
             row.setAlignment(Pos.TOP_LEFT);

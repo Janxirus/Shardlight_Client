@@ -36,12 +36,18 @@ public final class ThemeManager {
 
     public static void apply(Scene scene, LauncherSettings.Appearance a) {
         Parent root = scene.getRoot();
-        root.getStyleClass().removeAll("light", "high-contrast");
+        root.getStyleClass().removeAll("light", "high-contrast", "compact", "no-effects");
         if ("light".equalsIgnoreCase(a.theme)) {
             root.getStyleClass().add("light");
         }
         if (a.highContrast) {
             root.getStyleClass().add("high-contrast");
+        }
+        if (a.compact) {
+            root.getStyleClass().add("compact");
+        }
+        if (!a.backgroundEffects) {
+            root.getStyleClass().add("no-effects");
         }
         Color accent = parse(a.accent, Color.web("#8b7cf6"));
         boolean lightAccent = accent.getBrightness() > 0.75 && accent.getSaturation() < 0.35;

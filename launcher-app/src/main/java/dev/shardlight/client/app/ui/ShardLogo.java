@@ -33,6 +33,7 @@ public final class ShardLogo {
         Group g = new Group(left, right, core, tip);
         DropShadow glow = new DropShadow(size * 0.28, accent.deriveColor(0, 1, 1, 0.55));
         g.setEffect(glow);
+        g.getStyleClass().add("shard-logo");
         g.setAccessibleText("Shardlight");
         return g;
     }
