@@ -74,11 +74,9 @@ public final class I18n {
         if (pattern == null) {
             return args == null || args.length == 0 ? key : key + " " + java.util.Arrays.toString(args);
         }
-        if (args == null || args.length == 0) {
-            return pattern;
-        }
+        // every value is a MessageFormat pattern, with or without arguments, so '' is always one apostrophe
         try {
-            return new MessageFormat(pattern, l == Locale.ROOT ? Locale.ENGLISH : l).format(args);
+            return new MessageFormat(pattern, l == Locale.ROOT ? Locale.ENGLISH : l).format(args == null ? new Object[0] : args);
         } catch (IllegalArgumentException e) {
             return pattern;
         }
