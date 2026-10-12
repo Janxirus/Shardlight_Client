@@ -226,7 +226,6 @@ public final class AppContext {
         play.checkForUpdatesQuietly();
     }
 
-    /** pages saved by --capture, in order */
     /** the pages, tabs, sections and dialogs --capture saves, in order */
     List<String> captureSteps() {
         List<String> steps = new ArrayList<>(List.of("home", "library"));
@@ -238,7 +237,8 @@ public final class AppContext {
             "storage", "about")) {
             steps.add("settings-" + section);
         }
-        steps.addAll(List.of("signin", "crash", "home-light", "project-light"));
+        steps.addAll(List.of("signin", "crash", "home-light", "library-light", "project-light", "discover-light",
+            "settings-light"));
         return steps;
     }
 
@@ -253,7 +253,7 @@ public final class AppContext {
             showProjectTab(PROJECT_TABS.indexOf(id.substring(8)));
             return;
         }
-        if (id.startsWith("settings-")) {
+        if (id.startsWith("settings-") && !id.endsWith("-light")) {
             shell.navigate("settings");
             if (shell.current() instanceof SettingsPage sp) {
                 sp.open(id.substring(9));
@@ -273,15 +273,20 @@ public final class AppContext {
                 shell.navigate("home");
                 selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services)));
             }
-            case "home-light", "project-light" -> {
+            case "home-light", "library-light", "project-light", "discover-light", "settings-light" -> {
                 LauncherSettings.Appearance light = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
                     LauncherSettings.Appearance.class);
                 light.theme = "light";
                 ThemeManager.apply(scene, light);
-                if (id.equals("home-light")) {
-                    shell.navigate("home");
-                } else {
-                    showProjectTab(1);
+                switch (id) {
+                    case "project-light" -> showProjectTab(1);
+                    case "settings-light" -> {
+                        shell.navigate("settings");
+                        if (shell.current() instanceof SettingsPage sp) {
+                            sp.open("appearance");
+                        }
+                    }
+                    default -> shell.navigate(id.substring(0, id.length() - "-light".length()));
                 }
             }
             default -> shell.navigate(id);

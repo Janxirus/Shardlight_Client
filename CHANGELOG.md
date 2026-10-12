@@ -2,6 +2,17 @@
 
 All notable changes to Shardlight Client. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Changed
+
+- **Design system** (UI overhaul, part 1): bundled Inter, Inter Tabular and JetBrains Mono fonts; colour
+  tokens with five surface levels, three text levels, an accent ramp computed from the accent setting
+  and strong and subtle status colours, checked against WCAG AA by a test; a separate light palette; one
+  type, spacing, radius and shadow scale; a `Motion` helper that honours Reduce motion; a redrawn outline
+  icon set with 11 new icons; restyled buttons, fields, menus, check boxes, switches, sliders, tabs,
+  lists, tables, scroll bars and tooltips. See docs/DESIGN_SYSTEM.md and docs/UI_AUDIT.md.
+
 ## 0.1.0 (unreleased preview)
 
 The first version: a standalone launcher with projects, mod browsing, optional Shardlight modules and
