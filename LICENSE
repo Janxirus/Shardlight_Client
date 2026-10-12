@@ -1,0 +1,43 @@
+Shardlight Client
+Copyright (c) 2026 Janxirus. All Rights Reserved.
+
+This launcher is free to download and use. It is not open source.
+
+
+YOU MAY
+
+  - Download and use it for yourself to install and play Minecraft: Java
+    Edition with an account that owns the game.
+  - Show it in videos, streams and screenshots, monetized or not.
+    A link back to the official page is appreciated.
+  - Read the source code to learn from it, and build it for your own
+    personal use.
+
+
+YOU MAY NOT, WITHOUT WRITTEN PERMISSION FROM THE AUTHOR
+
+  - Re-upload or redistribute it, original or changed, on any website,
+    mirror or file host other than its official pages.
+  - Publish a modified version, fork or derivative of it, or reuse its code,
+    artwork or interface design in your own project.
+  - Sell it, put it behind a paywall, ad link or subscription, or bundle it
+    with anything you sell.
+  - Remove or change the author's name or this license.
+
+To ask for permission, contact Janxirus through the project's official pages.
+
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT
+SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+FROM ITS USE.
+
+Minecraft is a trademark of Mojang Synergies AB. Shardlight Client is not an
+official Minecraft product and is not approved by or associated with Mojang
+or Microsoft. The launcher downloads Minecraft only from Mojang's own servers
+and never redistributes it.
+
+
+THIRD-PARTY SOFTWARE
+The launcher uses OpenJFX (GPL v2 with the Classpath Exception), Gson
+(Apache License 2.0) and JNA (Apache License 2.0). Those libraries are not
+covered by this license; their licenses come with their own jars.

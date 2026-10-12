@@ -115,7 +115,8 @@ def jpackageCommon = { String type, File dest ->
                      '--win-per-user-install', '--win-upgrade-uuid', '6b0e8f8e-3c1d-4f5e-9a51-5d1b9c0a7e21']
         }
     } else if (os.contains('mac')) {
-        args += ['--icon', rootProject.file('packaging/icons/shardlight.icns').absolutePath]
+        def icns = rootProject.file('packaging/icons/shardlight.icns')
+        if (icns.exists()) args += ['--icon', icns.absolutePath]
     } else {
         args += ['--icon', rootProject.file('packaging/icons/shardlight.png').absolutePath]
         if (type != 'app-image') args += ['--linux-shortcut']
