@@ -2,7 +2,6 @@ package dev.shardlight.client.app.ui;
 
 import dev.shardlight.client.BuildInfo;
 import dev.shardlight.client.i18n.I18n;
-import javafx.animation.FadeTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -21,7 +20,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.util.Duration;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -233,12 +231,7 @@ public final class Shell {
         pageHost.getChildren().setAll(view);
         refreshChrome();
         p.onShow();
-        if (!UiSettings.reducedMotion()) {
-            FadeTransition f = new FadeTransition(Duration.millis(130), view);
-            f.setFromValue(0.35);
-            f.setToValue(1);
-            f.play();
-        }
+        Motion.enter(view, Motion.Speed.SLOW, Motion.ENTER_OFFSET);
         frame.setPadding(Insets.EMPTY);
     }
 }

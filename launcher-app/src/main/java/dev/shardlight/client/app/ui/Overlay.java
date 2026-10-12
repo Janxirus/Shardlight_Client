@@ -1,7 +1,6 @@
 package dev.shardlight.client.app.ui;
 
 import dev.shardlight.client.i18n.I18n;
-import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -94,12 +93,8 @@ public final class Overlay {
         content.setDisable(true);
         open.push(layer);
         root.getChildren().add(root.getChildren().indexOf(toasts), layer);
-        if (!UiSettings.reducedMotion()) {
-            FadeTransition f = new FadeTransition(Duration.millis(140), layer);
-            f.setFromValue(0);
-            f.setToValue(1);
-            f.play();
-        }
+        Motion.fadeIn(layer, Motion.Speed.MEDIUM);
+        Motion.pop(card, Motion.Speed.SLOW, 0.96);
         layer.requestFocus();
         card.requestFocus();
         return d;
@@ -159,11 +154,12 @@ public final class Overlay {
         banner.getChildren().add(close);
         HBox.setHgrow(banner, Priority.NEVER);
         toasts.getChildren().add(banner);
+        Motion.enter(banner, Motion.Speed.MEDIUM, Motion.ENTER_OFFSET);
         while (toasts.getChildren().size() > 4) {
             toasts.getChildren().remove(0);
         }
         PauseTransition p = new PauseTransition(Duration.seconds(kind.equals("danger") ? 9 : 5));
-        p.setOnFinished(e -> toasts.getChildren().remove(banner));
+        p.setOnFinished(e -> Motion.exit(banner, Motion.Speed.MEDIUM, () -> toasts.getChildren().remove(banner)));
         p.play();
     }
 
