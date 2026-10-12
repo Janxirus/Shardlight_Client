@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "ui",
+      "modId": "softglass",
+      "nameKey": "shardlight.module.ui.name",
+      "descriptionKey": "shardlight.module.ui.description",
+      "minecraftVersions": ["26.3"],
+      "loaders": ["fabric"],
+      "minLoaderVersion": "0.19.5",
+      "javaMajor": 25,
+      "requires": [
+        {"source": "modrinth", "project": "fabric-api", "reasonKey": "shardlight.dependency.fabricApi.reason"}
+      ],
+      "worksBetterWith": [],
+      "configFile": "config/shardlight.json",
+      "modrinthSlug": null,
+      "pageUrl": "https://github.com/Janxirus/Shardlight_ui",
+      "sources": [
+        {"type": "github-release", "repo": "Janxirus/Shardlight_ui", "assetPattern": "*.jar"}
+      ]
+    },
+    {
+      "id": "map",
+      "modId": "shardmap",
+      "nameKey": "shardlight.module.map.name",
+      "descriptionKey": "shardlight.module.map.description",
+      "minecraftVersions": ["26.3"],
+      "loaders": ["fabric"],
+      "minLoaderVersion": "0.19.5",
+      "javaMajor": 25,
+      "requires": [
+        {"source": "modrinth", "project": "fabric-api", "reasonKey": "shardlight.dependency.fabricApi.reason"}
+      ],
+      "worksBetterWith": ["ui"],
+      "configFile": "config/shardmap.json",
+      "modrinthSlug": null,
+      "pageUrl": "https://github.com/Janxirus/Shardlight_map",
+      "sources": [
+        {"type": "github-release", "repo": "Janxirus/Shardlight_map", "assetPattern": "*.jar"}
+      ]
+    },
+    {
+      "id": "party",
+      "modId": "shardparty",
+      "nameKey": "shardlight.module.party.name",
+      "descriptionKey": "shardlight.module.party.description",
+      "minecraftVersions": ["26.3"],
+      "loaders": ["fabric"],
+      "minLoaderVersion": "0.19.5",
+      "javaMajor": 25,
+      "requires": [
+        {"source": "modrinth", "project": "fabric-api", "reasonKey": "shardlight.dependency.fabricApi.reason"}
+      ],
+      "worksBetterWith": ["ui", "map"],
+      "configFile": "config/shardparty.json",
+      "modrinthSlug": null,
+      "pageUrl": "https://github.com/Janxirus/Shardlight_party",
+      "sources": [
+        {"type": "github-release", "repo": "Janxirus/Shardlight_party", "assetPattern": "*.jar"}
+      ]
+    },
+    {
+      "id": "companion",
+      "modId": "shardcompanion",
+      "nameKey": "shardlight.module.companion.name",
+      "descriptionKey": "shardlight.module.companion.description",
+      "minecraftVersions": ["26.3"],
+      "loaders": ["fabric"],
+      "minLoaderVersion": "0.19.5",
+      "javaMajor": 25,
+      "requires": [
+        {"source": "modrinth", "project": "fabric-api", "reasonKey": "shardlight.dependency.fabricApi.reason"}
+      ],
+      "worksBetterWith": ["ui", "map"],
+      "configFile": "config/shardcompanion.json",
+      "modrinthSlug": null,
+      "pageUrl": "https://github.com/Janxirus/Shardlight_Companion",
+      "sources": [
+        {"type": "github-release", "repo": "Janxirus/Shardlight_Companion", "assetPattern": "*.jar"}
+      ]
+    }
+  ],
+  "themes": [
+    {
+      "id": "EMBER",
+      "displayName": "Ember",
+      "packTitle": "Molten Forge",
+      "classic": true,
+      "accent": "#F0782C",
+      "panel": "#140C0E",
+      "edge": "#962C32",
+      "description": "Warm fire and dark glass. Embers rise.",
+      "uiPackFile": "Shardlight UI - Ember (Molten Forge).zip",
+      "soundPackFile": "Shardlight Sounds - Ember (Molten Forge).zip",
+      "feel": "lava crust, iron & flame",
+      "aliases": []
+    },
+    {
+      "id": "BLOOD_MOON",
+      "displayName": "Blood Moon",
+      "packTitle": "Crimson Night",
+      "classic": true,
+      "accent": "#E0304A",
+      "panel": "#160608",
+      "edge": "#B01830",
+      "description": "Deep red under a blood moon.",
+      "uiPackFile": "Shardlight UI - Blood Moon (Crimson Night).zip",
+      "soundPackFile": "Shardlight Sounds - Blood Moon (Crimson Night).zip",
+      "feel": "crimson stone under a blood moon",
+      "aliases": []
+    },
+    {
+      "id": "SOUL_FIRE",
+      "displayName": "Soul Fire",
+      "packTitle": "Soulflame Hollow",
+      "classic": true,
+      "accent": "#3CC8E6",
+      "panel": "#0A1016",
+      "edge": "#287C96",
+      "description": "Cold blue soul flames. Sparks fall like snow.",
+      "uiPackFile": "Shardlight UI - Soul Fire (Soulflame Hollow).zip",
+      "soundPackFile": "Shardlight Sounds - Soul Fire (Soulflame Hollow).zip",
+      "feel": "soul lanterns & blue flame",
+      "aliases": ["Soulfire"]
+    },
+    {
+      "id": "ASHEN",
+      "displayName": "Ashen",
+      "packTitle": "Cinderfall",
+      "classic": true,
+      "accent": "#D0C8C0",
+      "panel": "#121214",
+      "edge": "#706A6E",
+      "description": "Quiet greys and falling ash.",
+      "uiPackFile": "Shardlight UI - Ashen (Cinderfall).zip",
+      "soundPackFile": "Shardlight Sounds - Ashen (Cinderfall).zip",
+      "feel": "smoke, ash & silver",
+      "aliases": []
+    },
+    {
+      "id": "DARK_GREEN",
+      "displayName": "Dark Green",
+      "packTitle": "Mossgrove",
+      "classic": true,
+      "accent": "#5CC86A",
+      "panel": "#0A120C",
+      "edge": "#2E7A44",
+      "description": "Forest green with drifting leaves.",
+      "uiPackFile": "Shardlight UI - Dark Green (Mossgrove).zip",
+      "soundPackFile": "Shardlight Sounds - Dark Green (Mossgrove).zip",
+      "feel": "moss, vines & fireflies",
+      "aliases": ["Nature"]
+    },
+    {
+      "id": "PURPLE_FLAME",
+      "displayName": "Purple Flame",
+      "packTitle": "Amethyst Pyre",
+      "classic": true,
+      "accent": "#B45AF0",
+      "panel": "#120A18",
+      "edge": "#8A3AC8",
+      "description": "Violet fire.",
+      "uiPackFile": "Shardlight UI - Purple Flame (Amethyst Pyre).zip",
+      "soundPackFile": "Shardlight Sounds - Purple Flame (Amethyst Pyre).zip",
+      "feel": "amethyst & violet fire",
+      "aliases": []
+    },
+    {
+      "id": "PINK_BLOSSOM",
+      "displayName": "Pink Blossom",
+      "packTitle": "Sakura Grove",
+      "classic": true,
+      "accent": "#FF8CC0",
+      "panel": "#180C12",
+      "edge": "#E07AA0",
+      "description": "Soft pink with falling petals.",
+      "uiPackFile": "Shardlight UI - Pink Blossom (Sakura Grove).zip",
+      "soundPackFile": "Shardlight Sounds - Pink Blossom (Sakura Grove).zip",
+      "feel": "cherry blossom & falling petals",
+      "aliases": []
+    },
+    {
+      "id": "DARK_FANTASY",
+      "displayName": "Dark Fantasy",
+      "packTitle": "Thornblood Keep",
+      "classic": false,
+      "accent": "#D84050",
+      "panel": "#0A070C",
+      "edge": "#682838",
+      "description": "Thorned gothic frames, crimson and old gold, falling ash.",
+      "uiPackFile": "Shardlight UI - Dark Fantasy (Thornblood Keep).zip",
+      "soundPackFile": "Shardlight Sounds - Dark Fantasy (Thornblood Keep).zip",
+      "feel": "crimson & old gold",
+      "aliases": []
+    },
+    {
+      "id": "MEDIEVAL",
+      "displayName": "Medieval",
+      "packTitle": "Ironhold",
+      "classic": false,
+      "accent": "#D8A048",
+      "panel": "#181108",
+      "edge": "#8A6A3A",
+      "description": "Heavy timber frames with iron plates and studs, torchlight sparks.",
+      "uiPackFile": "Shardlight UI - Medieval (Ironhold).zip",
+      "soundPackFile": "Shardlight Sounds - Medieval (Ironhold).zip",
+      "feel": "timber, iron & torchlight",
+      "aliases": []
+    },
+    {
+      "id": "CYBERPUNK",
+      "displayName": "Cyberpunk",
+      "packTitle": "Neon Grid",
+      "classic": false,
+      "accent": "#20F0FF",
+      "panel": "#0A0614",
+      "edge": "#FF2AA0",
+      "description": "Neon chamfered frames, a scan line and digital rain.",
+      "uiPackFile": "Shardlight UI - Cyberpunk (Neon Grid).zip",
+      "soundPackFile": "Shardlight Sounds - Cyberpunk (Neon Grid).zip",
+      "feel": "neon circuits & rain",
+      "aliases": []
+    },
+    {
+      "id": "STEAMPUNK",
+      "displayName": "Steampunk",
+      "packTitle": "Brass Engine",
+      "classic": false,
+      "accent": "#D89A4A",
+      "panel": "#140E08",
+      "edge": "#B07A3A",
+      "description": "Brass frames with rivets and a cog, rising steam.",
+      "uiPackFile": "Shardlight UI - Steampunk (Brass Engine).zip",
+      "soundPackFile": "Shardlight Sounds - Steampunk (Brass Engine).zip",
+      "feel": "brass, rivets & steam",
+      "aliases": []
+    },
+    {
+      "id": "CELESTIAL",
+      "displayName": "Celestial",
+      "packTitle": "Starfall",
+      "classic": false,
+      "accent": "#F0D890",
+      "panel": "#0A0C1C",
+      "edge": "#C8B070",
+      "description": "Night-blue glass, star corners, a crescent moon and twinkling stars.",
+      "uiPackFile": "Shardlight UI - Celestial (Starfall).zip",
+      "soundPackFile": "Shardlight Sounds - Celestial (Starfall).zip",
+      "feel": "night glass & starlight",
+      "aliases": []
+    },
+    {
+      "id": "FROSTBOUND",
+      "displayName": "Frostbound",
+      "packTitle": "Rimefall",
+      "classic": false,
+      "accent": "#7AD4FF",
+      "panel": "#081420",
+      "edge": "#A8E0F8",
+      "description": "Icy frames with snowflakes and icicles, a sliding glint, snowfall.",
+      "uiPackFile": "Shardlight UI - Frostbound (Rimefall).zip",
+      "soundPackFile": "Shardlight Sounds - Frostbound (Rimefall).zip",
+      "feel": "ice, icicles & snow",
+      "aliases": []
+    },
+    {
+      "id": "VOIDBORN",
+      "displayName": "Voidborn",
+      "packTitle": "Rift Walker",
+      "classic": false,
+      "accent": "#B860FF",
+      "panel": "#040208",
+      "edge": "#5A1AA0",
+      "description": "A broken frame with drifting gaps, motes pulled into the void.",
+      "uiPackFile": "Shardlight UI - Voidborn (Rift Walker).zip",
+      "soundPackFile": "Shardlight Sounds - Voidborn (Rift Walker).zip",
+      "feel": "the edge of the void",
+      "aliases": []
+    },
+    {
+      "id": "ARCANE_ACADEMY",
+      "displayName": "Arcane Academy",
+      "packTitle": "Spellbound Library",
+      "classic": false,
+      "accent": "#6AA8FF",
+      "panel": "#0C0E1E",
+      "edge": "#4A62C8",
+      "description": "Gilded medallions, an inner line, rune marks and rising glyphs.",
+      "uiPackFile": "Shardlight UI - Arcane Academy (Spellbound Library).zip",
+      "soundPackFile": "Shardlight Sounds - Arcane Academy (Spellbound Library).zip",
+      "feel": "gilded runes & sapphire",
+      "aliases": []
+    }
+  ]
+}

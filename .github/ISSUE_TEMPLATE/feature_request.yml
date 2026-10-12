@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an idea or an improvement for Shardlight Client.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe the problem or the goal, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could the launcher help?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Home, Library and projects, Discover, Shardlight modules and presets, Multiplayer, Downloads, Settings and accounts, Other]

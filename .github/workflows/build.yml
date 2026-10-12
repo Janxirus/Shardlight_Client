@@ -1,0 +1,131 @@
+name: Build
+
+# Every pull request and every push to main is built and tested on Linux and Windows.
+# Windows also produces the app folder (with its own Java runtime) and the MSI installer.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+# Distributor values baked into the build (all optional; see docs/SIGN_IN.md and docs/RELEASING.md).
+# Set them under the repository's Settings > Secrets and variables > Actions. Without them the app still
+# builds and runs; sign-in, CurseForge and update checks then explain what is missing.
+env:
+  SHARDLIGHT_MSA_CLIENT_ID: ${{ vars.SHARDLIGHT_MSA_CLIENT_ID }}
+  SHARDLIGHT_UPDATE_MANIFEST_URL: ${{ vars.SHARDLIGHT_UPDATE_MANIFEST_URL }}
+  SHARDLIGHT_UPDATE_PUBLIC_KEY: ${{ vars.SHARDLIGHT_UPDATE_PUBLIC_KEY }}
+  SHARDLIGHT_CURSEFORGE_API_KEY: ${{ secrets.SHARDLIGHT_CURSEFORGE_API_KEY }}
+
+jobs:
+  linux:
+    name: Linux build, tests and screenshots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install a virtual display
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb
+
+      - name: Build and test
+        run: |
+          chmod +x gradlew
+          xvfb-run -a ./gradlew build :launcher-app:portableZip --stacktrace
+
+      - name: Screenshot every page
+        run: |
+          xvfb-run -a -s "-screen 0 1400x900x24" ./gradlew :launcher-app:run \
+            --args="--capture ${{ runner.temp }}/screens --data-dir ${{ runner.temp }}/capture-data"
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-linux
+          path: '**/build/reports/tests/'
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShardlightClient-portable-${{ github.sha }}
+          path: launcher-app/build/distributions/*-portable.zip
+          if-no-files-found: error
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.sha }}
+          path: ${{ runner.temp }}/screens/*.png
+          if-no-files-found: warn
+
+  windows:
+    name: Windows build, tests, app and installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        shell: pwsh
+        run: ./gradlew.bat build --stacktrace
+
+      - name: App folder with its own Java runtime
+        shell: pwsh
+        run: |
+          ./gradlew.bat :launcher-app:jpackageImage --stacktrace
+          $ver = (Select-String -Path gradle.properties -Pattern '^launcher_version=(.*)$').Matches[0].Groups[1].Value
+          Compress-Archive -Path "launcher-app/build/jpackage/image/Shardlight Client" -DestinationPath "launcher-app/build/ShardlightClient-$ver-windows-x64.zip"
+
+      - name: Install WiX Toolset 3 for the MSI
+        shell: pwsh
+        run: |
+          if (-not (Get-Command candle.exe -ErrorAction SilentlyContinue)) {
+            choco install wixtoolset --no-progress -y
+            $wix = Get-ChildItem "${env:ProgramFiles(x86)}" -Directory -Filter "WiX Toolset v3*" | Select-Object -First 1
+            if ($wix) { Add-Content $env:GITHUB_PATH (Join-Path $wix.FullName 'bin') }
+          }
+
+      - name: MSI installer
+        shell: pwsh
+        run: ./gradlew.bat :launcher-app:jpackageInstaller --stacktrace
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-windows
+          path: '**/build/reports/tests/'
+
+      - name: Upload Windows app folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShardlightClient-windows-x64-${{ github.sha }}
+          path: launcher-app/build/ShardlightClient-*-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShardlightClient-msi-${{ github.sha }}
+          path: launcher-app/build/jpackage/installer/*.msi
+          if-no-files-found: error

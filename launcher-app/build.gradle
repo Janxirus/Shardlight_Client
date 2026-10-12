@@ -1,0 +1,145 @@
+plugins {
+    id 'application'
+}
+
+description = 'Shardlight Client desktop app (JavaFX).'
+
+// JavaFX ships one jar per operating system. The build machine's own platform is used for compiling,
+// running and jpackage; the portable zip carries Windows, Linux and macOS jars side by side.
+static String fxPlatform(String os, String arch) {
+    os = os.toLowerCase(Locale.ROOT)
+    boolean arm = arch == 'aarch64' || arch == 'arm64'
+    if (os.contains('win')) return 'win'
+    if (os.contains('mac')) return arm ? 'mac-aarch64' : 'mac'
+    return arm ? 'linux-aarch64' : 'linux'
+}
+
+def hostFx = fxPlatform(System.getProperty('os.name'), System.getProperty('os.arch'))
+def fxModules = ['base', 'graphics', 'controls']
+def portablePlatforms = ['win', 'linux', 'mac', 'mac-aarch64']
+
+configurations {
+    // one configuration per platform for the portable zip
+    portablePlatforms.each { p -> create("javafx_${p.replace('-', '_')}") { canBeConsumed = false; transitive = false } }
+}
+
+dependencies {
+    implementation project(':launcher-core')
+    fxModules.each { m -> implementation("org.openjfx:javafx-${m}:${javafx_version}:${hostFx}") { transitive = false } }
+    portablePlatforms.each { p ->
+        fxModules.each { m -> add("javafx_${p.replace('-', '_')}", "org.openjfx:javafx-${m}:${javafx_version}:${p}") }
+    }
+}
+
+def appJvmArgs = ['-Xss2m', '-XX:+UseG1GC', '-Dprism.lcdtext=false', '--enable-native-access=ALL-UNNAMED']
+
+application {
+    mainClass = 'dev.shardlight.client.app.Main'
+    applicationName = 'shardlight-client'
+    applicationDefaultJvmArgs = appJvmArgs
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes(
+            'Main-Class': 'dev.shardlight.client.app.Main',
+            'Implementation-Title': 'Shardlight Client',
+            'Implementation-Version': project.version,
+        )
+    }
+}
+
+tasks.named('run', JavaExec) {
+    // ./gradlew run --args="--data-dir /tmp/shardlight-dev"
+    workingDir = rootProject.projectDir
+}
+
+// ---------------------------------------------------------------- portable zip (all platforms, needs Java 21+)
+def portableName = "ShardlightClient-${project.version}-portable"
+
+tasks.register('portableZip', Zip) {
+    group = 'distribution'
+    description = 'Portable build for Windows, Linux and macOS. Needs a Java 21+ runtime on the computer.'
+    archiveFileName = "${portableName}.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    into(portableName) {
+        from(rootProject.file('packaging/portable'))
+        from(rootProject.file('README.md'))
+        from(rootProject.file('LICENSE'))
+        into('lib') {
+            from(tasks.named('jar'))
+            from(configurations.runtimeClasspath.filter { !it.name.startsWith('javafx-') })
+        }
+        portablePlatforms.each { p ->
+            into("lib/javafx-${p}") { from(configurations.getByName("javafx_${p.replace('-', '_')}")) }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- jpackage (native app for the build machine's OS)
+def jpackageInput = layout.buildDirectory.dir('jpackage/input')
+
+tasks.register('jpackageInput', Sync) {
+    group = 'distribution'
+    from(tasks.named('jar'))
+    from(configurations.runtimeClasspath)
+    into(jpackageInput)
+}
+
+static String jpackageTool() {
+    def home = System.getProperty('java.home')
+    def exe = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('win') ? 'jpackage.exe' : 'jpackage'
+    return new File(home, "bin/${exe}").absolutePath
+}
+
+def jpackageCommon = { String type, File dest ->
+    def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    def args = [jpackageTool(),
+                '--type', type,
+                '--dest', dest.absolutePath,
+                '--name', 'Shardlight Client',
+                '--app-version', project.version.toString().replaceAll(/[^0-9.]/, ''),
+                '--vendor', 'Janxirus',
+                '--description', 'Shardlight Client - Minecraft Java Edition launcher',
+                '--copyright', 'Copyright (c) Janxirus. All rights reserved.',
+                '--input', jpackageInput.get().asFile.absolutePath,
+                '--main-jar', tasks.named('jar').get().archiveFileName.get(),
+                '--main-class', 'dev.shardlight.client.app.Main',
+                '--add-modules', 'java.base,java.desktop,java.logging,java.net.http,java.naming,java.sql,java.xml,java.management,jdk.management,jdk.naming.dns,jdk.crypto.ec,jdk.unsupported,jdk.zipfs,jdk.charsets,jdk.localedata,jdk.jfr',
+                '--jlink-options', '--strip-debug --no-man-pages --no-header-files']
+    appJvmArgs.each { args += ['--java-options', it] }
+    if (os.contains('win')) {
+        args += ['--icon', rootProject.file('packaging/icons/shardlight.ico').absolutePath]
+        if (type != 'app-image') {
+            args += ['--win-menu', '--win-menu-group', 'Shardlight', '--win-shortcut', '--win-dir-chooser',
+                     '--win-per-user-install', '--win-upgrade-uuid', '6b0e8f8e-3c1d-4f5e-9a51-5d1b9c0a7e21']
+        }
+    } else if (os.contains('mac')) {
+        def icns = rootProject.file('packaging/icons/shardlight.icns')
+        if (icns.exists()) args += ['--icon', icns.absolutePath]
+    } else {
+        args += ['--icon', rootProject.file('packaging/icons/shardlight.png').absolutePath]
+        if (type != 'app-image') args += ['--linux-shortcut']
+    }
+    return args
+}
+
+tasks.register('jpackageImage', Exec) {
+    group = 'distribution'
+    description = 'Self-contained app folder (bundled Java runtime) for this operating system.'
+    dependsOn 'jpackageInput'
+    def dest = layout.buildDirectory.dir('jpackage/image').get().asFile
+    doFirst { project.delete(dest) }
+    commandLine jpackageCommon('app-image', dest)
+}
+
+tasks.register('jpackageInstaller', Exec) {
+    group = 'distribution'
+    description = 'Installer for this operating system (Windows: MSI, needs WiX 3; macOS: DMG; Linux: DEB).'
+    dependsOn 'jpackageInput'
+    def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    def type = os.contains('win') ? 'msi' : os.contains('mac') ? 'dmg' : 'deb'
+    def dest = layout.buildDirectory.dir('jpackage/installer').get().asFile
+    doFirst { project.delete(dest) }
+    commandLine jpackageCommon(type, dest)
+}
