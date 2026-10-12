@@ -3,6 +3,7 @@ package dev.shardlight.client.project;
 import dev.shardlight.client.error.ErrorCode;
 import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.game.GameDirs;
+import dev.shardlight.client.util.PathSafety;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -44,6 +45,35 @@ public final class ScreenshotService {
     /** PNG and JPEG files in {@code screenshots/}, newest first */
     public List<Screenshot> list(Project p) {
         return images(screenshotsDir(p), false);
+    }
+
+    /**
+     * Copy a PNG or JPEG into {@code screenshots/} under its own name, or {@code name-2}, {@code name-3}... when that
+     * name is taken. The picture appears complete or not at all. Returns the new file.
+     */
+    public Path importFile(Project p, Path image) throws LauncherException {
+        Objects.requireNonNull(image, "image");
+        if (!FileTrees.isPlainFile(image)) {
+            throw new LauncherException(ErrorCode.NOT_FOUND, "project.screenshot.notFound", String.valueOf(image.getFileName()));
+        }
+        Path dir = screenshotsDir(p);
+        String clean = PathSafety.sanitizeFileName(image.getFileName().toString());
+        int dot = clean.lastIndexOf('.');
+        String stem = dot > 0 ? clean.substring(0, dot) : clean;
+        String ext = dot > 0 ? clean.substring(dot) : "";
+        try {
+            Files.createDirectories(dir);
+            Path target = dir.resolve(clean);
+            for (int i = 2; Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS); i++) {
+                target = dir.resolve(stem + "-" + i + ext);
+            }
+            Path part = dir.resolve(target.getFileName() + ".part");
+            Files.copy(image, part, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            mover.move(part, target);
+            return target;
+        } catch (IOException e) {
+            throw ProjectService.fileError(e, dir);
+        }
     }
 
     /** move a screenshot to the project's trash; the file must lie directly inside {@code screenshots/} */
