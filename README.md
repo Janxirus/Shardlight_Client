@@ -8,7 +8,7 @@ on Modrinth (and CurseForge, with a key), and puts frame rate first: every proje
 The four Shardlight mods (UI, Map, Party, Companion) and their 15 theme packs are optional. The launcher
 works without any of them, and a project only gets the modules you pick for it.
 
-> **Status: 0.1.0 preview.** The launcher builds, runs and is covered by 578 automated tests, but it
+> **Status: 0.1.0 preview.** The launcher builds, runs and is covered by about 590 automated tests, but it
 > has not launched a real game yet. Signing in needs an Azure app that Microsoft has approved for
 > Minecraft (see [Sign-in](#sign-in)), and that approval is not in place. See
 > [docs/TESTING.md](docs/TESTING.md) for what has and hasn't been checked.

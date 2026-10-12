@@ -65,7 +65,7 @@ Needs a Microsoft account that owns Minecraft: Java Edition, and a build whose A
 If a step does not behave as written, export diagnostics (project > Logs > Export diagnostics) and attach the zip
 to the report. It contains no tokens.
 
-## Automated tests (578)
+## Automated tests (about 590, plus the live tests above)
 
 | Package | Tests | What they cover |
 |---|---:|---|
