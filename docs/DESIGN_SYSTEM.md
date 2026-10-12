@@ -11,6 +11,10 @@ How the launcher looks and how to style anything new. The code lives in `launche
 | Animation | `ui/Motion.java` (Reduce motion flag in `ui/UiSettings.java`) |
 | Icons | `ui/Icons.java` |
 | Shared widgets (buttons, cards, chips, banners, setting rows) | `ui/UiKit.java`, `ui/ToggleSwitch.java`, `ui/Overlay.java` |
+| Components (fields, cards, lists, progress) | `ui/Fields.java`, `ui/Cards.java`, `ui/Lists.java`, `ui/ProgressRing.java`, `ui/Shimmer.java`, `ui/StepProgress.java` |
+| The window frame (sidebar, top bar, history, Play bar, palette) | `ui/Shell.java`, `ui/TopBarTools.java`, `ui/PlayBar.java`, `ui/CommandPalette.java`, `ui/SidebarProject.java` |
+| Windows title bar and taskbar progress | `ui/WindowsChrome.java`, `ui/TaskProgress.java` |
+| Component gallery (every component in every state) | `pages/GalleryPage.java`, open with Ctrl+K "gallery" or `--page gallery` |
 | Contrast test | `src/test/java/.../ui/DesignTokensContrastTest.java` |
 
 ![After, dark](images/ui-overhaul/part1-after-dark.jpg)
@@ -183,13 +187,16 @@ Every animation goes through `ui/Motion.java`.
 
 `Motion.ENTER` is ease-out (things appearing), `Motion.EXIT` is ease-in (things leaving). Helpers:
 `enter(node, speed, dy)` fades in while rising `dy` px (pages and toasts use `Motion.ENTER_OFFSET`, 8 px),
-`fadeIn`, `exit(node, speed, done)`, `pop(node, speed, from)` (modals grow from 0.96), `moveX`. With Reduce
-motion on, moves and scales are instant and fades take 80 ms. Never use `FadeTransition` and friends
+`fadeIn`, `exit(node, speed, done)`, `pop(node, speed, from)` (modals grow from 0.96), `moveX`, `moveY` (the
+sidebar pill), `lift(node)` (cards rise 2 px on hover and keyboard focus), `pulse` (skeletons, loading dots,
+an unknown progress ring) and `sweepX` (the shimmer bar). With Reduce motion on, moves and scales are
+instant, fades take 80 ms and endless animations hold still. Never use `FadeTransition` and friends
 directly.
 
 ## Icons
 
-`Icons.of(Icons.NAME, size)` returns a node (the app uses sizes such as 13, 16, 18 and 40). All icons are drawn on a
+`Icons.of(Icons.NAME, size)` returns a node (the app uses sizes such as 13, 16, 18 and 40, in pixels at 100%;
+icons grow with the interface size setting like text does). All icons are drawn on a
 24-unit grid as outlines with a 2-unit stroke and round caps and joins, inside 2.5 to 21.5, with corner
 radii of 1 to 2 units. Play, Stop and More are also filled. A clear 24x24 square keeps every glyph on the
 same grid, so icons line up with each other.
@@ -208,7 +215,8 @@ add it to `SOLID` only if it must be filled.
 Set: HOME, LIBRARY, DISCOVER, SHARD, SERVERS, DOWNLOAD, GEAR, PLAY, STOP, PLUS, SEARCH, FILTER, SORT, GRID,
 LIST, SLIDERS, FOLDER, TRASH, MORE, CLOSE, BACK, REFRESH, EXTERNAL, COPY, PIN, CHECK, WARNING, INFO,
 ERROR, UPDATE, CLOCK, SHIELD, BOLT, USER, PACKAGE, CUBE, IMAGE, ARCHIVE, PALETTE, GAUGE, SPARKLE, LOGS,
-STAR, HEART, EYE_OFF, KEY, WORLD, CPU, MEMORY, WIFI.
+STAR, HEART, EYE_OFF, KEY, WORLD, CPU, MEMORY, WIFI, WIFI_OFF, FORWARD, CHEVRON_RIGHT, CHEVRON_DOWN, MINUS,
+SIDEBAR, BELL, COMMAND.
 
 ## Controls
 
@@ -234,7 +242,73 @@ fill; -fx-background-insets: 0, 1`), so focusing never moves anything. The focus
 | Lists and tables | `ListView`, `TableView` | Selected row uses `-sl-accent-subtle` |
 | Chips | `UiKit.chip(text, variant)` | Variants: `accent`, `success`, `warning`, `danger`, `info` |
 | Banners | `UiKit.banner(kind, text)` | Subtle status background, strong icon |
-| Tooltips, context menus | `UiKit.tooltip`, `ContextMenu` | Menu items can add class `danger` |
+| Tooltips, context menus | `UiKit.tooltip`, `ContextMenu` | 400 ms delay. Menu items can add class `danger` |
+
+## The window frame
+
+![Home](images/ui-overhaul/part2-home-dark.jpg)
+
+- **Window.** The native window stays. On Windows 10 and 11 `WindowsChrome.titleBar` switches the title bar to
+  dark or light (`DWMWA_USE_IMMERSIVE_DARK_MODE`) and on Windows 11 sets the caption and caption-text colours to
+  `-sl-bg` and `-sl-text`; `AppContext.applyTitleBar` reruns it whenever the theme changes. Other systems:
+  nothing happens. Long tasks report to `TaskProgress`, which shows their average on the Windows taskbar button.
+- **Sidebar.** 240 px with labels, 72 px with icons only (Ctrl+B or the button at the bottom; remembered in
+  `appearance.sidebarCollapsed`). The current project is pinned at the top with its art. An accent pill
+  (`.nav-pill`) slides to the active item. `Shell.setBadge(id, n)` shows a count (Downloads: active downloads,
+  Settings: a launcher update). Settings, the account chip and the version sit at the bottom.
+- **Top bar.** 52 px, no divider: back and forward, breadcrumbs (pushed pages appear after the page that opened
+  them, and earlier crumbs are links), the page's own `actions()`, then the search box (opens the palette),
+  the downloads indicator (ring while downloading), the notifications bell and the account switcher.
+- **History.** Back and forward with the buttons, Alt+Left / Alt+Right and the mouse's side buttons. Escape goes
+  up one breadcrumb. A page shown again by going back keeps its scroll position; a page opened from the sidebar
+  starts at the top. Pages fade and rise 8 px as they enter.
+- **Command palette.** Ctrl+K. `CommandPalette` fuzzy-matches (`Fuzzy.score`) projects, installed content,
+  pages, settings sections and actions (New project, Open logs, Switch to Ultra Performance, theme, sidebar,
+  diagnostics...). Up, Down, Enter, Escape. To add an action, add a `Command` in `CommandPalette.commands()`.
+- **Ctrl+F** focuses the page's `SearchField` (or a `.search-field`), else opens the palette.
+- **Play bar.** On every page: the selected project (click to switch, right-click for its actions), version,
+  loader and preset, Live log, and the Play button. `PlayFlow.state(projectId)` gives the phase: idle,
+  preparing, downloading (with a percentage and a thin bar along the top), launching, running (play time,
+  click to stop) and error (click to retry, "What went wrong" for details). Starting a game no longer opens a
+  progress dialog; clicking while it gets ready cancels.
+- **Notifications.** One toast system in `Overlay`: `toast(kind, text, actions...)` with kind success, info,
+  warning or error (`danger` still works), optional `Overlay.Action`s (Undo, Open, Retry), at most three
+  stacked above the Play bar, kept while hovered. `undo(text, action)` is the undo snackbar. Every toast is
+  kept in `history()`, which the bell shows for the session.
+- **Popovers.** `Overlay.popover(anchor, content, alignRight)` floats a `.popover` under a control; it closes
+  on a click outside, Escape, navigation or a dialog. Used by the bell, the account switcher and the project
+  switcher. Popovers live in the window (not separate windows), so they follow the theme and `--capture` sees
+  them.
+
+## Components
+
+Build pages from these. All of them are shown, in each state, in the component gallery.
+
+![Gallery](images/ui-overhaul/part2-gallery-dark.jpg)
+
+| Component | API | Notes |
+| --- | --- | --- |
+| Loading button | `UiKit.loading(button, true)` | Three pulsing dots replace the label; the width stays; clicks are ignored |
+| Disabled with a reason | `UiKit.explained(control)` in the layout, then `UiKit.disable(control, reason)` | The tooltip says why; `null` enables it |
+| Copy button | `UiKit.copyButton(text, name)` or `UiKit.copied(button)` | Check mark for 1.5 s |
+| Search field | `new Fields.SearchField(prompt)` | Clear button, Escape clears, Ctrl+F focuses it |
+| Number field | `new Fields.NumberField(min, max, step, value, name)` | Steppers, arrow keys, Page Up/Down; `errorProperty()` |
+| Slider with value bubble | `new Fields.ValueSlider(min, max, value, format, name)` | Bubble over the thumb on hover, drag and focus |
+| Labelled field, inline error | `new Fields.Field(label, control, help)`, `setError(msg)` or `bindError(...)` | Error replaces the help line and marks the control |
+| Segmented control | `UiKit.segmented(options, selected, onSelect)` | 2 to 4 options |
+| Cards | `Cards.project`, `modResult`, `preset`, `theme`, `server`, `world`, `stat`; `Cards.onOpen(card, action)` | 2 px hover lift; long text is one line; actions on the bottom edge |
+| Lists | `Lists.rows(list, render, actions)`, `Lists.stickyHeader(list, groupOf)` | Virtualised, Shift/Ctrl multi-select, row actions on hover |
+| Tables | `Lists.table(table, placeholder)`, `Lists.column`, `numberColumn`, `actionsColumn` | Sortable headers that stay put, multi-select |
+| Badges | `UiKit.badge(n)`, `UiKit.setBadge(label, n)` | 0 hides it, over 99 shows 99+ |
+| Filter chips | `UiKit.filterChip(text, onRemove)` | |
+| Progress | `UiKit.progress(f)`, `new ProgressRing(f)` (`small`; negative = unknown), `new Shimmer()`, `new StepProgress(steps, current)` | |
+| Tooltip, banner, confirm, undo | `UiKit.tooltip`, `UiKit.banner`, `Overlay.confirm`, `Overlay.undo` | |
+| Skeleton | `UiKit.skeleton("line" / "short" / "block" / "circle")`, `UiKit.skeletonCard()` | Pulses while loading |
+| Empty state | `UiKit.empty(illustration, sentence, action)` | One sentence, one action |
+| Error and offline | `UiKit.errorState(message, retry)`, `UiKit.offlineState(retry)` | Both have Retry |
+
+Images: show a placeholder in `-sl-fill` and fade the picture in when it arrives (`RemoteImage`). Right-click
+menus offer the same actions as the visible buttons (project tiles, the pinned project, the Play bar).
 
 ## Styling a new view
 
@@ -247,5 +321,5 @@ fill; -fx-background-insets: 0, 1`), so focusing never moves anything. The focus
    involved), then add the text/background pair to `DesignTokensContrastTest`.
 4. Numbers get `.tabular`; paths and versions get `.mono`.
 5. Animate with `Motion` only.
-6. Check it with `--capture` in dark and light, at 100% and a larger interface size, with high contrast
+6. Check it in the gallery and with `--capture` in dark and light, at 100% and a larger interface size, with high contrast
    and Reduce motion on, and with the keyboard alone.

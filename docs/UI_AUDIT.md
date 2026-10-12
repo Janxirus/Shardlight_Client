@@ -34,7 +34,8 @@ with in Part 1 (design system and base controls); the rest belong to the later p
   corner radii 0.3 to 1.2 em with no rule.
 - **Fixed.** Raised cards, modals and toasts had both a border and a drop shadow.
 - Java layouts use fixed pixel gaps (`new HBox(10, ...)`, `new VBox(16, ...)`) that don't follow the
-  4 px grid or the interface size setting (Parts 2 to 4, page by page).
+  4 px grid or the interface size setting. **Fixed in Part 2** for the window frame and every shared
+  component (gaps live in the stylesheet); the pages themselves move over in Parts 3 and 4.
 
 ## States
 
@@ -58,7 +59,8 @@ with in Part 1 (design system and base controls); the rest belong to the later p
 
 ## Layout (later parts)
 
-- Library tiles: the Play and Open buttons sit at different heights because descriptions wrap to one or
-  two lines.
+- **Fixed (Part 2).** Library tiles: the Play and Open buttons sat at different heights because descriptions
+  wrapped to one or two lines. Tiles are now equal-size cells with one-line details and the buttons on the
+  bottom edge.
 - Large empty areas under short pages (Home, Discover while loading); no page width limit on wide windows.
 - Project page header: chips wrap onto a second line at the default window size.
