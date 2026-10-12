@@ -243,7 +243,11 @@ class ContentServiceTest {
         install(plan(planned("Alpha", v1, ContentKind.MOD, false, null)));
         assertEquals("v1", entry("alpha.jar").versionId);
         byte[] other = TestJars.fabricMod("alpha", "9.9");
-        Files.write(game.resolve("mods/alpha.jar"), other);
+        Path jar = game.resolve("mods/alpha.jar");
+        long installedTime = Files.getLastModifiedTime(jar).toMillis();
+        Files.write(jar, other);
+        // same size as before, so only the file time tells the scan to look again
+        Files.setLastModifiedTime(jar, java.nio.file.attribute.FileTime.fromMillis(installedTime + 5_000));
         svc.scan(p);
         ContentEntry e = entry("alpha.jar");
         assertEquals(sha1(other), e.sha1);

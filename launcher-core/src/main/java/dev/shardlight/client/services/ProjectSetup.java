@@ -89,13 +89,13 @@ public final class ProjectSetup {
         if (!provider.isAvailable()) {
             throw new LauncherException(ErrorCode.API_KEY_MISSING, provider.unavailableReasonKey());
         }
-        LoaderType loader = kind == ContentKind.MOD ? project.loader.type() : null;
+        LoaderType loader = kind == ContentKind.MOD ? project.loader.type : null;
         List<CatalogVersion> versions = provider.versions(catalogProjectId, project.minecraftVersion, loader, cancel);
         CatalogVersion best = versions.stream()
             .min(Comparator.comparingInt((CatalogVersion v) -> channelRank(v.channel()))
                 .thenComparing(CatalogVersion::published, Comparator.nullsLast(Comparator.reverseOrder())))
             .orElseThrow(() -> new LauncherException(ErrorCode.NOT_FOUND, "services.noCompatibleVersion",
-                catalogProjectId, project.minecraftVersion, project.loader.type().displayName()));
+                catalogProjectId, project.minecraftVersion, project.loader.type.displayName()));
         InstallPlan plan = s.planner().plan(project, provider, best, kind, false, cancel);
         if (!plan.canInstall()) {
             throw new LauncherException(ErrorCode.CONFLICT, "services.planBlocked", catalogProjectId);

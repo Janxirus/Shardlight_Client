@@ -26,6 +26,11 @@ public final class ContentEntry {
     public String sha1;
     public String sha512;
     public long size;
+    /**
+     * the file's last-modified time (epoch millis) when {@link #sha1} was taken; a scan re-hashes the file when it
+     * differs, so a file replaced outside the launcher is noticed even at the same size. 0 = not recorded yet
+     */
+    public long modifiedAt;
     public boolean enabled = true;
     /** pinned entries are skipped by "update all" */
     public boolean pinned;

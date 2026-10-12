@@ -517,6 +517,7 @@ public final class ShardlightService {
             e.sha1 = Hashing.hash(file, HashAlgo.SHA1);
             e.sha512 = Hashing.hash(file, HashAlgo.SHA512);
             e.size = Files.size(file);
+            e.modifiedAt = Files.getLastModifiedTime(file).toMillis();
         } catch (IOException ex) {
             throw LauncherException.io(ex, file.toString());
         }

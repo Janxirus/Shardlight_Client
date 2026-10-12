@@ -39,6 +39,7 @@ import dev.shardlight.client.shardlight.ShardlightContentLibrary;
 import dev.shardlight.client.shardlight.ShardlightService;
 import dev.shardlight.client.storage.AppPaths;
 import dev.shardlight.client.update.UpdateService;
+import dev.shardlight.client.util.OsInfo;
 
 import java.io.IOException;
 import java.net.URI;
@@ -48,6 +49,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -121,7 +123,9 @@ public final class LauncherServices implements AutoCloseable {
         this.worlds = new WorldService(projects);
         this.screenshots = new ScreenshotService(projects);
         this.servers = new ServerListService(projects);
-        this.launches = new LaunchService(paths, projects, loaders, installer, java);
+        this.crashAnalyzer = new CrashAnalyzer();
+        this.launches = new LaunchService(paths, projects, loaders, installer, java,
+            () -> settings.get().java.preferMojangRuntime, crashAnalyzer, OsInfo.current());
 
         this.content = new ContentService(paths, projects, downloads);
         this.modrinth = new ModrinthCatalog(http, endpoints);
@@ -130,7 +134,7 @@ public final class LauncherServices implements AutoCloseable {
         this.planner = new InstallPlanner();
         this.modpacks = new ModpackService(paths, projects,
             (name, mc, loader) -> projects.create(new NewProjectRequest(name, null, "modpack", mc, loader,
-                java.util.Set.of(), null, null, null)),
+                Set.of(), null, null, null)),
             content, downloads, catalogs);
 
         this.shardlightCatalog = ShardlightCatalog.load();
@@ -140,7 +144,6 @@ public final class LauncherServices implements AutoCloseable {
         this.updates = new UpdateService(http, updateManifestUrl().orElse(null), updatePublicKey().orElse(null),
             BuildInfo.VERSION);
 
-        this.crashAnalyzer = new CrashAnalyzer();
         this.diagnostics = new DiagnosticsExporter();
         this.setup = new ProjectSetup(this);
 

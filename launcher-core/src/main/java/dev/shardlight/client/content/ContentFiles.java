@@ -90,6 +90,15 @@ final class ContentFiles {
         return loose;
     }
 
+    /** the last-modified time in epoch millis without following links; 0 when it can't be read */
+    static long modifiedMillis(Path p) {
+        try {
+            return p == null ? 0 : Files.getLastModifiedTime(p, LinkOption.NOFOLLOW_LINKS).toMillis();
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
     static boolean exists(Path p) {
         return p != null && Files.exists(p, LinkOption.NOFOLLOW_LINKS);
     }

@@ -429,6 +429,7 @@ public final class ContentService {
         e.sha1 = hashes[0];
         e.sha512 = hashes[1];
         e.size = ContentFiles.sizeOf(file);
+        e.modifiedAt = ContentFiles.modifiedMillis(file);
         e.title = md.map(ModMetadata::name).filter(n -> !n.isBlank()).orElse(stripExtension(e.fileName));
         if (e.kind == MOD) {
             e.modId = md.map(ModMetadata::id).orElse(e.modId);
@@ -653,6 +654,7 @@ public final class ContentService {
         e.sha1 = st.sha1();
         e.sha512 = st.sha512();
         e.size = st.size();
+        e.modifiedAt = 0; // recorded from the placed file when the session commits
         e.dependency = fresh ? pf.dependency() : e.dependency && pf.dependency();
         if (pf.pageUrl() != null) {
             e.pageUrl = pf.pageUrl().toString();
@@ -821,6 +823,7 @@ public final class ContentService {
                     e.sha512 = h[1];
                 }
                 e.size = ContentFiles.sizeOf(p);
+                e.modifiedAt = ContentFiles.modifiedMillis(p);
                 e.missing = false;
                 out.add(e);
             }
@@ -1196,6 +1199,7 @@ public final class ContentService {
             e.sha512 = h[1];
         }
         e.size = ContentFiles.sizeOf(p);
+        e.modifiedAt = ContentFiles.modifiedMillis(p);
         return e;
     }
 
@@ -1225,8 +1229,9 @@ public final class ContentService {
             return false;
         }
         long size = ContentFiles.sizeOf(p);
+        long modified = ContentFiles.modifiedMillis(p);
         boolean changed = false;
-        if (e.sha1 == null || e.sha512 == null || e.size != size) {
+        if (e.sha1 == null || e.sha512 == null || e.size != size || e.modifiedAt != modified) {
             String[] h = ContentFiles.sha1AndSha512(p);
             if (e.sha1 != null && !e.sha1.equalsIgnoreCase(h[0])) {
                 // replaced outside the launcher: the catalog version no longer describes it
@@ -1239,10 +1244,11 @@ public final class ContentService {
                 }
                 e.downloadUrl = null;
             }
+            changed |= e.sha1 == null || !e.sha1.equalsIgnoreCase(h[0]) || e.size != size || e.modifiedAt != modified;
             e.sha1 = h[0];
             e.sha512 = h[1];
             e.size = size;
-            changed = true;
+            e.modifiedAt = modified;
         }
         if (e.kind == MOD && e.modId == null) {
             String id = metadata.read(p).map(ModMetadata::id).orElse(null);
@@ -1423,6 +1429,23 @@ public final class ContentService {
         return ContentFiles.exists(first) ? first : ContentFiles.exists(second) ? second : null;
     }
 
+    /** record the file time of entries whose hashes the launcher just set (see {@link ContentEntry#modifiedAt}) */
+    private void stampModifiedTimes(Session s) {
+        for (ContentEntry e : s.project.content) {
+            if (e.modifiedAt != 0 || !FOLDER_KINDS.contains(e.kind) || !isSafeEntryName(e)) {
+                continue;
+            }
+            try {
+                Path p = currentPath(s, e);
+                if (p != null && Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS)) {
+                    e.modifiedAt = ContentFiles.modifiedMillis(p);
+                }
+            } catch (LauncherException ex) {
+                LOG.fine("No file time for " + e.fileName + ": " + ex.getMessage());
+            }
+        }
+    }
+
     private static boolean isSafeEntryName(ContentEntry e) {
         return e.fileName != null && PathSafety.isSafeFileName(e.fileName)
             && (e.kind != MOD || PathSafety.isSafeFileName(e.fileName + DISABLED));
@@ -1557,6 +1580,7 @@ public final class ContentService {
 
         void commit() throws LauncherException {
             if (projectDirty) {
+                stampModifiedTimes(this);
                 Project saved = projects.save(project);
                 List<ContentEntry> c = saved != null && saved.content != null ? saved.content : project.content;
                 caller.content = copyList(c);
