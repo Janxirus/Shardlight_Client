@@ -18,8 +18,11 @@ public interface ProjectAccess {
     /** {@code projects/<id>} */
     Path projectDir(String id);
 
-    /** {@code projects/<id>/minecraft}, the game directory passed to Minecraft */
+    /** the game directory passed to Minecraft: {@code projects/<id>/minecraft}, or the project's own location */
     default Path gameDir(Project p) {
+        if (p.gameDirLocation != null && !p.gameDirLocation.isBlank()) {
+            return Path.of(p.gameDirLocation);
+        }
         return projectDir(p.id).resolve("minecraft");
     }
 }

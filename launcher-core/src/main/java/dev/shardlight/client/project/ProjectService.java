@@ -121,6 +121,8 @@ public final class ProjectService implements ProjectAccess {
     /** moves folders; replaced in tests to simulate files held open by another program */
     volatile DirMover mover = FileTrees::move;
     /** the clock (epoch milliseconds); replaceable in tests */
+    /** lets tests make a move fail at chosen points */
+    volatile ProjectMover.Fault moveFault;
     volatile LongSupplier clock = System::currentTimeMillis;
 
     /** moves a folder to a path that doesn't exist yet */
@@ -217,6 +219,9 @@ public final class ProjectService implements ProjectAccess {
 
     @Override
     public Path gameDir(Project p) {
+        if (p.gameDirLocation != null && !p.gameDirLocation.isBlank()) {
+            return Path.of(p.gameDirLocation);
+        }
         return projectDir(p.id).resolve(GAME_DIR);
     }
 
@@ -331,6 +336,15 @@ public final class ProjectService implements ProjectAccess {
      * installed. The id is derived from the name (see {@link #idFor}).
      */
     public Project create(NewProjectRequest req) throws LauncherException {
+        return create(req, null);
+    }
+
+    /**
+     * Like {@link #create(NewProjectRequest)}, with the game directory in a new folder inside {@code location}
+     * (a folder outside the launcher's data folder that already exists), named after the project. project.json
+     * and the icon stay in the data folder. Nothing is left behind when it fails.
+     */
+    public Project create(NewProjectRequest req, Path location) throws LauncherException {
         Objects.requireNonNull(req, "req");
         Project p = new Project();
         p.name = Names.requireProjectName(req.name());
@@ -345,12 +359,26 @@ public final class ProjectService implements ProjectAccess {
         p.java = req.java() == null ? new JavaSettings() : Json.copy(req.java(), JavaSettings.class);
         p.createdAt = now();
         String id;
+        Path external = null;
+        if (location != null) {
+            Path parent = ProjectMover.requireLocationParent(paths, location);
+            external = parent.resolve(ProjectMover.folderName(parent, Names.slug(p.name)));
+            p.gameDirLocation = external.toString();
+        }
         Path staging = newStaging();
         try {
-            GameDirs.create(staging.resolve(GAME_DIR));
+            if (external == null) {
+                GameDirs.create(staging.resolve(GAME_DIR));
+            } else {
+                GameDirs.create(external);
+            }
             id = commit(staging, Names.slug(p.name), p);
         } catch (IOException e) {
-            throw fileError(e, paths.projects());
+            removeCreated(external);
+            throw fileError(e, external == null ? paths.projects() : external);
+        } catch (LauncherException | RuntimeException e) {
+            removeCreated(external);
+            throw e;
         } finally {
             discardStaging(staging);
         }
@@ -390,7 +418,7 @@ public final class ProjectService implements ProjectAccess {
             throw newerSchema(src.name);
         }
         Path srcDir = paths.project(id);
-        Path srcGame = srcDir.resolve(GAME_DIR);
+        Path srcGame = gameDir(src);
         String newId;
         Path staging = newStaging();
         try {
@@ -400,6 +428,7 @@ public final class ProjectService implements ProjectAccess {
             copyPlainFile(srcDir.resolve(ICON_FILE), staging.resolve(ICON_FILE));
             copyPlainFile(srcDir.resolve(SERVERS_META), staging.resolve(SERVERS_META));
             Project copy = Json.copy(src, Project.class);
+            copy.gameDirLocation = null; // a copy always starts in the data folder
             copy.name = name;
             copy.createdAt = now();
             copy.lastPlayedAt = 0;
@@ -416,13 +445,39 @@ public final class ProjectService implements ProjectAccess {
         return require(newId);
     }
 
+    // ---- location ----------------------------------------------------------------------------------------
+
+    /**
+     * Move the project's game directory into a new folder named after the project inside {@code newParent}, or
+     * back into the data folder when {@code newParent} is null. Copies first, checks every file, switches with one
+     * atomic write and deletes the old folder last; any failure or cancel leaves the project untouched. The game
+     * must not be running.
+     */
+    public MoveResult moveGameDir(String id, Path newParent, ProgressListener progress, CancellationToken cancel)
+        throws LauncherException {
+        if (!isUsableId(id)) {
+            throw notFound(id);
+        }
+        return ProjectMover.move(this, paths, id, newParent, progress, cancel, moveFault);
+    }
+
+    /** a folder name for a new game directory inside {@code parent}, so the dialogs can show the exact path */
+    public Path suggestGameDir(Path parent, String id) {
+        return parent.toAbsolutePath().normalize().resolve(ProjectMover.folderName(parent, id));
+    }
+
+    /** the data folder location a project's game directory has when it isn't moved */
+    public Path defaultGameDir(String id) {
+        return projectDir(id).resolve(GAME_DIR);
+    }
+
     // ---- removal --------------------------------------------------------------------------------------
 
     /** what removing the project would affect */
     public RemovalPlan planRemoval(String id) throws LauncherException {
         Project p = require(id);
         Path dir = paths.project(id);
-        Path game = dir.resolve(GAME_DIR);
+        Path game = gameDir(p);
         int worlds = 0;
         for (Path w : FileTrees.children(game.resolve(GameDirs.SAVES))) {
             if (FileTrees.isPlainDirectory(w)) {
@@ -449,7 +504,8 @@ public final class ProjectService implements ProjectAccess {
             }
         }
         boolean hasConfig = !FileTrees.children(game.resolve(GameDirs.CONFIG)).isEmpty();
-        return new RemovalPlan(id, p.name, worlds, screenshots, mods, packs, FileTrees.sizeOf(dir), hasConfig);
+        long total = FileTrees.sizeOf(dir) + (p.gameDirLocation == null ? 0 : FileTrees.sizeOf(game));
+        return new RemovalPlan(id, p.name, worlds, screenshots, mods, packs, total, hasConfig);
     }
 
     /**
@@ -579,12 +635,31 @@ public final class ProjectService implements ProjectAccess {
                 if (FileTrees.isPlainFile(target)) {
                     throw new LauncherException(ErrorCode.NOT_FOUND, "project.error.trashNotFound", trashId);
                 }
+                Path external = externalGameDir(target);
                 FileTrees.deleteTree(trash, target);
+                if (external != null) {
+                    ProjectMover.deleteExternal(paths, external);
+                }
             }
             writeIndexQuietly(idx);
         }
         LOG.info("Deleted archived project " + trashId);
         fireChanged();
+    }
+
+    /** the game directory an archived project keeps outside the data folder, or null */
+    private static Path externalGameDir(Path archivedDir) {
+        try {
+            Path file = archivedDir.resolve(PROJECT_FILE);
+            if (!FileTrees.isPlainFile(file)) {
+                return null;
+            }
+            JsonObject o = parseObject(Files.readString(file, StandardCharsets.UTF_8));
+            Project p = o == null ? null : fromJson(o);
+            return p == null || p.gameDirLocation == null || p.gameDirLocation.isBlank() ? null : Path.of(p.gameDirLocation);
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     // ---- export and import ----------------------------------------------------------------------------
@@ -614,8 +689,9 @@ public final class ProjectService implements ProjectAccess {
         Project copy = Json.copy(p, Project.class);
         copy.java.javaPath = null;
         copy.installedVersionId = null;
+        copy.gameDirLocation = null;
         copy.schemaVersion = Project.SCHEMA_VERSION;
-        Path game = projectDir.resolve(GAME_DIR);
+        Path game = gameDir(p);
         List<String> folders = o.folders();
         long total = 0;
         for (String f : folders) {
@@ -1077,6 +1153,18 @@ public final class ProjectService implements ProjectAccess {
         return taken;
     }
 
+    /** remove a game directory this class just made for a project that then failed to be created */
+    private static void removeCreated(Path external) {
+        if (external == null) {
+            return;
+        }
+        try {
+            FileTrees.deleteTree(external.getParent(), external);
+        } catch (LauncherException e) {
+            LOG.log(Level.WARNING, "Couldn't remove " + external, e);
+        }
+    }
+
     private Path newStaging() throws LauncherException {
         Path dir = paths.projects().resolve(STAGING_PREFIX + UUID.randomUUID());
         try {
@@ -1277,6 +1365,7 @@ public final class ProjectService implements ProjectAccess {
     private void sanitizeImported(Project p, String nameOverride, String fileName) throws LauncherException {
         String exportedName = p.name;
         p.id = null; // a fresh id is chosen on commit; the exported one is never used
+        p.gameDirLocation = null; // a file from someone else never decides where files are written
         fillDefaults(p);
         if (nameOverride != null && !nameOverride.isBlank()) {
             p.name = Names.requireProjectName(nameOverride);

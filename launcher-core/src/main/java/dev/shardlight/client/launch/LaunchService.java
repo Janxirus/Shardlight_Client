@@ -132,6 +132,9 @@ public final class LaunchService {
             throw new LauncherException(ErrorCode.UNSUPPORTED_VERSION, "launch.error.noVersion", current.name);
         }
         Path gameDir = projects.gameDir(current);
+        if (current.gameDirLocation != null && !Files.isDirectory(gameDir)) {
+            throw new LauncherException(ErrorCode.NOT_FOUND, "project.location.missing", current.name, gameDir.toString());
+        }
         if (o.quickPlayWorld() != null) {
             if (!PathSafety.isSafeSegment(o.quickPlayWorld())
                 || !Files.isDirectory(gameDir.resolve(GameDirs.SAVES).resolve(o.quickPlayWorld()))) {

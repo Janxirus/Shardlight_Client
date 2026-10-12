@@ -40,6 +40,12 @@ public final class Project {
     public long lastPlayedAt;
     public long totalPlayMillis;
     public String notes = "";
+    /**
+     * Absolute path of the game directory when it lives outside the launcher's data folder (chosen in the new
+     * project wizard or by moving the project); null = {@code projects/<id>/minecraft}. Only the game directory
+     * moves; project.json, the icon and backups stay in the data folder.
+     */
+    public String gameDirLocation;
     /** set once the game files for this project's version + loader were installed and verified */
     public String installedVersionId;
 
