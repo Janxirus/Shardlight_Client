@@ -12,6 +12,13 @@ All notable changes to Shardlight Client. Versions follow [semantic versioning](
   type, spacing, radius and shadow scale; a `Motion` helper that honours Reduce motion; a redrawn outline
   icon set with 11 new icons; restyled buttons, fields, menus, check boxes, switches, sliders, tabs,
   lists, tables, scroll bars and tooltips. See docs/DESIGN_SYSTEM.md and docs/UI_AUDIT.md.
+- **First run, Home, Library and project page** (UI overhaul, part 3): a three-step welcome (sign in, starter,
+  Balanced or Ultra Performance) that ends on the new project; a sign-in dialog with a large device code, a
+  waiting state, the player's head and a plain next step for every error; a Home with a project hero, a
+  "Jump back in" row and an alerts strip; a Library with grid and list views, sorting, filters, folders and
+  drag to reorder; and a project page with eight tabs (overview, mods, worlds, screenshots, backups,
+  performance, logs, settings), a screenshot viewer, level-coloured logs with "Explain this crash", and
+  generated project art.
 
 ## 0.1.0 (unreleased preview)
 

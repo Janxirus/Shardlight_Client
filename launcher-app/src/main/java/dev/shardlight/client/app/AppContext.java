@@ -1,6 +1,8 @@
 package dev.shardlight.client.app;
 
+import dev.shardlight.client.app.flows.FirstRun;
 import dev.shardlight.client.app.flows.PlayFlow;
+import dev.shardlight.client.app.flows.SignInDialog;
 import dev.shardlight.client.app.pages.DiscoverPage;
 import dev.shardlight.client.app.pages.DownloadsPage;
 import dev.shardlight.client.app.pages.HomePage;
@@ -281,6 +283,13 @@ public final class AppContext {
 
     void afterShow() {
         TaskProgress.attach(stage);
+        if (!services.settings().get().firstRunDone) {
+            if (FirstRun.due(this)) {
+                Platform.runLater(() -> FirstRun.show(this));
+            } else {
+                FirstRun.markDone(this);
+            }
+        }
         Platform.runLater(this::applyTitleBar);
         play.checkForUpdatesQuietly();
     }
@@ -312,8 +321,7 @@ public final class AppContext {
             "storage", "about")) {
             steps.add("settings-" + section);
         }
-        steps.addAll(List.of("signin", "crash", "home-light", "library-light", "project-light", "discover-light",
-            "settings-light"));
+        steps.addAll(List.of("crash", "home-light", "library-light", "discover-light", "settings-light"));
         // Part 2: the shell and the component gallery
         steps.addAll(List.of("gallery", "gallery-full", "palette", "notifications", "collapsed"));
         for (String page : List.of("home", "gallery")) {
@@ -324,7 +332,68 @@ public final class AppContext {
             }
         }
         steps.addAll(List.of("gallery-full-light", "gallery-full-contrast"));
+        // Part 3: first run, sign-in, Home, Library and the project page, each in dark and light
+        for (String suffix : List.of("", "-light")) {
+            for (String id : part3Views()) {
+                steps.add("p3-" + id + suffix);
+            }
+        }
         return steps;
+    }
+
+    private static List<String> part3Views() {
+        List<String> ids = new ArrayList<>(List.of("firstrun-0", "firstrun-1", "firstrun-2", "signin-getting", "signin-code",
+            "signin-success", "signin-approval", "signin-network", "signin-xbox", "home", "library", "library-list",
+            "library-empty"));
+        for (String tab : PROJECT_TABS) {
+            ids.add("project-" + tab);
+        }
+        ids.addAll(List.of("project-screenshots-viewer", "project-logs-explain"));
+        return ids;
+    }
+
+    /** one Part 3 capture ("p3-<view>", optionally ending in "-light"); false when {@code raw} is not one */
+    private boolean showPart3Capture(String raw) {
+        if (!raw.startsWith("p3-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        String id = raw.substring(3, light ? raw.length() - "-light".length() : raw.length());
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        if (id.startsWith("firstrun-")) {
+            shell.navigate("home");
+            FirstRun.preview(this, Integer.parseInt(id.substring(9)));
+        } else if (id.startsWith("signin-")) {
+            shell.navigate("home");
+            SignInDialog.preview(this, id.substring(7));
+        } else if (id.equals("home")) {
+            shell.navigate("home");
+        } else if (id.startsWith("library")) {
+            shell.navigate("library");
+            if (shell.current() instanceof LibraryPage lp) {
+                lp.previewEmpty(id.equals("library-empty"));
+                lp.previewView(id.equals("library-list"));
+            }
+        } else if (id.startsWith("project-")) {
+            String tab = id.substring(8);
+            boolean viewer = tab.equals("screenshots-viewer");
+            boolean explain = tab.equals("logs-explain");
+            if (viewer) {
+                tab = "screenshots";
+            } else if (explain) {
+                tab = "logs";
+            }
+            showProjectTab(PROJECT_TABS.indexOf(tab));
+            if (shell.current() instanceof ProjectPage page) {
+                if (viewer) {
+                    page.previewViewer();
+                } else if (explain) {
+                    page.previewExplain();
+                }
+            }
+        }
+        return true;
     }
 
     /** show the app in {@code theme} (dark, light or contrast) at {@code scale} for --capture, not saved */
@@ -387,15 +456,14 @@ public final class AppContext {
         return true;
     }
 
-    private static final List<String> PROJECT_TABS = List.of("overview", "content", "worlds", "backups", "screenshots",
-        "performance", "settings", "logs");
+    private static final List<String> PROJECT_TABS = ProjectPage.TABS;
 
     void showForCapture(String id) {
         while (overlay().hasOpenDialog()) {
             overlay().closeTop();
         }
         overlay().closePopover();
-        if (showShellCapture(id)) {
+        if (showPart3Capture(id) || showShellCapture(id)) {
             return;
         }
         if (id.startsWith("project-") && PROJECT_TABS.contains(id.substring(8))) {
@@ -414,21 +482,16 @@ public final class AppContext {
                 shell.navigate("library");
                 newProject("shardlight-default");
             }
-            case "signin" -> {
-                shell.navigate("home");
-                dev.shardlight.client.app.flows.SignInDialog.show(this, a -> { });
-            }
             case "crash" -> {
                 shell.navigate("home");
                 selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services)));
             }
-            case "home-light", "library-light", "project-light", "discover-light", "settings-light" -> {
+            case "home-light", "library-light", "discover-light", "settings-light" -> {
                 LauncherSettings.Appearance light = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
                     LauncherSettings.Appearance.class);
                 light.theme = "light";
                 ThemeManager.apply(scene, light);
                 switch (id) {
-                    case "project-light" -> showProjectTab(1);
                     case "settings-light" -> {
                         shell.navigate("settings");
                         if (shell.current() instanceof SettingsPage sp) {

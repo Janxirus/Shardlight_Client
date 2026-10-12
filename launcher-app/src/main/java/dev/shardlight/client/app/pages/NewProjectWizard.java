@@ -1,6 +1,7 @@
 package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
+import dev.shardlight.client.app.flows.ProjectCreation;
 import dev.shardlight.client.app.flows.ProjectActions;
 import dev.shardlight.client.app.ui.Dialogs;
 import dev.shardlight.client.app.ui.Fx;
@@ -715,53 +716,9 @@ public final class NewProjectWizard {
         Path pictured = iconFile;
         boolean install = installNow;
         dialog.close();
-        Tasks.withProgress(ctx.overlay(), I18n.tr("ui.wizard.creating", name), true, (progress, c) -> {
-            var projects = ctx.services().projects();
-            Project p = projects.create(req);
-            if (vanilla) {
-                p = projects.update(p.id, x -> x.preset.applyVanillaVideoSettings = true);
-            }
-            if (pictured != null) {
-                p = projects.setIconFromFile(p.id, pictured);
-            }
-            List<String> notes = new ArrayList<>();
-            if (install) {
-                ctx.services().setup().installGame(p, progress, c);
-                if (!chosenModules.isEmpty()) {
-                    var report = ctx.services().shardlight().check(p, chosenModules);
-                    if (report.canApply()) {
-                        var outcome = ctx.services().setup().applyShardlight(p, chosenModules, req.shardlightTheme(), progress, c);
-                        notes.addAll(outcome.warnings());
-                    } else {
-                        notes.add(I18n.tr("ui.wizard.shardlightLater"));
-                    }
-                }
-                for (SuggestedContent s : suggestions) {
-                    try {
-                        ctx.services().setup().installLatest(p, s.source(), s.projectSlug(),
-                            s.kind() == null ? ContentKind.MOD : s.kind(), progress, c);
-                    } catch (Exception e) {
-                        if (Tasks.isCancelled(e)) {
-                            throw e;
-                        }
-                        notes.add(I18n.tr("ui.wizard.suggestionFailed", s.projectSlug(), Tasks.message(e)));
-                    }
-                }
-            }
-            return new Created(p, notes);
-        }, created -> {
-            ctx.selectProject(created.project().id);
-            ctx.projectsChanged();
-            ctx.overlay().toast("success", I18n.tr("ui.wizard.created", created.project().name));
-            ctx.openProject(created.project().id);
-            if (!created.notes().isEmpty()) {
-                ctx.overlay().message(I18n.tr("ui.wizard.createdTitle"), String.join("\n\n", created.notes()));
-            }
-        });
+        ProjectCreation.run(ctx, req, vanilla, pictured, install, suggestions);
     }
 
-    private record Created(Project project, List<String> notes) {
-    }
 
     /** tiny helper so focus requests run after the step is on screen */
     private static final class Platform {

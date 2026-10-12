@@ -14,6 +14,7 @@ public final class LauncherSettings {
     public List<String> recentProjects = new ArrayList<>();
     public boolean firstRunDone;
     public Appearance appearance = new Appearance();
+    public Library library = new Library();
     public Downloads downloads = new Downloads();
     public JavaDefaults java = new JavaDefaults();
     public Privacy privacy = new Privacy();
@@ -36,6 +37,25 @@ public final class LauncherSettings {
         public boolean highContrast;
         /** the sidebar shows icons only */
         public boolean sidebarCollapsed;
+    }
+
+    /** how the Library page shows projects: view, sort, a custom order and the player's folders */
+    public static final class Library {
+        /** "grid" or "list" */
+        public String view = "grid";
+        /** "recent", "name", "created" or "custom" */
+        public String sort = "recent";
+        /** project ids in the order the player dragged them to (used by the custom sort) */
+        public List<String> order = new ArrayList<>();
+        public List<Group> groups = new ArrayList<>();
+
+        /** a folder of projects; a project belongs to at most one */
+        public static final class Group {
+            public String id;
+            public String name;
+            public boolean collapsed;
+            public List<String> projects = new ArrayList<>();
+        }
     }
 
     public static final class Downloads {

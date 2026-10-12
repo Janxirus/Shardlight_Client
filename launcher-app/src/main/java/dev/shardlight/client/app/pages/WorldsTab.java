@@ -1,13 +1,16 @@
 package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
+import dev.shardlight.client.app.ui.Cards;
 import dev.shardlight.client.app.ui.Dialogs;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.launch.LaunchOptions;
+import dev.shardlight.client.project.BackupInfo;
 import dev.shardlight.client.project.Project;
 import dev.shardlight.client.project.WorldInfo;
 import javafx.geometry.Pos;
@@ -31,11 +34,12 @@ import java.util.Optional;
 final class WorldsTab {
     private final AppContext ctx;
     private final String projectId;
-    private final VBox root = new VBox(10);
+    private final VBox root = new VBox();
 
     WorldsTab(AppContext ctx, String projectId) {
         this.ctx = ctx;
         this.projectId = projectId;
+        root.getStyleClass().add("stack");
     }
 
     VBox view() {
@@ -48,70 +52,123 @@ final class WorldsTab {
             return;
         }
         Project p = found.get();
-        Tasks.quiet(ctx.overlay(), () -> ctx.services().worlds().list(p), worlds -> render(p, worlds));
+        Tasks.quiet(ctx.overlay(), () -> new Loaded(ctx.services().worlds().list(p), ctx.services().backups().list(p.id)),
+            loaded -> render(p, loaded.worlds(), loaded.backups()));
     }
 
-    private void render(Project p, List<WorldInfo> worlds) {
+    private record Loaded(List<WorldInfo> worlds, List<BackupInfo> backups) {
+    }
+
+    private void render(Project p, List<WorldInfo> worlds, List<BackupInfo> backups) {
         root.getChildren().clear();
         Button folder = UiKit.button(I18n.tr("ui.worlds.openFolder"), Icons.FOLDER,
             () -> ctx.openFolder(ctx.services().projects().gameDir(p).resolve("saves")));
-        HBox bar = new HBox(8, UiKit.label(I18n.tr("ui.worlds.count", worlds.size()), "muted"), UiKit.spacer(), folder);
-        bar.setAlignment(Pos.CENTER_LEFT);
+        HBox bar = new HBox(UiKit.label(I18n.tr("ui.worlds.count", worlds.size()), "muted"), UiKit.spacer(), folder);
+        bar.getStyleClass().add("tab-bar");
         root.getChildren().add(bar);
         if (worlds.isEmpty()) {
             root.getChildren().add(UiKit.emptyState(Icons.WORLD, I18n.tr("ui.worlds.emptyTitle"), I18n.tr("ui.worlds.emptyBody"),
                 null));
             return;
         }
+        FlowPane grid = new FlowPane();
+        grid.getStyleClass().add("world-grid");
         for (WorldInfo w : worlds) {
-            root.getChildren().add(row(p, w));
+            grid.getChildren().add(card(p, w, backups.stream().filter(b -> BackupInfo.WORLD.equals(b.kind())
+                && w.folder().equals(b.worldFolder())).toList()));
         }
+        root.getChildren().add(grid);
     }
 
-    private Node row(Project p, WorldInfo w) {
-        Node icon;
+    private Node card(Project p, WorldInfo w, List<BackupInfo> backups) {
+        Node picture;
         if (w.icon() != null && Files.isRegularFile(w.icon())) {
-            ImageView v = new ImageView(new Image(w.icon().toUri().toString(), 48, 48, true, false, true));
-            v.setFitWidth(48);
-            v.setFitHeight(48);
-            icon = v;
+            ImageView v = new ImageView(new Image(w.icon().toUri().toString(), 0, ThemeManager.em(9), true, false, true));
+            v.setFitHeight(ThemeManager.em(9));
+            v.setPreserveRatio(true);
+            v.setSmooth(false);
+            picture = v;
         } else {
-            icon = UiKit.iconBox(dev.shardlight.client.app.ui.Icons.of(Icons.WORLD, 22), 48);
+            picture = Icons.of(Icons.WORLD, 40);
+            picture.getStyleClass().add("faint");
         }
-        FlowPane meta = new FlowPane(6, 4);
-        if (!w.readable()) {
-            meta.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.unreadable"), "danger"));
-        } else {
-            meta.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.mode." + (w.gameMode() == null ? "unknown" : w.gameMode())), null));
-            if (w.hardcore()) {
-                meta.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.hardcore"), "danger"));
-            }
-            if (w.cheats()) {
-                meta.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.cheats"), null));
-            }
-            if (w.versionName() != null) {
-                meta.getChildren().add(UiKit.chip(w.versionName(), null));
-            }
-            if (ctx.services().worlds().isNewerThan(w, p.minecraftVersion)) {
-                meta.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.newer"), "warning", Icons.WARNING));
-            }
-        }
-        VBox text = new VBox(3, UiKit.label(w.name() == null ? w.folder() : w.name(), "project-name"), meta,
-            UiKit.label(I18n.tr("ui.worlds.row", w.lastPlayed() > 0 ? ProjectText.ago(w.lastPlayed()) : "-",
-                UiKit.bytes(w.sizeBytes()), w.folder()), "faint", "small"));
-        HBox.setHgrow(text, Priority.ALWAYS);
-        Button play = UiKit.primary(I18n.tr("ui.worlds.play"), Icons.PLAY, () -> playWorld(p, w));
+        String title = w.name() == null ? w.folder() : w.name();
+        String meta = (w.readable() ? I18n.tr("ui.worlds.mode." + (w.gameMode() == null ? "unknown" : w.gameMode()))
+            : I18n.tr("ui.worlds.unreadable")) + "  ·  " + (w.lastPlayed() > 0 ? ProjectText.ago(w.lastPlayed()) : "-")
+            + "  ·  " + UiKit.bytes(w.sizeBytes());
+
+        Button play = UiKit.button(I18n.tr("ui.play.play"), Icons.PLAY, () -> playWorld(p, w), "primary", "small");
+        play.setAccessibleText(I18n.tr("ui.worlds.playNamed", title));
         play.setDisable(!w.readable());
-        Button backup = UiKit.button(I18n.tr("ui.worlds.backup"), Icons.ARCHIVE, () -> Tasks.withProgress(ctx.overlay(),
-            I18n.tr("ui.worlds.backingUp", w.name()), true,
-            (pr, c) -> ctx.services().backups().backupWorld(p.id, w.folder(), I18n.tr("ui.backup.manualLabel"), pr, c),
-            b -> ctx.overlay().toast("success", I18n.tr("ui.backup.created", UiKit.bytes(b.sizeBytes())))));
-        Button more = UiKit.iconButton(Icons.MORE, I18n.tr("ui.worlds.more", w.name()), () -> { });
+        Button backup = UiKit.button(I18n.tr("ui.worlds.backup"), Icons.ARCHIVE,
+            () -> Tasks.withProgress(ctx.overlay(), I18n.tr("ui.worlds.backingUp", title), true,
+                (pr, c) -> ctx.services().backups().backupWorld(p.id, w.folder(), I18n.tr("ui.backup.manualLabel"), pr, c),
+                b -> {
+                    ctx.overlay().toast("success", I18n.tr("ui.backup.created", UiKit.bytes(b.sizeBytes())));
+                    refresh();
+                }), "small");
+        backup.setAccessibleText(I18n.tr("ui.worlds.backupNamed", title));
+        Button restore = UiKit.button(I18n.tr("ui.backup.restore"), Icons.REFRESH, () -> { }, "small");
+        restore.setAccessibleText(I18n.tr("ui.worlds.restoreNamed", title));
+        if (backups.isEmpty()) {
+            restore.setDisable(true);
+            UiKit.tooltip(restore, I18n.tr("ui.worlds.noBackups"));
+        } else {
+            restore.setOnAction(e -> restoreMenu(p, w, backups).show(restore, Side.BOTTOM, 0, 0));
+        }
+        Button more = UiKit.iconButton(Icons.MORE, I18n.tr("ui.worlds.more", title), () -> { });
         more.setOnAction(e -> menu(p, w).show(more, Side.BOTTOM, 0, 0));
-        HBox row = new HBox(12, icon, text, play, backup, more);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.getStyleClass().addAll("card", "flat");
-        return row;
+        HBox actions = new HBox(play, backup, restore, more);
+        actions.getStyleClass().add("card-actions");
+
+        VBox card = Cards.world(picture, title, meta, null);
+        FlowPane chips = new FlowPane();
+        chips.getStyleClass().add("chip-row");
+        if (w.hardcore()) {
+            chips.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.hardcore"), "danger"));
+        }
+        if (w.cheats()) {
+            chips.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.cheats"), null));
+        }
+        if (w.versionName() != null) {
+            chips.getChildren().add(UiKit.chip(w.versionName(), null));
+        }
+        if (w.readable() && ctx.services().worlds().isNewerThan(w, p.minecraftVersion)) {
+            chips.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.newer"), "warning", Icons.WARNING));
+        }
+        chips.getChildren().add(UiKit.chip(I18n.tr("ui.worlds.backupCount", backups.size()), backups.isEmpty() ? null : "success"));
+        card.getChildren().addAll(chips, actions);
+        return card;
+    }
+
+    /** the backups of one world, newest first: pick one to restore */
+    private ContextMenu restoreMenu(Project p, WorldInfo w, List<BackupInfo> backups) {
+        ContextMenu menu = new ContextMenu();
+        for (BackupInfo b : backups.stream().sorted((x, y) -> Long.compare(y.createdAt(), x.createdAt())).limit(10).toList()) {
+            String label = (b.label() == null || b.label().isBlank() ? I18n.tr("ui.backup.kindWorld", w.folder()) : b.label())
+                + "  ·  " + ProjectText.ago(b.createdAt()) + "  ·  " + UiKit.bytes(b.sizeBytes());
+            MenuItem item = new MenuItem(label);
+            item.setOnAction(e -> restore(p, w, b));
+            menu.getItems().add(item);
+        }
+        return menu;
+    }
+
+    private void restore(Project p, WorldInfo w, BackupInfo b) {
+        if (ctx.play().isRunning(p.id)) {
+            ctx.overlay().message(I18n.tr("ui.backup.restore"), I18n.tr("ui.project.closeGameFirst"));
+            return;
+        }
+        ctx.overlay().confirm(I18n.tr("ui.backup.restoreTitle"), I18n.tr("ui.backup.restoreMessage", w.name()),
+            List.of(I18n.tr("ui.backup.restoreSafety")), I18n.tr("ui.backup.restore"), true,
+            () -> Tasks.withProgress(ctx.overlay(), I18n.tr("ui.backup.restoring"), true, (pr, c) -> {
+                ctx.services().backups().restore(b, pr, c);
+                return true;
+            }, x -> {
+                ctx.overlay().toast("success", I18n.tr("ui.backup.restored"));
+                ctx.projectsChanged();
+                refresh();
+            }));
     }
 
     private void playWorld(Project p, WorldInfo w) {

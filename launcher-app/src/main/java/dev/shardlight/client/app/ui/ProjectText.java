@@ -23,6 +23,11 @@ public final class ProjectText {
         return p.loader.type.displayName() + (p.loader.version == null ? "" : " " + p.loader.version);
     }
 
+    /** just the loader's name ("Fabric", "Vanilla"), without its version: for badges */
+    public static String loaderName(Project p) {
+        return p.loader == null || p.loader.isVanilla() ? I18n.tr("ui.project.vanilla") : p.loader.type.displayName();
+    }
+
     public static String java(Project p) {
         return p.java != null && p.java.javaPath != null && !p.java.javaPath.isBlank()
             ? I18n.tr("ui.project.javaCustom") : I18n.tr("ui.project.javaAuto");

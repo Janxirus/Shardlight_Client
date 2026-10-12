@@ -64,3 +64,28 @@ with in Part 1 (design system and base controls); the rest belong to the later p
   bottom edge.
 - Large empty areas under short pages (Home, Discover while loading); no page width limit on wide windows.
 - Project page header: chips wrap onto a second line at the default window size.
+
+## Part 3: first run, Home, Library and the project page
+
+- **Fixed.** Home had a news-style row and fixed-size tiles; it now has a hero for the selected project
+  (art, version, loader, preset, modules, Play), a "Jump back in" row, and an alerts strip that appears only
+  when something needs attention. Last played and play time come from real launch records only.
+- **Fixed.** Library had one flat list; it now has grid and list views, sorting, filters, folders and drag to
+  reorder, with its own empty and no-match states.
+- **Fixed.** The project page showed everything in one scroll; it now has a header and eight tabs, each with
+  loading, empty and error states.
+- **Fixed.** Sign-in showed a code and little else; it now shows the waiting state, the player's head on
+  success, and a plain next step for every error code, including "waiting for Minecraft approval" with Retry.
+- **Left over.** The Settings and Backups tabs keep their earlier layouts (some fixed gaps); hover and drag
+  states cannot be captured in a screenshot; the player head and sign-in were not checked against a real
+  Microsoft account.
+
+![Home](images/ui-overhaul/part3-home-dark.jpg)
+![Library](images/ui-overhaul/part3-library-dark.jpg)
+![Project overview](images/ui-overhaul/part3-project-overview-dark.jpg)
+![Project mods](images/ui-overhaul/part3-project-content-dark.jpg)
+![Performance](images/ui-overhaul/part3-project-performance-dark.jpg)
+![First run](images/ui-overhaul/part3-firstrun-1-dark.jpg)
+![Sign-in](images/ui-overhaul/part3-signin-code-dark.jpg)
+![Home, light](images/ui-overhaul/part3-home-light.jpg)
+![Library, light](images/ui-overhaul/part3-library-light.jpg)

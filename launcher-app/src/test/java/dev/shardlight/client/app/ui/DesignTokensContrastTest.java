@@ -67,6 +67,20 @@ class DesignTokensContrastTest {
         assertTrue(failures.isEmpty(), "Contrast below WCAG AA:\n" + String.join("\n", failures));
     }
 
+    /** text on project art sits on a translucent chip or scrim, so check it over the worst case: pure white art */
+    @Test
+    void textOnProjectArtPassesAAOverWhiteArt() {
+        Map<String, Color> tokens = themes().get(0).tokens();
+        Color text = tokens.get("-sl-on-art");
+        for (String name : List.of("-sl-art-chip", "-sl-art-chip-hover", "-sl-art-chip-pressed", "-sl-art-scrim-bottom")) {
+            Color over = tokens.get(name);
+            double a = over.getOpacity();
+            Color flat = Color.color(over.getRed() * a + (1 - a), over.getGreen() * a + (1 - a), over.getBlue() * a + (1 - a));
+            double ratio = DesignTokens.contrast(text, flat);
+            assertTrue(ratio >= DesignTokens.AA_TEXT, name + " over white art = " + ratio);
+        }
+    }
+
     @Test
     void accentRampPassesAAForEveryPresetAndRandomColours() {
         List<Color> accents = new ArrayList<>();

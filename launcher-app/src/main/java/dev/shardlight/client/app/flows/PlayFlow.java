@@ -313,6 +313,13 @@ public final class PlayFlow {
         });
     }
 
+    private volatile String availableUpdate;
+
+    /** the version of a newer launcher found by the start-up check, if any */
+    public Optional<String> availableUpdate() {
+        return Optional.ofNullable(availableUpdate);
+    }
+
     /** on start: look for a newer launcher when updates are set up for this build (never installs anything) */
     public void checkForUpdatesQuietly() {
         var updates = ctx.services().updates();
@@ -322,6 +329,7 @@ public final class PlayFlow {
         }
         Fx.run(() -> updates.check(settings.channel, new dev.shardlight.client.task.CancellationToken()), info -> info
             .ifPresent(u -> {
+                availableUpdate = u.version();
                 ctx.shell().setBadge("settings", 1);
                 ctx.overlay().toast("info", I18n.tr("ui.update.available", u.version()),
                     new Overlay.Action(I18n.tr("ui.toast.open"), () -> ctx.openSettings("updates")));

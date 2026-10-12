@@ -140,6 +140,26 @@ public final class Motion {
         return play(t);
     }
 
+    /**
+     * Slide and stretch an underline to span {@code x} .. {@code x + width}. The bar is a node one pixel wide laid
+     * out at the left edge of its track: it moves with translation and stretches with scale, so no layout runs.
+     */
+    public static Animation slideBar(Node bar, Speed speed, double x, double width) {
+        double tx = x + width / 2 - 0.5;
+        if (reduced()) {
+            bar.setTranslateX(tx);
+            bar.setScaleX(width);
+            return null;
+        }
+        TranslateTransition t = new TranslateTransition(speed.duration(), bar);
+        t.setToX(tx);
+        t.setInterpolator(ENTER);
+        ScaleTransition s = new ScaleTransition(speed.duration(), bar);
+        s.setToX(width);
+        s.setInterpolator(ENTER);
+        return play(new ParallelTransition(t, s));
+    }
+
     /** how far cards rise under the pointer, in pixels */
     public static final double LIFT = 2;
 

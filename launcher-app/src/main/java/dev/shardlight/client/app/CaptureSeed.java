@@ -10,6 +10,7 @@ import dev.shardlight.client.nbt.NbtIo;
 import dev.shardlight.client.preset.Preset;
 import dev.shardlight.client.project.BackupScope;
 import dev.shardlight.client.project.JavaSettings;
+import dev.shardlight.client.project.LibraryView;
 import dev.shardlight.client.project.NewProjectRequest;
 import dev.shardlight.client.project.Project;
 import dev.shardlight.client.project.ServerEntry;
@@ -66,6 +67,12 @@ final class CaptureSeed {
                 "EMBER", Preset.BALANCED, new JavaSettings()));
             fill(ctx, p);
             ctx.selectProject(p.id);
+            List<String> ids = projects.list().stream().map(x -> x.id).toList();
+            ctx.services().settings().update(st -> {
+                var folder = LibraryView.addGroup(st.library, "Testing");
+                projects.list().stream().filter(x -> x.name.equals("Map only")).findFirst()
+                    .ifPresent(x -> LibraryView.move(st.library, ids, x.id, folder.id, null));
+            });
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Couldn't create the capture example projects", e);
         }
@@ -120,7 +127,20 @@ final class CaptureSeed {
             "[20:14:06] [Render thread/INFO]: Backend library: LWJGL version 3.4.3",
             "[20:14:09] [Render thread/INFO]: Reloading ResourceManager: vanilla, fabric, file/Faithful 32x.zip",
             "[20:14:12] [Render thread/INFO]: Sound engine started",
+            "[20:14:13] [Render thread/WARN]: Mod 'zoomify' is disabled and was skipped",
+            "[20:21:05] [Render thread/ERROR]: Failed to load a texture for minecraft:textures/gui/sprites/hud/missing.png",
+            "java.io.FileNotFoundException: minecraft:textures/gui/sprites/hud/missing.png",
+            "\tat net.minecraft.client.renderer.texture.SimpleTexture.load(SimpleTexture.java:44)",
+            "[20:21:06] [Render thread/DEBUG]: Using the fallback missing texture",
             "[20:31:40] [Render thread/INFO]: Stopping!", ""), StandardCharsets.UTF_8);
+        Path crashes = Files.createDirectories(game.resolve("crash-reports"));
+        Files.writeString(crashes.resolve("crash-2026-10-12_20.31.40-client.txt"), String.join("\n",
+            "---- Minecraft Crash Report ----",
+            "Description: Initializing game",
+            "net.fabricmc.loader.impl.FormattedException: Some of your mods are incompatible with the game or each other!",
+            " - Mod 'Sodium Extra' (sodium-extra) 0.7.0 requires version 0.7.0 or later of mod 'Sodium' (sodium), which is missing!",
+            " - Mod 'Old Zoom' (oldzoom) 1.2 requires version 1.21.4 of 'Minecraft' (minecraft), but only the wrong version is present: 26.3!",
+            ""), StandardCharsets.UTF_8);
 
         services.backups().backupProject(p.id, "Before trying shaders", BackupScope.EVERYTHING, ProgressListener.NONE,
             CancellationToken.NONE);

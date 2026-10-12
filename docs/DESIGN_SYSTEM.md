@@ -307,6 +307,28 @@ Build pages from these. All of them are shown, in each state, in the component g
 | Empty state | `UiKit.empty(illustration, sentence, action)` | One sentence, one action |
 | Error and offline | `UiKit.errorState(message, retry)`, `UiKit.offlineState(retry)` | Both have Retry |
 
+### Pieces added in Part 3
+
+| Piece | API | Notes |
+| --- | --- | --- |
+| Project art | `ProjectArt.of(project, dir, w, h, radiusEm)` | The project's own picture as a cover, or art drawn from the name and the template colour, so no two projects look alike. Same project, same art |
+| Play button | `PlayButton.of(ctx, project, "large")` | Play, Cancel or Stop by the launch phase; the one main action on Home, the project page and the Play bar |
+| Tab strip | `new TabStrip(labels, initial, onSelect)` | Underline slides with `Motion.slideBar`; Left and Right move between tabs; the page owns the content |
+| Masonry | `MasonryPane.add(node, ratio)` | Shortest-column layout for the screenshot gallery |
+| Player head | `PlayerHead.of(account, size)` | The face and hat of the account's own skin; only `textures.minecraft.net`, always over https |
+| Log lines | `LogLines.parse` (`log-error`, `log-warn`, `log-info`, `log-debug`) | Level colours are tokens; stack traces take the level of their error |
+| Library view | `LibraryView` in `launcher-core` | Sort, filter, folders and drag order as plain logic with tests; saved in `settings.library` |
+
+Text and controls drawn on art use `-sl-on-art` with the translucent `-sl-art-chip` and `-sl-art-scrim-*`
+tokens (the same in dark and light, because the art is a picture; a test checks them over pure white art).
+Add the class `on-art` to a label, chip or button that sits on art, and `art-action` to a button that
+floats over it.
+
+Layout classes replace numbers in Java: `stack` and `stack-tight` (vertical gaps), `button-row`, `stat-row`,
+`tab-bar`, `page-actions`, `tab-body`, and `page-column` (the 80em reading width of Home and Library).
+Spacing set with a constructor argument is not overridden by the stylesheet, so give containers a class
+instead of `new VBox(10)`.
+
 Images: show a placeholder in `-sl-fill` and fade the picture in when it arrives (`RemoteImage`). Right-click
 menus offer the same actions as the visible buttons (project tiles, the pinned project, the Play bar).
 
