@@ -29,11 +29,11 @@ class MicrosoftClientIdsTest {
     }
 
     @Test
-    void noBuiltInId() throws IOException {
+    void idComesFromTheBuild() throws IOException {
         System.clearProperty(MicrosoftClientIds.PROPERTY);
-        // the source tree bakes in no id; only a distributor's build does (SHARDLIGHT_MSA_CLIENT_ID)
+        // the id comes from the build (gradle.properties default or SHARDLIGHT_MSA_CLIENT_ID), never from the template
         String template = Files.readString(Path.of("src/main/resources/shardlight-client-build.properties"));
-        assertTrue(template.contains("msaClientId=${msaClientId}"), "there is no built-in client id");
+        assertTrue(template.contains("msaClientId=${msaClientId}"), "the client id is filled in by the build");
         String baked = BuildInfo.microsoftClientId().orElse("");
         assertEquals(baked, MicrosoftClientIds.buildDefault());
         assertEquals(baked, MicrosoftClientIds.of(() -> "").get());
@@ -52,7 +52,7 @@ class MicrosoftClientIdsTest {
     void readsTheSettingOnEveryCall() throws Exception {
         SettingsService settings = new SettingsService(new AppPaths(dir));
         Supplier<String> id = MicrosoftClientIds.fromSettings(settings);
-        assertEquals("", id.get());
+        assertEquals(BuildInfo.microsoftClientId().orElse(""), id.get(), "no setting falls back to the build default");
         settings.update(s -> s.auth.microsoftClientId = ID);
         assertEquals(ID, id.get());
         settings.update(s -> s.auth.microsoftClientId = "");

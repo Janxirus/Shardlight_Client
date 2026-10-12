@@ -5,10 +5,11 @@ and checks that the account owns Minecraft: Java Edition. The launcher **never s
 and has **no offline or cracked mode**.
 
 This page is for whoever builds and distributes Shardlight Client. Sign-in needs a Microsoft
-application (an Azure "client ID") that **you** register and that Mojang approves for Minecraft. There
-is no built-in client ID, and you must not reuse another launcher's. Until one is configured, the
-Accounts page explains that sign-in isn't set up, and every sign-in call fails with
-`AUTH_NOT_CONFIGURED`.
+application (an Azure "client ID") that the distributor registers and that Mojang approves for
+Minecraft. Builds of this repository use the project's own app, `default_msa_client_id` in
+`gradle.properties`. Anyone distributing their own build registers their own app and must not reuse
+another launcher's. Without an id, the Accounts page explains that sign-in isn't set up, and every
+sign-in call fails with `AUTH_NOT_CONFIGURED`.
 
 ## How sign-in works
 
@@ -96,6 +97,7 @@ The launcher looks for the client ID in this order and uses the first one it fin
 | `settings.json` | `"auth": { "microsoftClientId": "4f2b1a9c-..." }` in the data folder (see below) |
 | Build default: system property | `-Dshardlight.msaClientId=4f2b1a9c-...`, for example through jpackage `--java-options` |
 | Build default: baked into the build | `-Pshardlight.msaClientId=4f2b1a9c-...` on the Gradle command line, or the `SHARDLIGHT_MSA_CLIENT_ID` environment variable (in CI, the Actions variable of that name; see [RELEASING.md](RELEASING.md)) |
+| Build default: the project's app | `default_msa_client_id` in `gradle.properties`, used when nothing above is set |
 
 The setting is read every time sign-in starts, so a change takes effect without a restart.
 `MicrosoftClientIds.looksValid` checks that a typed value has the shape of a GUID.

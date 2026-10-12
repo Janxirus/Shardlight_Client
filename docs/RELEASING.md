@@ -5,13 +5,14 @@ draft that a maintainer reviews and publishes by hand.
 
 ## 1. Distributor values
 
-A release build can carry four values. None of them is in the repository. They are read at build time
+A release build can carry four values. Only the Microsoft client id has a default in the repository
+(`default_msa_client_id` in `gradle.properties`, the project's own app); the others are not in it. They are read at build time
 from Gradle properties or environment variables, and CI passes them from the repository's
 **Settings > Secrets and variables > Actions**:
 
 | Actions name | Kind | Gradle property | What it does without it |
 |---|---|---|---|
-| `SHARDLIGHT_MSA_CLIENT_ID` | variable | `shardlight.msaClientId` | Microsoft sign-in is off until a player pastes an id in Settings > Accounts ([SIGN_IN.md](SIGN_IN.md)) |
+| `SHARDLIGHT_MSA_CLIENT_ID` | variable | `shardlight.msaClientId` | the project's app id from `gradle.properties` is used ([SIGN_IN.md](SIGN_IN.md)) |
 | `SHARDLIGHT_CURSEFORGE_API_KEY` | **secret** | `shardlight.curseForgeApiKey` | CurseForge is off until a player enters their own key |
 | `SHARDLIGHT_UPDATE_MANIFEST_URL` | variable | `shardlight.updateManifestUrl` | update checks are off and Settings > Updates says so |
 | `SHARDLIGHT_UPDATE_PUBLIC_KEY` | variable | `shardlight.updatePublicKey` | update checks are off |

@@ -66,10 +66,11 @@ launcher, for example on a USB drive.
 ## Sign-in
 
 Minecraft accounts sign in through Microsoft. A launcher can only do that with an Azure application id
-that Microsoft has approved for Minecraft's services, and there is deliberately no id built in. Until the
-distributor registers one, the launcher shows "Microsoft sign-in is not set up" and can install, organise
-and prepare projects but not start the game. [docs/SIGN_IN.md](docs/SIGN_IN.md) walks through
-registering the app, asking for access and configuring the id.
+that Microsoft has approved for Minecraft's services. Builds of this repository use the project's own
+app (`default_msa_client_id` in `gradle.properties`); sign-in works once Mojang has approved it. A build
+without an id shows "Microsoft sign-in is not set up" and can install, organise and prepare projects but
+not start the game. [docs/SIGN_IN.md](docs/SIGN_IN.md) walks through registering an app, asking for
+access and configuring the id.
 
 ## Where your data lives
 
