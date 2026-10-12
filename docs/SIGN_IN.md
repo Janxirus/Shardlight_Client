@@ -50,9 +50,15 @@ Accounts page explains that sign-in isn't set up, and every sign-in call fails w
 
 ## 1. Register the application (Microsoft Entra)
 
-1. Sign in at https://entra.microsoft.com (or the Azure portal, https://portal.azure.com) with the
-   Microsoft account that will own the app. A free account is enough.
-2. Go to **Identity > Applications > App registrations > New registration**.
+1. Sign in at the Azure portal, https://portal.azure.com, with the Microsoft account that will own the
+   app, and open **App registrations** (search for it at the top). A personal account (Outlook, Gmail
+   or any other email used as a Microsoft account) needs its own directory first:
+   * `entra.microsoft.com` answers a personal account with "Selected user account does not exist in
+     tenant 'Microsoft Services'". Use the Azure portal instead.
+   * If the portal says you have no access or asks you to create a directory or subscription, sign up
+     for a free Azure account at https://azure.microsoft.com/free with the same email (Microsoft asks
+     for a card to verify identity), then open App registrations again. App registrations cost nothing.
+2. Click **New registration**.
    * **Name**: for example `Shardlight Client (your name)`. Players see it on Microsoft's consent page.
    * **Supported account types**: **Personal Microsoft accounts only**. "Accounts in any
      organizational directory and personal Microsoft accounts" also works. The launcher signs in
