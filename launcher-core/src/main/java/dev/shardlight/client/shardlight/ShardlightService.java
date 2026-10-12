@@ -329,8 +329,7 @@ public final class ShardlightService {
             progress.progress("shardlight.stage.modules", I18n.tr(m.nameKey()), i++, sel.size());
             List<ContentEntry> others = otherCopies(proj, m);
             if (!others.isEmpty()) {
-                warnings.add(I18n.tr("shardlight.apply.keptOtherCopy", I18n.tr(m.nameKey()), String.valueOf(others.get(0).fileName)));
-                continue;
+                continue; // the check's otherCopy warning already says that copy is kept
             }
             LibraryItem jar = library.moduleJar(m.id(), proj.minecraftVersion).orElseThrow(() ->
                 new LauncherException(ErrorCode.DEPENDENCY_MISSING, "shardlight.apply.missingJar", I18n.tr(m.nameKey())));
