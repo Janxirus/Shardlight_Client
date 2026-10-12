@@ -1,5 +1,6 @@
 package dev.shardlight.client.app;
 
+import dev.shardlight.client.app.flows.DropFlow;
 import dev.shardlight.client.app.flows.FirstRun;
 import dev.shardlight.client.app.flows.PlayFlow;
 import dev.shardlight.client.app.flows.SignInDialog;
@@ -273,6 +274,7 @@ public final class AppContext {
 
     void attach(Scene s) {
         this.scene = s;
+        DropFlow.install(this, s);
         services.settings().addListener(st -> Fx.ui(() -> {
             UiSettings.setReducedMotion(st.appearance.reducedMotion);
             ThemeManager.apply(s, st.appearance);

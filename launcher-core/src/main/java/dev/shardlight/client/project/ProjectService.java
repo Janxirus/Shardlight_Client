@@ -461,6 +461,12 @@ public final class ProjectService implements ProjectAccess {
         return ProjectMover.move(this, paths, id, newParent, progress, cancel, moveFault);
     }
 
+    /** where a new project called {@code projectName} would keep its game files inside {@code parent} */
+    public Path suggestNewGameDir(Path parent, String projectName) {
+        Path p = parent.toAbsolutePath().normalize();
+        return p.resolve(ProjectMover.folderName(p, Names.slug(projectName == null || projectName.isBlank() ? "project" : projectName)));
+    }
+
     /** a folder name for a new game directory inside {@code parent}, so the dialogs can show the exact path */
     public Path suggestGameDir(Path parent, String id) {
         return parent.toAbsolutePath().normalize().resolve(ProjectMover.folderName(parent, id));
@@ -645,6 +651,14 @@ public final class ProjectService implements ProjectAccess {
         }
         LOG.info("Deleted archived project " + trashId);
         fireChanged();
+    }
+
+    /** the folder outside the data folder that holds an archived project's game files, which deleting it for good also deletes */
+    public Optional<Path> archivedGameDir(String trashId) {
+        if (!isUsableId(trashId) || trashId.equalsIgnoreCase(TRASH_INDEX)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(externalGameDir(paths.trash().resolve(trashId)));
     }
 
     /** the game directory an archived project keeps outside the data folder, or null */

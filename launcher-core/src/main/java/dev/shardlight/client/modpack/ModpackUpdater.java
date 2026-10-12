@@ -158,7 +158,7 @@ public final class ModpackUpdater {
             items.add(new UpdateItem(extra, UpdateAction.KEEP_ADDED, false));
         }
         items.sort(Comparator.comparing(UpdateItem::path));
-        UpdatePlan plan = new UpdatePlan(m.name(), Objects.equals(m.name(), baseline.packName), baseline.packVersion, m.versionId(),
+        UpdatePlan plan = new UpdatePlan(m.name(), baseline.packName, Objects.equals(m.name(), baseline.packName), baseline.packVersion, m.versionId(),
             project.minecraftVersion, m.minecraft(), project.loader, m.loader(), items);
         return new Loaded(plan, m, next);
     }

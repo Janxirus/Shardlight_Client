@@ -1009,6 +1009,15 @@
     -fx-padding: 0.857em;
 }
 
+/* a file is being dragged over the window */
+.root.drop-active {
+    -fx-border-color: -sl-accent;
+    -fx-border-style: dashed;
+    -fx-border-width: 0.143em;
+    -fx-border-insets: 0.571em;
+    -fx-border-radius: 1.143em;
+}
+
 .device-code {
     -fx-font-size: 2.143em;
     -fx-font-weight: bold;

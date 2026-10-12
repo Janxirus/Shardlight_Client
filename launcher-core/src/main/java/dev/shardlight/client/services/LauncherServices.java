@@ -23,6 +23,10 @@ import dev.shardlight.client.log.Redactor;
 import dev.shardlight.client.minecraft.GameInstaller;
 import dev.shardlight.client.minecraft.VersionManifestService;
 import dev.shardlight.client.modpack.ModpackService;
+import dev.shardlight.client.storage.DiskUsage;
+import dev.shardlight.client.project.BackupScope;
+import dev.shardlight.client.modpack.ModpackUpdater;
+import dev.shardlight.client.content.DropService;
 import dev.shardlight.client.net.Endpoints;
 import dev.shardlight.client.net.HttpService;
 import dev.shardlight.client.preset.PresetEngine;
@@ -81,6 +85,9 @@ public final class LauncherServices implements AutoCloseable {
     private final CatalogRegistry catalogs;
     private final InstallPlanner planner;
     private final ModpackService modpacks;
+    private final ModpackUpdater modpackUpdater;
+    private final DropService drops;
+    private final DiskUsage diskUsage;
     private final ShardlightCatalog shardlightCatalog;
     private final ShardlightContentLibrary shardlightLibrary;
     private final ShardlightService shardlight;
@@ -131,6 +138,10 @@ public final class LauncherServices implements AutoCloseable {
             (name, mc, loader) -> projects.create(new NewProjectRequest(name, null, "modpack", mc, loader,
                 Set.of(), null, null, null)),
             content, downloads, catalogs);
+        this.modpackUpdater = new ModpackUpdater(modpacks, projects, content, downloads,
+            (p, pl, ct) -> backups.backupProject(p.id, "Before modpack update", new BackupScope(false, true, true, true, false, true), pl, ct));
+        this.drops = new DropService(content, worlds, screenshots);
+        this.diskUsage = new DiskUsage(paths, projects, projects::list);
 
         this.shardlightCatalog = ShardlightCatalog.load();
         this.shardlightLibrary = new ShardlightContentLibrary(paths, http, downloads, shardlightCatalog, modrinth);
@@ -291,6 +302,18 @@ public final class LauncherServices implements AutoCloseable {
 
     public InstallPlanner planner() {
         return planner;
+    }
+
+    public ModpackUpdater modpackUpdater() {
+        return modpackUpdater;
+    }
+
+    public DropService drops() {
+        return drops;
+    }
+
+    public DiskUsage diskUsage() {
+        return diskUsage;
     }
 
     public ModpackService modpacks() {

@@ -92,6 +92,7 @@ public final class NewProjectWizard {
     private String javaPath;
     private String extraJvmArgs = "";
     private boolean installNow = true;
+    private Path locationParent;
     private boolean advancedOpen;
     private boolean focusName;
     private final Set<SuggestedContent> chosenSuggestions = new LinkedHashSet<>();
@@ -494,6 +495,7 @@ public final class NewProjectWizard {
         }
         out.add(presetBox());
         out.add(javaBox());
+        out.add(locationBox());
         return out.toArray(new Node[0]);
     }
 
@@ -785,6 +787,43 @@ public final class NewProjectWizard {
             UiKit.label(I18n.tr("ui.wizard.jvmArgsHint"), "faint", "small"));
     }
 
+    private Node locationBox() {
+        Label where = UiKit.label("", "mono");
+        where.setWrapText(true);
+        Label problem = UiKit.label("", "danger-text", "small");
+        Runnable show = () -> where.setText(locationParent == null ? I18n.tr("ui.wizard.locationDefault")
+            : ctx.services().projects().suggestNewGameDir(locationParent, name).toString());
+        show.run();
+        Button useDefault = UiKit.button(I18n.tr("ui.wizard.locationUseDefault"), null, () -> { });
+        useDefault.setVisible(locationParent != null);
+        useDefault.setManaged(locationParent != null);
+        Button choose = UiKit.button(I18n.tr("ui.wizard.locationChoose"), Icons.FOLDER, () -> {
+            Path picked = Dialogs.chooseFolder(ctx.stage(), I18n.tr("ui.wizard.locationTitle"), locationParent);
+            if (picked == null) {
+                return;
+            }
+            if (picked.toAbsolutePath().normalize().startsWith(ctx.services().paths().root())) {
+                problem.setText(I18n.tr("ui.move.insideData"));
+                return;
+            }
+            problem.setText("");
+            locationParent = picked;
+            useDefault.setVisible(true);
+            useDefault.setManaged(true);
+            show.run();
+        });
+        useDefault.setOnAction(e -> {
+            locationParent = null;
+            problem.setText("");
+            useDefault.setVisible(false);
+            useDefault.setManaged(false);
+            show.run();
+        });
+        HBox buttons = new HBox(8, choose, useDefault);
+        return new VBox(6, UiKit.label(I18n.tr("ui.wizard.location"), "strong"), where, buttons, problem,
+            UiKit.label(I18n.tr("ui.wizard.locationHint"), "faint", "small"));
+    }
+
     // ------------------------------------------------------------------ step 3: review
 
     /** ask the game installer what is still missing for this version; the answer redraws the review */
@@ -825,6 +864,8 @@ public final class NewProjectWizard {
             summaryRow(I18n.tr("ui.wizard.review.name"), name + "  ·  " + I18n.tr(template.nameKey())),
             summaryRow(I18n.tr("ui.wizard.review.minecraft"), minecraftVersion + "  ·  " + loaderText),
             summaryRow(I18n.tr("ui.wizard.review.shardlight"), shardlightSummary()),
+            summaryRow(I18n.tr("ui.wizard.review.location"), locationParent == null ? I18n.tr("ui.wizard.locationDefault")
+                : ctx.services().projects().suggestNewGameDir(locationParent, name).toString()),
             summaryRow(I18n.tr("ui.wizard.review.settings"), I18n.tr(preset.nameKey())
                 + (vanillaVideo ? " (" + I18n.tr("ui.wizard.review.vanillaToo") + ")" : "") + "  ·  "
                 + UiKit.bytes(memoryMb * 1024L * 1024L) + "  ·  "
@@ -966,7 +1007,8 @@ public final class NewProjectWizard {
         boolean vanilla = vanillaVideo;
         Path pictured = iconFile;
         boolean install = installNow;
+        Path location = locationParent;
         dialog.close();
-        ProjectCreation.run(ctx, req, vanilla, pictured, install, suggestions);
+        ProjectCreation.run(ctx, req, vanilla, pictured, install, suggestions, location);
     }
 }

@@ -100,6 +100,8 @@ public final class SettingsPage implements Page {
         new Entry("storage", "backupsFolder", "ui.settings.backupsFolder", "ui.settings.dataFolderHow"),
         new Entry("storage", "logsFolder", "ui.settings.logsFolder", "ui.settings.dataFolderHow"),
         new Entry("storage", "cacheFolder", "ui.settings.cacheFolder", "ui.settings.dataFolderHow"),
+        new Entry("storage", "diskUse", "ui.storage.title", "ui.storage.cleanupAbout"),
+        new Entry("storage", "cleanup", "ui.storage.cleanup", "ui.storage.cleanupAbout"),
         new Entry("storage", "diagnostics", "ui.settings.diagnostics", "ui.settings.diagnosticsAbout"),
         new Entry("advanced", "signin", "ui.settings.clientId", "ui.settings.clientIdAbout"),
         new Entry("advanced", "content", "ui.settings.section.content", "ui.settings.section.content.about"),
@@ -760,6 +762,9 @@ public final class SettingsPage implements Page {
             folderRow("backupsFolder", I18n.tr("ui.settings.backupsFolder"), paths.backups()),
             folderRow("logsFolder", I18n.tr("ui.settings.logsFolder"), paths.logs()),
             folderRow("cacheFolder", I18n.tr("ui.settings.cacheFolder"), paths.cache())));
+        List<Node> usage = StorageSection.build(ctx);
+        content.getChildren().add(reg("diskUse", usage.get(0)));
+        content.getChildren().add(reg("cleanup", usage.get(1)));
         if (ctx.services().settings().recoveredFrom() != null) {
             content.getChildren().add(UiKit.banner("warning", I18n.tr("ui.settings.recovered",
                 ctx.services().settings().recoveredFrom().getFileName())));

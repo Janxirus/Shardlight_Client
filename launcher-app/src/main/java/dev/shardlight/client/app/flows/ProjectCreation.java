@@ -30,9 +30,15 @@ public final class ProjectCreation {
      */
     public static void run(AppContext ctx, NewProjectRequest req, boolean vanillaVideo, Path pictured, boolean install,
                            List<SuggestedContent> suggestions) {
+        run(ctx, req, vanillaVideo, pictured, install, suggestions, null);
+    }
+
+    /** as above, with the game files in a new folder inside {@code location} (null = the launcher's folder) */
+    public static void run(AppContext ctx, NewProjectRequest req, boolean vanillaVideo, Path pictured, boolean install,
+                           List<SuggestedContent> suggestions, Path location) {
         Tasks.withProgress(ctx.overlay(), I18n.tr("ui.wizard.creating", req.name()), true, (progress, c) -> {
             var projects = ctx.services().projects();
-            Project p = projects.create(req);
+            Project p = projects.create(req, location);
             if (vanillaVideo) {
                 p = projects.update(p.id, x -> x.preset.applyVanillaVideoSettings = true);
             }

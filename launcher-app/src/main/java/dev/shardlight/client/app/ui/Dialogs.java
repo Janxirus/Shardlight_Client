@@ -116,6 +116,17 @@ public final class Dialogs {
         return out;
     }
 
+    /** a choose-folder dialog starting in {@code initial} when that exists; null when cancelled */
+    public static Path chooseFolder(Window owner, String title, Path initial) {
+        javafx.stage.DirectoryChooser dc = new javafx.stage.DirectoryChooser();
+        dc.setTitle(title);
+        if (initial != null && java.nio.file.Files.isDirectory(initial)) {
+            dc.setInitialDirectory(initial.toFile());
+        }
+        File f = dc.showDialog(owner);
+        return f == null ? null : f.toPath();
+    }
+
     public static Path saveFile(Window owner, String title, String initialName, String filterName, String extension) {
         FileChooser fc = new FileChooser();
         fc.setTitle(title);

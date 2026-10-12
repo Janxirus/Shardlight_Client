@@ -2,6 +2,8 @@ package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.flows.ProjectActions;
+import dev.shardlight.client.app.flows.ProjectMoveDialog;
+import dev.shardlight.client.app.flows.ModpackUpdateFlow;
 import dev.shardlight.client.app.ui.Dialogs;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Motion;
@@ -328,7 +330,23 @@ public final class ProjectPage implements Page {
         full.selectedProperty().addListener((o, a, b) -> save(x -> x.window.fullscreen = b));
         window.getChildren().add(UiKit.settingRow(I18n.tr("ui.projectPage.fullscreen"), null, full));
 
-        settings.getChildren().addAll(game, java, window);
+        VBox where = UiKit.card(UiKit.label(I18n.tr("ui.move.row"), "h3"));
+        where.getStyleClass().add("stack-tight");
+        Label gamePath = UiKit.label(ctx.services().projects().gameDir(p).toString(), "mono", "small");
+        gamePath.setWrapText(true);
+        Button move = UiKit.button(I18n.tr("ui.move.button"), Icons.FOLDER, () -> ProjectMoveDialog.show(ctx, p));
+        where.getChildren().add(UiKit.settingRow(p.gameDirLocation == null ? I18n.tr("ui.move.here") : I18n.tr("ui.move.outside"),
+            I18n.tr("ui.move.rowHint"), move));
+        where.getChildren().add(gamePath);
+
+        settings.getChildren().addAll(game, java, window, where);
+        if (ctx.services().modpackUpdater().canUpdate(p)) {
+            VBox pack = UiKit.card(UiKit.label(I18n.tr("ui.update.cardTitle"), "h3"));
+            pack.getStyleClass().add("stack-tight");
+            Button update = UiKit.button(I18n.tr("ui.update.button"), Icons.UPDATE, () -> ModpackUpdateFlow.start(ctx, p));
+            pack.getChildren().add(UiKit.settingRow(I18n.tr("ui.update.rowTitle"), I18n.tr("ui.update.rowHint"), update));
+            settings.getChildren().add(pack);
+        }
     }
 
     private Node versionControl(Project p) {
