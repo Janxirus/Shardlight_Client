@@ -133,6 +133,24 @@ public final class UiKit {
         return h;
     }
 
+    /** a coloured strip around any content (several lines, links...) */
+    public static HBox banner(String kind, Node content, Node... actions) {
+        String icon = switch (kind) {
+            case "warning" -> Icons.WARNING;
+            case "danger" -> Icons.ERROR;
+            case "success" -> Icons.CHECK;
+            default -> Icons.INFO;
+        };
+        HBox.setHgrow(content, Priority.ALWAYS);
+        if (content instanceof Region r) {
+            r.setMaxWidth(Double.MAX_VALUE);
+        }
+        HBox h = new HBox(Icons.of(icon, 18), content);
+        h.getChildren().addAll(actions);
+        h.getStyleClass().addAll("banner", kind);
+        return h;
+    }
+
     public static VBox stat(String value, String label) {
         Label v = label(value, "stat-value");
         Label l = label(label, "stat-label");

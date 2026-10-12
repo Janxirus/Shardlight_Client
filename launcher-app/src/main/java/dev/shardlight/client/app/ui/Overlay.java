@@ -170,4 +170,14 @@ public final class Overlay {
     public boolean hasOpenDialog() {
         return !open.isEmpty();
     }
+
+    /** close the topmost dialog (used by --capture between pages) */
+    public void closeTop() {
+        StackPane top = open.peek();
+        if (top != null) {
+            root.getChildren().remove(top);
+            open.remove(top);
+            content.setDisable(!open.isEmpty());
+        }
+    }
 }

@@ -603,3 +603,90 @@
     -fx-font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
     -fx-font-size: 0.82em;
 }
+
+/* ---- page-specific pieces ---- */
+
+.button.large { -fx-font-size: 1.08em; -fx-padding: 0.7em 1.4em; }
+
+.account-chip { -fx-padding: 0.4em 0 0 0; }
+.account-row {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 0.7em;
+    -fx-padding: 0.5em 0.6em;
+    -fx-cursor: hand;
+}
+.account-row:hover { -fx-background-color: -sl-surface-2; }
+.account-name { -fx-font-weight: bold; -fx-text-fill: -sl-text; }
+
+/* Discover */
+.source-toggle, .chip-toggle {
+    -fx-background-color: -sl-surface-2;
+    -fx-border-color: -sl-border;
+    -fx-text-fill: -sl-text-2;
+    -fx-cursor: hand;
+}
+.source-toggle { -fx-background-radius: 0.6em; -fx-border-radius: 0.6em; -fx-padding: 0.45em 1em; }
+.chip-toggle { -fx-background-radius: 1em; -fx-border-radius: 1em; -fx-padding: 0.22em 0.75em; -fx-font-size: 0.86em; }
+.source-toggle:hover, .chip-toggle:hover { -fx-border-color: -sl-border-strong; -fx-text-fill: -sl-text; }
+.source-toggle:selected, .chip-toggle:selected {
+    -fx-background-color: derive(-sl-accent, -55%);
+    -fx-border-color: -sl-accent;
+    -fx-text-fill: -sl-text;
+}
+.root.light .source-toggle:selected, .root.light .chip-toggle:selected { -fx-background-color: derive(-sl-accent, 82%); }
+.source-toggle:focused, .chip-toggle:focused { -fx-border-color: -sl-focus; -fx-border-width: 1.6; }
+.source-toggle:disabled { -fx-opacity: 0.5; }
+
+.result-row, .content-row, .server-row { -fx-padding: 0.75em 0.9em; }
+.result-row:hover, .content-row:hover, .server-row:hover { -fx-border-color: -sl-border-strong; }
+
+/* new project wizard: icon picker */
+.icon-choice {
+    -fx-background-radius: 0.8em;
+    -fx-border-radius: 0.8em;
+    -fx-border-color: transparent;
+    -fx-border-width: 2;
+    -fx-padding: 0.2em;
+    -fx-cursor: hand;
+}
+.icon-choice:hover { -fx-border-color: -sl-border-strong; }
+.icon-choice.selected { -fx-border-color: -sl-accent; }
+.icon-choice:focused { -fx-border-color: -sl-focus; }
+
+/* Downloads */
+.download-details {
+    -fx-padding: 0.6em 0 0 0;
+    -fx-border-color: -sl-border transparent transparent transparent;
+}
+.progress-bar.danger > .bar { -fx-background-color: -sl-danger; }
+
+/* Settings */
+.settings-nav { -fx-border-color: transparent -sl-border transparent transparent; }
+.settings-nav-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 0.6em;
+    -fx-padding: 0.55em 0.8em;
+    -fx-text-fill: -sl-text-2;
+    -fx-graphic-text-gap: 0.75em;
+}
+.settings-nav-button .icon { -fx-fill: -sl-text-3; }
+.settings-nav-button:hover { -fx-background-color: -sl-surface; -fx-text-fill: -sl-text; }
+.settings-nav-button.selected { -fx-background-color: -sl-surface-2; -fx-text-fill: -sl-text; -fx-font-weight: bold; }
+.settings-nav-button.selected .icon { -fx-fill: -sl-accent; }
+.settings-nav-button:focused { -fx-border-color: -sl-focus; -fx-border-radius: 0.6em; }
+
+.accent-swatch {
+    -fx-min-width: 1.9em;
+    -fx-min-height: 1.9em;
+    -fx-pref-width: 1.9em;
+    -fx-pref-height: 1.9em;
+    -fx-background-radius: 1em;
+    -fx-border-radius: 1em;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 2;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+.accent-swatch.selected { -fx-border-color: -sl-text; }
+.accent-swatch:focused { -fx-border-color: -sl-focus; }

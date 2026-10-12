@@ -30,7 +30,10 @@ public final class ShardlightApp extends Application {
     public void start(Stage stage) {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> LOG.log(Level.SEVERE, "Uncaught error on " + t.getName(), e));
         try {
-            ctx = AppContext.create(paths == null ? AppPaths.defaults() : paths, stage);
+            ctx = AppContext.create(paths == null ? AppPaths.defaults() : paths, stage, getHostServices());
+            if (launchArgs != null && launchArgs.captureDir() != null) {
+                CaptureSeed.seed(ctx);
+            }
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "Startup failed", e);
             StartupError.show(stage, e);
