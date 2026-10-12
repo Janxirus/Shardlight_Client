@@ -332,6 +332,24 @@ instead of `new VBox(10)`.
 Images: show a placeholder in `-sl-fill` and fade the picture in when it arrives (`RemoteImage`). Right-click
 menus offer the same actions as the visible buttons (project tiles, the pinned project, the Play bar).
 
+### Pieces added in Part 4
+
+| Piece | API | Notes |
+| --- | --- | --- |
+| Dialog frame | `Overlay.modal(title, body, buttons...)`, `Overlay.fillActions` | Title, body, then one footer: Cancel on the left, the main action on the right. Esc closes (give the button `setCancelButton(true)`). The first `primary` button is the default, so Enter confirms |
+| Danger dialog | `Overlay.confirm(message, details, danger)` | The red `modal-lost` panel says what is lost; the button uses the danger style. Enter never confirms a danger dialog and the focus starts on Cancel, so a stray key cannot delete anything |
+| Disclosure | `Disclosure.of(title, content)` | A collapsed "Advanced" part: header with a chevron, content slides open. Used by the new-project wizard and a download's file list |
+| Split Install button | `InstallButton` | Main button shows the state (Install, Installing, Installed, Update); the arrow opens versions. Class `primary-split` when the main part is primary |
+| Step header | `StepProgress` | Numbered steps joined by a line; done steps get a tick. The new-project wizard uses three: template, basics, review |
+| Ping bars, MOTD | `PingBars`, `MotdText` | Four bars by latency; the MOTD is drawn from Minecraft colour codes mapped to readable colours in both themes (a test checks contrast) |
+| Settings search | `SettingsPage` | Every setting is registered with a title and keywords; the search jumps to the section, scrolls to the row and marks it with `setting-found` for three seconds. Each change applies at once and shows an Undo toast |
+| Crash screen | `CrashScreen.show` | The most likely cause in plain words, the fix button from the crash analysis, the other findings collapsed, then Open log and Export diagnostics |
+
+**JavaFX CSS limits.** There are no sibling combinators (`+`, `~`) and no `:not`, `:is`, `:where`,
+`:nth-child` or `:last-child`. A selector the parser cannot read makes it drop the rest of the stylesheet,
+so everything after it looks unstyled. Use a style class instead (`ruled`, `primary-split`).
+`StylesheetTest` fails the build on these selectors.
+
 ## Styling a new view
 
 1. Build it from `UiKit` pieces and JavaFX controls; give containers style classes (`card`, `page`,
