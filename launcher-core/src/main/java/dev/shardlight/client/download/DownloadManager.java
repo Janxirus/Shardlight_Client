@@ -30,7 +30,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -52,7 +55,10 @@ public final class DownloadManager implements AutoCloseable {
     private final HttpService http;
     private final Path cacheDir;
     private final ExecutorService executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("download-", 0).factory());
-    private final Object slotLock = new Object();
+    // a j.u.c lock, not synchronized/wait: waiting on a monitor pins a virtual thread to its carrier (JDK 21),
+    // and a batch of thousands of queued items would pin every carrier and stall the running downloads
+    private final ReentrantLock slotLock = new ReentrantLock();
+    private final Condition slotFree = slotLock.newCondition();
     private int maxConcurrent;
     private int running;
     private volatile int maxRetries;
@@ -73,9 +79,12 @@ public final class DownloadManager implements AutoCloseable {
     }
 
     public void setLimits(int concurrent, int retries) {
-        synchronized (slotLock) {
+        slotLock.lock();
+        try {
             maxConcurrent = Math.max(1, Math.min(16, concurrent));
-            slotLock.notifyAll();
+            slotFree.signalAll();
+        } finally {
+            slotLock.unlock();
         }
         maxRetries = Math.max(0, Math.min(10, retries));
     }
@@ -264,8 +273,9 @@ public final class DownloadManager implements AutoCloseable {
                     last = LauncherException.io(e, r.target().toString());
                     break; // local disk trouble: another attempt won't help
                 } catch (LauncherException e) {
-                    if (e.isCancelled()) {
-                        throw e;
+                    if (e.isCancelled() || cancel.isCancelled()) {
+                        // cancelling an in-flight request surfaces as a network error from the HTTP client
+                        throw LauncherException.cancelled();
                     }
                     last = e;
                     if (e.code() == ErrorCode.CHECKSUM_MISMATCH) {
@@ -440,24 +450,33 @@ public final class DownloadManager implements AutoCloseable {
     // ---------------------------------------------------------------- helpers
 
     private void acquireSlot(CancellationToken cancel) throws LauncherException {
-        synchronized (slotLock) {
+        slotLock.lock();
+        try {
             while (running >= maxConcurrent) {
-                cancel.check();
+                if (cancel.isCancelled()) {
+                    slotFree.signal(); // pass on a wake-up this thread may have consumed
+                    throw LauncherException.cancelled();
+                }
                 try {
-                    slotLock.wait(200);
+                    slotFree.await(200, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw LauncherException.cancelled();
                 }
             }
             running++;
+        } finally {
+            slotLock.unlock();
         }
     }
 
     private void releaseSlot() {
-        synchronized (slotLock) {
+        slotLock.lock();
+        try {
             running--;
-            slotLock.notifyAll();
+            slotFree.signal(); // one slot freed: wake one waiter, not the whole queue
+        } finally {
+            slotLock.unlock();
         }
     }
 
