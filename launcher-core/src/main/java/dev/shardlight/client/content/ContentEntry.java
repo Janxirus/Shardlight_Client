@@ -37,6 +37,10 @@ public final class ContentEntry {
     public String installedAt;
     /** where the user can read about it (project page) */
     public String pageUrl;
+    /** true when the last scan found no file for this entry (deleted or moved outside the launcher) */
+    public boolean missing;
+    /** the URL the file was downloaded from (catalog installs), used for modpack export; null for local files */
+    public String downloadUrl;
 
     @Override
     public String toString() {
