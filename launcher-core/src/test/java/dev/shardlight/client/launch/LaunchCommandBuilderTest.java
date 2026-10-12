@@ -172,7 +172,7 @@ class LaunchCommandBuilderTest {
         assertTrue(cmd.contains("--fullscreen"));
         assertEquals(List.of("--extra", "two words"), cmd.subList(cmd.size() - 2, cmd.size()), "extra game arguments last");
         String cp = after(cmd, "-cp");
-        assertEquals(3, cp.split(":").length, "':' separates the classpath on Linux");
+        assertEquals(3, unixClasspathEntries(cp), "':' separates the classpath on Linux");
 
         // only a width: no custom resolution feature
         List<String> half = LaunchCommandBuilder.build(with(ctx(modern(), LINUX), "", "", 1920, 0, false, null, null, false))
@@ -249,7 +249,7 @@ class LaunchCommandBuilderTest {
 
         List<String> mac = LaunchCommandBuilder.build(ctx(iv, MAC)).command();
         assertFalse(mac.contains("-XstartOnFirstThread"), "LWJGL 2 must not run on the first thread");
-        assertEquals(3, after(mac, "-cp").split(":").length);
+        assertEquals(3, unixClasspathEntries(after(mac, "-cp")));
         assertTrue(LaunchCommandBuilder.build(with(ctx(iv, LINUX), "", "", 0, 0, false, null, null, true)).command()
             .contains("--demo"));
     }
@@ -391,5 +391,13 @@ class LaunchCommandBuilderTest {
         assertEquals(5, lc.command().size());
         assertThrows(UnsupportedOperationException.class, () -> lc.command().add("x"));
         assertEquals("java \"-Dx=a b\" \"\" --accessToken " + Redactor.MASK, lc.redacted());
+    }
+
+    /**
+     * Entries in a ':'-separated classpath. When the tests run on Windows the paths themselves start with a
+     * drive letter ("D:\..."), so that colon is not counted as a separator.
+     */
+    private static int unixClasspathEntries(String cp) {
+        return cp.replaceAll("(^|:)[A-Za-z]:\\\\", "$1").split(":").length;
     }
 }

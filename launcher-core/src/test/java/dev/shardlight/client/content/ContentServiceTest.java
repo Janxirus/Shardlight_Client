@@ -814,9 +814,10 @@ class ContentServiceTest {
         assertEquals("a.jar", e.fileName);
         assertEquals(1, stored().size());
 
-        ContentEntry odd = svc.installLocalFile(p, ContentKind.MOD, source("we<ird>na|me.jar.disabled", TestJars.fabricMod("b", "1")),
+        // characters every file system allows but the launcher doesn't keep in names
+        ContentEntry odd = svc.installLocalFile(p, ContentKind.MOD, source("we#ird&na[me].jar.disabled", TestJars.fabricMod("b", "1")),
             ContentSource.LOCAL, null, null);
-        assertFalse(odd.fileName.contains("<") || odd.fileName.contains("|"), odd.fileName);
+        assertFalse(odd.fileName.matches(".*[#&\\[\\]].*"), odd.fileName);
         assertTrue(odd.fileName.endsWith(".jar"));
         assertTrue(odd.enabled);
         assertTrue(Files.exists(game.resolve("mods").resolve(odd.fileName)));

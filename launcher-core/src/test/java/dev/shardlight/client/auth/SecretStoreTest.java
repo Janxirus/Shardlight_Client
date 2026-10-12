@@ -156,7 +156,7 @@ class SecretStoreTest {
         assertEquals(Optional.of(TOKEN), s.get("msa.refresh.abc"));
 
         FakeTools.Call add = tool.calls.get(0);
-        assertEquals(List.of("/usr/bin/security", "-i"), add.command());
+        assertEquals(List.of(Path.of("/usr/bin/security").toString(), "-i"), add.command());
         String expectedLine = "add-generic-password -U -s \"Shardlight Client\" -a \"msa.refresh.abc\" -w \""
             + SecretEncoding.encode(TOKEN) + "\"\n";
         assertEquals(expectedLine, add.stdin());
@@ -245,7 +245,7 @@ class SecretStoreTest {
         LinuxSecretServiceStore s = new LinuxSecretServiceStore(tool, Path.of("/usr/bin/secret-tool"));
         s.put("mc.session.abc", TOKEN);
         assertEquals(Optional.of(TOKEN), s.get("mc.session.abc"));
-        assertEquals(List.of("/usr/bin/secret-tool", "store", "--label=Shardlight Client", "service", "shardlight-client",
+        assertEquals(List.of(Path.of("/usr/bin/secret-tool").toString(), "store", "--label=Shardlight Client", "service", "shardlight-client",
             "account", "mc.session.abc"), tool.calls.get(0).command());
         assertEquals(SecretEncoding.encode(TOKEN), tool.calls.get(0).stdin(), "the value goes to stdin, without a newline");
         assertEquals(List.of("/usr/bin/secret-tool", "lookup", "service", "shardlight-client", "account", "mc.session.abc"),
