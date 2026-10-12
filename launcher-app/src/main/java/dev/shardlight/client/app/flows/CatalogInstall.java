@@ -181,8 +181,9 @@ public final class CatalogInstall {
                         .orElseThrow(() -> new LauncherException(ErrorCode.NOT_FOUND, "services.noCompatibleVersion",
                             item.title(), "-", "-"));
                 }
-                CatalogFile f = v.files().stream().filter(CatalogFile::primary).findFirst()
-                    .or(() -> v.files().stream().findFirst())
+                List<CatalogFile> files = v.files();
+                CatalogFile f = files.stream().filter(CatalogFile::primary).findFirst()
+                    .or(() -> files.stream().findFirst())
                     .orElseThrow(() -> new LauncherException(ErrorCode.NOT_FOUND, "services.noFile", item.title()));
                 if (f.distributionRestricted() || f.url() == null) {
                     throw new LauncherException(ErrorCode.DISTRIBUTION_RESTRICTED, "services.restricted", item.title());

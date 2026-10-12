@@ -16,6 +16,11 @@ public final class ToggleSwitch extends StackPane {
     private final BooleanProperty selected = new SimpleBooleanProperty(this, "selected");
     private final Circle knob = new Circle(7.5);
 
+    /** a switch named by the row it sits in ({@link UiKit#settingRow} sets the accessible name) */
+    public ToggleSwitch(boolean initial) {
+        this(initial, null);
+    }
+
     public ToggleSwitch(boolean initial, String accessibleName) {
         getStyleClass().add("toggle-switch");
         knob.getStyleClass().add("knob");

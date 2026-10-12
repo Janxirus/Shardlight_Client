@@ -202,7 +202,7 @@ public final class PresetPanel {
             UiKit.label(I18n.tr("ui.preset.customHint"), "muted", "small"));
         Map<String, Object> custom = p.preset.customOverrides;
         Map<String, Object> balanced = ctx.services().presets().values(Preset.BALANCED);
-        for (SettingDef d : ctx.services().presets().definitions()) {
+        for (SettingDef d : ctx.services().presets().settings()) {
             if (!applies(p, d)) {
                 continue;
             }

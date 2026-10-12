@@ -8,6 +8,7 @@ import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
 import dev.shardlight.client.app.ui.ToggleSwitch;
 import dev.shardlight.client.app.ui.UiKit;
+import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.loader.LoaderType;
 import dev.shardlight.client.project.Project;
@@ -157,7 +158,12 @@ public final class ShardlightPage implements Page {
             if (installed) {
                 chips.getChildren().add(UiKit.chip(I18n.tr("ui.shardlight.inProject"), "success", Icons.CHECK));
             }
-            Optional<LibraryItem> jar = library.moduleJar(m.id(), p.minecraftVersion);
+            Optional<LibraryItem> jar;
+            try {
+                jar = library.moduleJar(m.id(), p.minecraftVersion);
+            } catch (LauncherException e) {
+                jar = Optional.empty();
+            }
             chips.getChildren().add(jar.isPresent()
                 ? UiKit.chip(I18n.tr("ui.shardlight.ready", jar.get().version()), null, Icons.PACKAGE)
                 : UiKit.chip(I18n.tr("ui.shardlight.notImported"), "warning", Icons.WARNING));
@@ -232,14 +238,14 @@ public final class ShardlightPage implements Page {
         box.getStyleClass().add("card");
         try {
             var report = ctx.services().shardlight().check(p, Set.copyOf(pending));
-            for (String e : report.errors()) {
-                box.getChildren().add(UiKit.banner("danger", e));
+            for (var e : report.errors()) {
+                box.getChildren().add(UiKit.banner("danger", e.text()));
             }
-            for (String w : report.warnings()) {
-                box.getChildren().add(UiKit.banner("warning", w));
+            for (var w : report.warnings()) {
+                box.getChildren().add(UiKit.banner("warning", w.text()));
             }
-            for (String i : report.info()) {
-                box.getChildren().add(UiKit.label("• " + i, "muted", "small"));
+            for (var i : report.infos()) {
+                box.getChildren().add(UiKit.label("• " + i.text(), "muted", "small"));
             }
         } catch (Exception e) {
             box.getChildren().add(UiKit.banner("danger", Tasks.message(e)));
@@ -285,7 +291,13 @@ public final class ShardlightPage implements Page {
     private Node library() {
         VBox box = new VBox(10);
         var lib = ctx.services().shardlightLibrary();
-        List<LibraryItem> items = lib.items();
+        List<LibraryItem> items;
+        try {
+            items = lib.items();
+        } catch (LauncherException e) {
+            items = List.of();
+            box.getChildren().add(UiKit.banner("danger", e.userMessage()));
+        }
         Button importFiles = UiKit.primary(I18n.tr("ui.shardlight.import"), Icons.ARCHIVE, this::importFiles);
         Button folder = UiKit.iconButton(Icons.FOLDER, I18n.tr("ui.library.openFolder"),
             () -> ctx.openFolder(ctx.services().paths().content()));

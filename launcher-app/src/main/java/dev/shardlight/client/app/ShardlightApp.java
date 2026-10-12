@@ -42,7 +42,7 @@ public final class ShardlightApp extends Application {
         Shell shell = ctx.shell();
         Scene scene = new Scene(shell.root(), 1280, 800);
         ThemeManager.install(scene);
-        ThemeManager.apply(scene, ctx.settings().get().appearance);
+        ThemeManager.apply(scene, ctx.services().settings().get().appearance);
         ctx.attach(scene);
         stage.setScene(scene);
         stage.setTitle(BuildInfo.NAME);

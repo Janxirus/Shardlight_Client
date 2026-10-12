@@ -344,7 +344,7 @@ public final class ProjectPage implements Page {
                             x.loader.version = null;
                         }
                     }, true));
-            }))));
+            })));
         HBox h = new HBox(10, current, change);
         h.setAlignment(Pos.CENTER_LEFT);
         return h;
