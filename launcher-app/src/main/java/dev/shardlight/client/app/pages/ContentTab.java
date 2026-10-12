@@ -195,7 +195,7 @@ final class ContentTab {
         if (e.dependency) {
             meta.getChildren().add(UiKit.chip(I18n.tr("ui.content.dependency"), null));
         }
-        if (isMissing(e)) {
+        if (e.missing) {
             meta.getChildren().add(UiKit.chip(I18n.tr("ui.content.missing"), "danger"));
         }
         if (!e.enabled) {
@@ -231,15 +231,6 @@ final class ContentTab {
         row.getChildren().addAll(pin, remove);
         row.getStyleClass().addAll("card", "flat", "content-row");
         return row;
-    }
-
-    private boolean isMissing(ContentEntry e) {
-        try {
-            var f = ContentEntry.class.getField("missing");
-            return f.getBoolean(e);
-        } catch (ReflectiveOperationException ex) {
-            return false;
-        }
     }
 
     private void confirmRemove(Project p, ContentEntry e) {
