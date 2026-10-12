@@ -7,6 +7,7 @@ import dev.shardlight.client.loader.LoaderSpec;
 import dev.shardlight.client.loader.LoaderType;
 import dev.shardlight.client.loader.LoaderVersion;
 import dev.shardlight.client.minecraft.GameInstaller;
+import dev.shardlight.client.minecraft.InstalledVersion;
 import dev.shardlight.client.minecraft.ResolvedVersion;
 import dev.shardlight.client.minecraft.VerifyReport;
 import dev.shardlight.client.minecraft.VersionManifestService;
@@ -100,6 +101,15 @@ class LoaderInstallersLiveTest {
         ResolvedVersion resolved = installer.resolve(id);
         assertEquals(List.of(id, MC), resolved.chain());
         assertNotNull(resolved.clientDownload(), "the vanilla client is part of the chain");
+
+        // a launch does this next: complete the loader's version (its own jar copy, every library) and build the classpath
+        InstalledVersion installed = installer.install(id, ProgressListener.NONE, CancellationToken.NONE);
+        assertTrue(Files.isRegularFile(installed.clientJar()), "no client jar at " + installed.clientJar());
+        assertTrue(installed.classpath().size() > 20, "classpath of " + installed.classpath().size() + " entries");
+        for (Path entry : installed.classpath()) {
+            assertTrue(Files.isRegularFile(entry), "classpath entry missing: " + entry);
+        }
+        assertEquals(installed.clientJar(), installed.classpath().get(installed.classpath().size() - 1));
 
         VerifyReport report = installer.verify(id, ProgressListener.NONE, CancellationToken.NONE);
         assertTrue(report.checkedFiles() > 0);

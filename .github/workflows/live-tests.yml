@@ -43,7 +43,7 @@ jobs:
           SHARDLIGHT_CURSEFORGE_API_KEY: ${{ secrets.SHARDLIGHT_CURSEFORGE_API_KEY }}
         run: |
           chmod +x gradlew
-          ./gradlew :launcher-core:liveTest -PliveTests --stacktrace
+          ./gradlew :launcher-core:liveTest -PliveTests
 
       - name: Upload test reports
         if: always()
@@ -69,7 +69,7 @@ jobs:
       - name: Install Forge and NeoForge with their real installers
         run: |
           chmod +x gradlew
-          ./gradlew :launcher-core:installerTest -PinstallerTests --stacktrace
+          ./gradlew :launcher-core:installerTest -PinstallerTests
 
       - name: Upload test reports
         if: always()

@@ -1,6 +1,5 @@
 package dev.shardlight.client.live;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.shardlight.client.net.Endpoints;
 import dev.shardlight.client.preset.VanillaOptions;
@@ -32,18 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VanillaOptionsLiveTest {
     @Test
     void everyPresetKeyIsAnOptionOfTheRealClient() throws Exception {
-        JsonObject manifest = LiveHttp.json(Endpoints.DEFAULT.versionManifest().toString()).getAsJsonObject();
-        String versionUrl = null;
-        JsonArray versions = manifest.getAsJsonArray("versions");
-        for (var e : versions) {
-            JsonObject v = e.getAsJsonObject();
-            if (VanillaOptions.VERIFIED_FOR.equals(v.get("id").getAsString())) {
-                versionUrl = v.get("url").getAsString();
-            }
-        }
-        assertNotNull(versionUrl, "Mojang's manifest has no " + VanillaOptions.VERIFIED_FOR);
-        String clientUrl = LiveHttp.json(versionUrl).getAsJsonObject().getAsJsonObject("downloads").getAsJsonObject("client")
-            .get("url").getAsString();
+        String clientUrl = clientUrl();
 
         byte[] needleA = "options.txt".getBytes(StandardCharsets.UTF_8);
         byte[] needleB = "resourcePacks".getBytes(StandardCharsets.UTF_8);
@@ -75,13 +63,13 @@ class VanillaOptionsLiveTest {
         }
         Set<String> keyLike = new TreeSet<>();
         for (String c : constants) {
-            if (c.matches("[a-z][A-Za-z0-9]{1,40}")) {
+            if (c.matches("[a-z][A-Za-z0-9]{1,40}") && !c.equals("true") && !c.equals("false")) {
                 keyLike.add(c);
             }
         }
         System.out.println("options class: " + optionsClass);
-        System.out.println("key-like constants in it (" + keyLike.size() + "): " + keyLike);
-        assertTrue(missing.isEmpty(), "not options of " + optionsClass + ": " + missing + "; key-like constants there: " + keyLike);
+        System.out.println("key-like string literals in it (" + keyLike.size() + "): " + keyLike);
+        assertTrue(missing.isEmpty(), "not options of " + optionsClass + ": " + missing + "; key-like string literals there: " + keyLike);
         assertEquals(12, VanillaOptions.keys().size());
     }
 
@@ -98,28 +86,67 @@ class VanillaOptionsLiveTest {
         return -1;
     }
 
-    /** the Utf8 entries of a class file's constant pool */
+    /**
+     * The string literals of a class file: the Utf8 constants that a {@code CONSTANT_String} entry points at. Field
+     * and method names are also Utf8 constants but are not string literals, so a name like {@code renderDistance}
+     * that is only a field name does not count as an option key.
+     */
     static Set<String> utf8Constants(byte[] classFile) throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(classFile));
         in.readInt();
         in.readUnsignedShort();
         in.readUnsignedShort();
         int count = in.readUnsignedShort();
-        Set<String> out = new LinkedHashSet<>();
+        String[] utf8 = new String[count];
+        List<Integer> literal = new ArrayList<>();
         for (int i = 1; i < count; i++) {
             int tag = in.readUnsignedByte();
             switch (tag) {
-                case 1 -> out.add(in.readUTF());
+                case 1 -> utf8[i] = in.readUTF();
+                case 8 -> literal.add(in.readUnsignedShort());
                 case 3, 4, 9, 10, 11, 12, 17, 18 -> in.skipNBytes(4);
                 case 5, 6 -> {
                     in.skipNBytes(8);
                     i++;
                 }
-                case 7, 8, 16, 19, 20 -> in.skipNBytes(2);
+                case 7, 16, 19, 20 -> in.skipNBytes(2);
                 case 15 -> in.skipNBytes(3);
                 default -> throw new IOException("unknown constant pool tag " + tag);
             }
         }
+        Set<String> out = new LinkedHashSet<>();
+        for (int index : literal) {
+            if (utf8[index] != null) {
+                out.add(utf8[index]);
+            }
+        }
         return out;
+    }
+
+    /** prints how the graphics related option values are written, for whoever maintains the preset table */
+    @Test
+    void printWhatTheGraphicsOptionsLookLike() throws Exception {
+        String clientUrl = clientUrl();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(LiveHttp.bytes(clientUrl)))) {
+            for (ZipEntry e = zip.getNextEntry(); e != null; e = zip.getNextEntry()) {
+                String n = e.getName();
+                if (n.endsWith(".class") && n.matches("net/minecraft/client/(GraphicsPreset|CloudStatus|ParticleStatus|GraphicsStatus|PrioritizeChunkUpdates|TextureFiltering|AttackIndicatorStatus)[A-Za-z$]*\\.class")) {
+                    System.out.println(n + " literals: " + utf8Constants(zip.readAllBytes()));
+                }
+            }
+        }
+    }
+
+    private static String clientUrl() throws Exception {
+        JsonObject manifest = LiveHttp.json(Endpoints.DEFAULT.versionManifest().toString()).getAsJsonObject();
+        String versionUrl = null;
+        for (var e : manifest.getAsJsonArray("versions")) {
+            JsonObject v = e.getAsJsonObject();
+            if (VanillaOptions.VERIFIED_FOR.equals(v.get("id").getAsString())) {
+                versionUrl = v.get("url").getAsString();
+            }
+        }
+        assertNotNull(versionUrl, "Mojang's manifest has no " + VanillaOptions.VERIFIED_FOR);
+        return LiveHttp.json(versionUrl).getAsJsonObject().getAsJsonObject("downloads").getAsJsonObject("client").get("url").getAsString();
     }
 }
