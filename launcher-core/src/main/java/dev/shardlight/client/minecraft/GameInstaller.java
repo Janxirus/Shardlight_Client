@@ -172,6 +172,16 @@ public final class GameInstaller {
         return toInstalled(plan, virtual, map);
     }
 
+    /** the version's own JSON from {@code versions/<id>/<id>.json}, without its parents (no network) */
+    public VersionJson readVersionJson(String versionId) throws LauncherException {
+        return resolver.read(versionId);
+    }
+
+    /** true when {@code versions/<id>/<id>.json} exists (its content isn't checked) */
+    public boolean hasVersionJson(String versionId) {
+        return resolver.exists(versionId);
+    }
+
     /** true when the version's JSON (and every parent's) is present */
     public boolean isInstalled(String versionId) {
         try {
