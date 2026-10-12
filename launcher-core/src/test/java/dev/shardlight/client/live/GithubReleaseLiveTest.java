@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GithubReleaseLiveTest {
     @Test
     void theLatestReleaseHasTheFieldsTheLauncherReads() throws Exception {
-        JsonObject release = LiveHttp.json("https://api.github.com/repos/FabricMC/fabric-installer/releases/latest").getAsJsonObject();
+        JsonObject release = LiveHttp.json("https://api.github.com/repos/cli/cli/releases/latest").getAsJsonObject();
         assertFalse(release.get("tag_name").getAsString().isBlank());
         JsonArray assets = release.getAsJsonArray("assets");
         assertTrue(assets.size() > 0);

@@ -23,7 +23,7 @@ class VanillaOptionsTest {
 
     @Test
     void theKeyListIsThePinned26_3Set() {
-        assertEquals(Set.of("graphicsMode", "renderDistance", "simulationDistance", "particles", "entityShadows", "ao",
+        assertEquals(Set.of("graphicsPreset", "renderDistance", "simulationDistance", "particles", "entityShadows", "ao",
             "biomeBlendRadius", "maxFps", "enableVsync", "mipmapLevels", "renderClouds", "entityDistanceScaling"),
             VanillaOptions.keys());
     }

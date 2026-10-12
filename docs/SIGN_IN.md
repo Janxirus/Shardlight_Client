@@ -80,6 +80,12 @@ New applications can't call `api.minecraftservices.com` until Mojang approves th
 `login_with_xbox` answers HTTP 403 "Invalid app registration", and the launcher says the app has to be
 approved first.
 
+While the approval is pending, a player who signs in sees the screen **"This app is still waiting for Minecraft
+approval"**. It says nothing is wrong with their account, links to this review form, and has **Retry**, which starts
+a fresh sign-in once the approval has arrived. The same screen appears for every build whose client ID is not yet
+approved, so no extra setting is needed when approval comes. The step-by-step check to run then is in
+[TESTING.md](TESTING.md#first-sign-in-and-first-launch-check).
+
 1. Fill in Mojang's review form at **https://aka.ms/mce-reviewappid**, giving the **Application (client)
    ID** and, if asked, the **Directory (tenant) ID** from the app's Overview page, along with a short
    description of the launcher.

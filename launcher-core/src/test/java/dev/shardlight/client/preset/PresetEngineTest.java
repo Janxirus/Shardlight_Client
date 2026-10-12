@@ -512,7 +512,7 @@ class PresetEngineTest {
     void vanillaVideoSettingsOnlyWithOptIn() throws Exception {
         Project p = project("ui");
         Path options = game(p).resolve("options.txt");
-        String original = "version:4189\nrenderDistance:16\ngraphicsMode:1\nlang:en_us\nresourcePacks:[\"vanilla\"]\n";
+        String original = "version:4189\nrenderDistance:16\ngraphicsPreset:\"fancy\"\nlang:en_us\nresourcePacks:[\"vanilla\"]\n";
         Files.writeString(options, original);
         engine.apply(p, Preset.ULTRA_PERFORMANCE);
         assertEquals(original, Files.readString(options), "untouched without the opt-in");
@@ -525,7 +525,7 @@ class PresetEngineTest {
         assertTrue(r.filesWritten().contains("options.txt"));
         OptionsTxt o = OptionsTxt.read(options);
         assertEquals("8", o.get("renderDistance").orElseThrow());
-        assertEquals("0", o.get("graphicsMode").orElseThrow());
+        assertEquals("\"custom\"", o.get("graphicsPreset").orElseThrow());
         assertEquals("\"false\"", o.get("renderClouds").orElseThrow());
         assertEquals("0.75", o.get("entityDistanceScaling").orElseThrow());
         assertEquals("false", o.get("enableVsync").orElseThrow());
@@ -536,7 +536,7 @@ class PresetEngineTest {
         engine.revertLast(q);
         OptionsTxt back = OptionsTxt.read(options);
         assertEquals("16", back.get("renderDistance").orElseThrow());
-        assertEquals("1", back.get("graphicsMode").orElseThrow());
+        assertEquals("\"fancy\"", back.get("graphicsPreset").orElseThrow());
         assertTrue(back.get("maxFps").isEmpty(), "keys that weren't there are removed again");
         assertEquals("en_us", back.get("lang").orElseThrow());
     }
@@ -717,7 +717,7 @@ class PresetEngineTest {
             assertTrue(I18n.has(d.labelKey()), d.labelKey());
             assertTrue(I18n.has(d.descriptionKey()), d.descriptionKey());
             if (d.target() == Target.VANILLA) {
-                assertTrue(I18n.english(d.descriptionKey()).contains("verify on 26.3"), d.key());
+                assertFalse(I18n.english(d.descriptionKey()).contains("verify on"), d.key() + " still says it needs verifying");
             }
         }
         assertTrue(I18n.has(PresetEngine.ULTRA_QUALITY_WARNING_KEY));

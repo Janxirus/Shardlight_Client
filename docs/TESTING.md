@@ -11,13 +11,59 @@ test fixtures. It does not mean a real game has been started.
 ./gradlew :launcher-core:test --tests 'dev.shardlight.client.preset.*'   # one package
 ```
 
-Network code never talks to the real services in tests. `testutil/TestHttpServer` serves recorded-shape
+Network code never talks to the real services in the normal tests (the live tests above are the exception). `testutil/TestHttpServer` serves recorded-shape
 responses for Mojang, Fabric, Quilt, Forge, NeoForge, Modrinth, CurseForge, Microsoft, Xbox and GitHub,
 and `Endpoints.local(...)` points every client at it. Fake Minecraft versions, libraries and assets come
 from `testutil/MinecraftFixtures`, and a small stand-in "game" jar is launched as a real process.
 
 CI runs the same build on Linux and Windows for every push and pull request, then captures a screenshot
 of every page with `--capture` under a virtual display (the `screenshots-…` artifact).
+
+## Live tests (real services)
+
+Some things can only be checked against the real services, so they live apart from the normal build: tests
+tagged `live` (and `installer`) are excluded from `./gradlew build` and only run when asked for. The
+**Live tests** workflow (`.github/workflows/live-tests.yml`) runs them on pull requests that touch
+`launcher-core`, every Monday on the default branch, and on demand. It is a separate check from **Build**, so a
+Modrinth outage can't hold up a pull request; don't make it a required check.
+
+| Job | Command | What it proves |
+|---|---|---|
+| Real APIs | `./gradlew :launcher-core:liveTest -PliveTests` | Modrinth: search, project, versions with SHA-1/SHA-512 and a CDN URL, lookup by hash, categories, Fabric API for 26.3, "not found" for an unknown project. CurseForge: search, files (skipped unless the secret `SHARDLIGHT_CURSEFORGE_API_KEY` is set). GitHub: the release answer still has the fields the module downloader reads. Minecraft 26.3: every `options.txt` key the presets write is a string literal of the real client's `Options` class. |
+| Forge and NeoForge installers | `./gradlew :launcher-core:installerTest -PinstallerTests` | Installs Minecraft 26.3, then Forge and NeoForge with their real installers through `LoaderService`, completes the version as a launch would, and checks the version file, the classpath and that every library exists with the right hash. They stay labelled experimental until someone launches them. |
+
+Both write their HTML report as a build artifact (`live-api-reports`, `loader-installer-reports`). Run them
+yourself with the commands above; they need a network that can reach those services.
+
+## First sign-in and first launch check
+
+Needs a Microsoft account that owns Minecraft: Java Edition, and a build whose Azure app Mojang has approved
+([SIGN_IN.md](SIGN_IN.md)). Until then, step 3 shows the waiting screen and nothing further can be checked.
+
+1. Start the launcher with a fresh data folder (`--data-dir <empty folder>`, or delete the old one).
+2. On the welcome screens press **Sign in** (or **Accounts > Add account** later). A code such as `K7QD-M2XP` and
+   a button for `microsoft.com/link` appear.
+3. Open the page, type the code and sign in. Expected result, one of:
+   * the dialog shows **Signed in as <your name>** with your head, and the Home page greets you by name;
+   * **"This app is still waiting for Minecraft approval"** with **Retry** and **About Minecraft approval**.
+     That means Mojang has not approved the app yet. Nothing is wrong with the account. Press Retry after the
+     approval arrives; it asks for a new code. Stop the check here if you see this.
+   * any other message (no Xbox account, child account, region, game not owned): it says what to do. Fix that
+     and press Retry.
+4. Quit and start the launcher again. You should still be signed in with no code (the token comes from the system
+   secret store). Settings > Accounts > Sign out removes it.
+5. **New project**: keep the defaults (newest release, no loader). Note the size the review step shows. Create it.
+   The Downloads page shows the game, libraries, assets and a Java runtime installing with a progress ring.
+6. Press **Play**. Expected: the Play bar goes through Preparing, Starting, Running; a Minecraft window opens at the
+   title screen within a minute or two. Open a world: your player name is your Minecraft name and your skin loads
+   (the session is the real one; the launcher has no offline mode).
+7. Open a world, then quit the game. The Play bar returns to Play, the project shows the play time, and Logs has
+   `latest.log`. If the game closes by itself, the crash screen opens with the likely cause.
+8. Repeat steps 5 to 7 with a **Fabric** project and Fabric API from Discover. Then add **Shardlight UI** (needs
+   the jar: Shardlight page > Download, or Import) and check its Control Center opens (Right Shift in game).
+
+If a step does not behave as written, export diagnostics (project > Logs > Export diagnostics) and attach the zip
+to the report. It contains no tokens.
 
 ## Automated tests (578)
 

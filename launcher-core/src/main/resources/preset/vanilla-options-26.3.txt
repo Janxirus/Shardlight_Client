@@ -1,7 +1,7 @@
 # The options.txt keys the presets write for Minecraft 26.3, one per line.
 # `VanillaOptionsLiveTest` (run with -PliveTests in CI) checks every line against the options class of
 # the real 26.3 client jar, and `VanillaOptionsTest` checks that the presets use exactly these keys.
-graphicsMode
+graphicsPreset
 renderDistance
 simulationDistance
 particles

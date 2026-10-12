@@ -130,7 +130,7 @@ class VanillaOptionsLiveTest {
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(LiveHttp.bytes(clientUrl)))) {
             for (ZipEntry e = zip.getNextEntry(); e != null; e = zip.getNextEntry()) {
                 String n = e.getName();
-                if (n.endsWith(".class") && n.matches("net/minecraft/client/(GraphicsPreset|CloudStatus|ParticleStatus|GraphicsStatus|PrioritizeChunkUpdates|TextureFiltering|AttackIndicatorStatus)[A-Za-z$]*\\.class")) {
+                if (n.endsWith(".class") && n.matches("net/minecraft/(client|server/level)/(GraphicsPreset|CloudStatus|ParticleStatus|GraphicsStatus)[A-Za-z$]*\\.class")) {
                     System.out.println(n + " literals: " + utf8Constants(zip.readAllBytes()));
                 }
             }
