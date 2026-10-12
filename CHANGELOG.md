@@ -4,6 +4,24 @@ All notable changes to Shardlight Client. Versions follow [semantic versioning](
 
 ## Unreleased
 
+### Added
+
+- **Core features** (UI overhaul, part 5):
+  - Shardlight modules download from their Modrinth project (when the catalog names one) and then from their
+    GitHub release; when neither has them the launcher says "not published yet" and offers to import a jar.
+  - Live tests against the real Modrinth, CurseForge, GitHub and Mojang services, and against the real Forge and
+    NeoForge installers for Minecraft 26.3, in a separate **Live tests** workflow that also runs weekly.
+    They are never part of `./gradlew build`.
+  - `config/shardlight/adaptive-quality.json` and docs/ADAPTIVE_QUALITY.md: the settings contract for the
+    Shardlight UI mod. The switch is a labelled **Preview**, off by default.
+  - A step-by-step first sign-in and first launch check in docs/TESTING.md.
+
+### Fixed
+
+- Minecraft video settings: Minecraft 26.3 no longer has the `graphicsMode` option, so presets now write
+  `graphicsPreset`. The switch only works for 26.3 (every key is checked against the real client by CI) and leaves
+  other Minecraft versions alone.
+
 ### Changed
 
 - **Design system** (UI overhaul, part 1): bundled Inter, Inter Tabular and JetBrains Mono fonts; colour
