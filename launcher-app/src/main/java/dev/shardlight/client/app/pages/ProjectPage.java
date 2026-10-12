@@ -108,6 +108,10 @@ public final class ProjectPage implements Page {
     }
 
     /** open a tab by index (0 overview .. 7 logs) */
+    public String projectId() {
+        return projectId;
+    }
+
     public ProjectPage select(int index) {
         tabs.getSelectionModel().select(index);
         return this;

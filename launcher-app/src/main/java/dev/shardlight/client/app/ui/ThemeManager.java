@@ -15,7 +15,27 @@ import java.util.Locale;
  * on the root, so changing the accent recolours every accent token at once.
  */
 public final class ThemeManager {
+    private static volatile double emPx = 14;
+    private static final javafx.beans.property.DoubleProperty SCALE = new javafx.beans.property.SimpleDoubleProperty(1);
+
     private ThemeManager() {
+    }
+
+    /** the interface size setting (1 = 100%); icons scale with it */
+    public static javafx.beans.property.ReadOnlyDoubleProperty scaleProperty() {
+        return SCALE;
+    }
+
+    /** set the interface size before the window is built, so the first icons are already the right size */
+    public static void setScale(double scale) {
+        double s = Math.max(0.8, Math.min(1.6, scale));
+        emPx = 14 * s;
+        SCALE.set(s);
+    }
+
+    /** {@code ems} in pixels at the current interface size (for the few sizes layout code has to compute) */
+    public static double em(double ems) {
+        return ems * emPx;
     }
 
     public static void install(Scene scene) {
@@ -40,7 +60,8 @@ public final class ThemeManager {
         if (!a.backgroundEffects) {
             root.getStyleClass().add("no-effects");
         }
-        double px = 14 * Math.max(0.8, Math.min(1.6, a.scale));
+        setScale(a.scale);
+        double px = emPx;
         root.setStyle(String.format(Locale.ROOT, "-fx-font-size: %.1fpx; -fx-font-family: \"%s\"; %s",
             px, Fonts.ui(), DesignTokens.rampCss(accent(a), light)));
         root.setNodeOrientation(I18n.isRightToLeft() ? NodeOrientation.RIGHT_TO_LEFT : NodeOrientation.LEFT_TO_RIGHT);

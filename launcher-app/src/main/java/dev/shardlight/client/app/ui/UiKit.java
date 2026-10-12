@@ -1,11 +1,12 @@
 package dev.shardlight.client.app.ui;
 
 import dev.shardlight.client.i18n.I18n;
-import javafx.geometry.Insets;
+import javafx.animation.PauseTransition;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ToggleButton;
@@ -20,9 +21,20 @@ import javafx.util.Duration;
 
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
-/** Small factory methods for the design system's building blocks. */
+/**
+ * Small factory methods for the design system's building blocks. Bigger components live next to it:
+ * {@link Fields} (search, number, slider, form fields), {@link Cards}, {@link Lists}, {@link ProgressRing},
+ * {@link Shimmer}, {@link StepProgress}; dialogs, popovers and toasts are in {@link Overlay}.
+ */
 public final class UiKit {
+    /** tooltips wait this long before showing */
+    public static final Duration TOOLTIP_DELAY = Duration.millis(400);
+    private static final String DISABLED_REASON = "sl.disabledReason";
+    private static final String REASON_UPDATER = "sl.reasonUpdater";
+    private static final String LOADING_GRAPHIC = "sl.loadingGraphic";
+
     private UiKit() {
     }
 
@@ -47,6 +59,7 @@ public final class UiKit {
         b.getStyleClass().addAll(styleClasses);
         b.setOnAction(e -> action.run());
         b.setMnemonicParsing(false);
+        b.setMinWidth(Region.USE_PREF_SIZE);
         return b;
     }
 
@@ -61,6 +74,7 @@ public final class UiKit {
         b.getStyleClass().addAll("icon-only", "ghost");
         b.setAccessibleText(accessibleName);
         b.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        b.setMinWidth(Region.USE_PREF_SIZE);
         tooltip(b, accessibleName);
         b.setOnAction(e -> action.run());
         return b;
@@ -68,7 +82,7 @@ public final class UiKit {
 
     public static void tooltip(Node n, String text) {
         Tooltip tip = new Tooltip(text);
-        tip.setShowDelay(Duration.millis(350));
+        tip.setShowDelay(TOOLTIP_DELAY);
         tip.setWrapText(true);
         tip.setMaxWidth(380);
         Tooltip.install(n, tip);
@@ -166,22 +180,203 @@ public final class UiKit {
         return v;
     }
 
+    /** an empty state with a title: icon, title, one sentence, one action (may be null) */
     public static VBox emptyState(String icon, String title, String body, Node action) {
-        VBox v = new VBox(10);
-        v.setAlignment(Pos.CENTER);
-        v.setPadding(new Insets(36));
-        Node i = Icons.of(icon, 40);
-        i.getStyleClass().add("faint");
-        Label t = label(title, "h3");
-        Label b = label(body, "muted");
-        b.setMaxWidth(440);
-        b.setStyle("-fx-text-alignment: center;");
-        v.getChildren().addAll(i, t, b);
+        VBox v = empty(Icons.of(icon, 40), body, action);
+        v.getChildren().add(1, label(title, "h3"));
+        return v;
+    }
+
+    /**
+     * The empty state: an illustration slot (an icon or a picture), one sentence saying what goes here, and one
+     * action (may be null).
+     */
+    public static VBox empty(Node illustration, String sentence, Node action) {
+        VBox v = new VBox();
+        v.getStyleClass().addAll("card", "empty-state");
+        illustration.getStyleClass().add("faint");
+        StackPane art = new StackPane(illustration);
+        art.getStyleClass().add("empty-illustration");
+        Label b = label(sentence, "muted", "empty-text");
+        v.getChildren().addAll(art, b);
         if (action != null) {
             v.getChildren().add(action);
         }
-        v.getStyleClass().add("card");
         return v;
+    }
+
+    /** something failed to load: what went wrong and a Retry button */
+    public static VBox errorState(String message, Runnable retry) {
+        VBox v = empty(Icons.of(Icons.ERROR, 40), message,
+            retry == null ? null : button(I18n.tr("ui.state.retry"), Icons.REFRESH, retry));
+        v.getStyleClass().add("error-state");
+        return v;
+    }
+
+    /** the network is unreachable: what still works and a Retry button */
+    public static VBox offlineState(Runnable retry) {
+        VBox v = empty(Icons.of(Icons.WIFI_OFF, 40), I18n.tr("ui.state.offline"),
+            retry == null ? null : button(I18n.tr("ui.state.retry"), Icons.REFRESH, retry));
+        v.getStyleClass().add("offline-state");
+        return v;
+    }
+
+    /** a grey placeholder shape that pulses while content loads; shape is line, short, block or circle */
+    public static Region skeleton(String shape) {
+        Region r = new Region();
+        r.getStyleClass().addAll("skeleton", shape);
+        r.setMouseTransparent(true);
+        Motion.pulse(r, 0.45, 0);
+        return r;
+    }
+
+    /** a card-shaped skeleton: a round picture, a title line, a shorter line and a block */
+    public static VBox skeletonCard() {
+        HBox head = new HBox(skeleton("circle"), new VBox(skeleton("line"), skeleton("short")));
+        head.getStyleClass().add("skeleton-head");
+        ((VBox) head.getChildren().get(1)).getStyleClass().add("skeleton-lines");
+        HBox.setHgrow(head.getChildren().get(1), Priority.ALWAYS);
+        VBox v = new VBox(head, skeleton("block"));
+        v.getStyleClass().addAll("card", "skeleton-card");
+        v.setAccessibleText(I18n.tr("ui.state.loading"));
+        return v;
+    }
+
+    /** a small count bubble (0 hides it) */
+    public static Label badge(int count) {
+        Label l = new Label();
+        l.getStyleClass().addAll("badge", "tabular");
+        setBadge(l, count);
+        return l;
+    }
+
+    public static void setBadge(Label badge, int count) {
+        badge.setText(count > 99 ? "99+" : String.valueOf(count));
+        badge.setVisible(count > 0);
+        badge.setManaged(count > 0);
+    }
+
+    /** an active filter that can be removed with its x button (or Delete / Backspace when focused) */
+    public static HBox filterChip(String text, Runnable onRemove) {
+        Label l = new Label(text);
+        Button x = iconButton(Icons.CLOSE, I18n.tr("ui.chip.remove", text), onRemove);
+        x.getStyleClass().add("chip-remove");
+        HBox h = new HBox(l, x);
+        h.getStyleClass().add("filter-chip");
+        h.setAlignment(Pos.CENTER_LEFT);
+        h.setMinWidth(Region.USE_PREF_SIZE);
+        return h;
+    }
+
+    /** a copy button: copies {@code text} and shows a check mark for 1.5 s */
+    public static Button copyButton(Supplier<String> text, String accessibleName) {
+        Button b = iconButton(Icons.COPY, accessibleName, () -> { });
+        b.setOnAction(e -> {
+            javafx.scene.input.ClipboardContent c = new javafx.scene.input.ClipboardContent();
+            c.putString(text.get());
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(c);
+            copied(b);
+        });
+        return b;
+    }
+
+    /** swap {@code b}'s icon for a check mark for 1.5 s (after it copied something) */
+    public static void copied(Button b) {
+        Node old = b.getGraphic();
+        if (b.getStyleClass().contains("copied")) {
+            return;
+        }
+        Node check = Icons.of(Icons.CHECK, 16);
+        b.setGraphic(check);
+        b.getStyleClass().add("copied");
+        Motion.fadeIn(check, Motion.Speed.FAST);
+        PauseTransition p = new PauseTransition(Duration.millis(1500));
+        p.setOnFinished(e -> {
+            b.setGraphic(old);
+            b.getStyleClass().remove("copied");
+        });
+        p.play();
+    }
+
+    /**
+     * Wrap {@code c} so that while it is disabled with a reason (see {@link #disable}) hovering it says why.
+     * Disabled controls get no mouse events, so the tooltip sits on the wrapper.
+     */
+    public static StackPane explained(Control c) {
+        StackPane wrap = new StackPane(c);
+        wrap.getStyleClass().add("explained");
+        wrap.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        Tooltip tip = new Tooltip();
+        tip.setShowDelay(TOOLTIP_DELAY);
+        tip.setWrapText(true);
+        tip.setMaxWidth(380);
+        Runnable update = () -> {
+            Object r = c.getProperties().get(DISABLED_REASON);
+            if (c.isDisabled() && r instanceof String reason) {
+                tip.setText(reason);
+                Tooltip.install(wrap, tip);
+                c.setAccessibleHelp(reason);
+            } else {
+                Tooltip.uninstall(wrap, tip);
+                c.setAccessibleHelp(null);
+            }
+        };
+        c.getProperties().put(REASON_UPDATER, update);
+        c.disabledProperty().addListener((o, a, b) -> update.run());
+        update.run();
+        return wrap;
+    }
+
+    /** disable {@code c} and say why ({@code reason} null enables it again) */
+    public static void disable(Control c, String reason) {
+        c.getProperties().put(DISABLED_REASON, reason);
+        c.setDisable(reason != null);
+        if (c.getProperties().get(REASON_UPDATER) instanceof Runnable r) {
+            r.run();
+        }
+    }
+
+    /**
+     * Show {@code b} as busy: its label gives way to three pulsing dots while it keeps its width, and it ignores
+     * clicks until loading ends.
+     */
+    public static void loading(Button b, boolean on) {
+        if (on == b.getStyleClass().contains("loading")) {
+            return;
+        }
+        if (on) {
+            b.setMinWidth(b.getWidth());
+            b.setPrefWidth(b.getWidth());
+            b.getProperties().put(LOADING_GRAPHIC, b.getGraphic() == null ? b : b.getGraphic());
+            b.setGraphic(dots());
+            b.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            b.getStyleClass().add("loading");
+            b.setMouseTransparent(true);
+            b.setAccessibleHelp(I18n.tr("ui.state.loading"));
+        } else {
+            Object g = b.getProperties().remove(LOADING_GRAPHIC);
+            b.setGraphic(g instanceof Node n && n != b ? n : null);
+            b.setContentDisplay(ContentDisplay.LEFT);
+            b.getStyleClass().remove("loading");
+            b.setMouseTransparent(false);
+            b.setMinWidth(Region.USE_COMPUTED_SIZE);
+            b.setPrefWidth(Region.USE_COMPUTED_SIZE);
+            b.setAccessibleHelp(null);
+        }
+    }
+
+    /** three dots pulsing one after another */
+    public static HBox dots() {
+        HBox h = new HBox();
+        h.getStyleClass().add("loading-dots");
+        h.setAlignment(Pos.CENTER);
+        for (int i = 0; i < 3; i++) {
+            Region d = new Region();
+            d.getStyleClass().add("loading-dot");
+            Motion.pulse(d, 0.25, i * 160);
+            h.getChildren().add(d);
+        }
+        return h;
     }
 
     /** a segmented control; returns the group, calls onSelect with the chosen index */
@@ -213,8 +408,7 @@ public final class UiKit {
 
     /** a settings row: title + description on the left, a control on the right */
     public static HBox settingRow(String title, String description, Node control) {
-        Label t = label(title);
-        t.setStyle("-fx-font-weight: bold;");
+        Label t = label(title, "strong");
         VBox text = new VBox(2, t);
         if (description != null && !description.isBlank()) {
             text.getChildren().add(label(description, "muted", "small"));
@@ -223,7 +417,7 @@ public final class UiKit {
         text.setMaxWidth(Double.MAX_VALUE);
         HBox h = new HBox(16, text, control);
         h.setAlignment(Pos.CENTER_LEFT);
-        h.setPadding(new Insets(6, 0, 6, 0));
+        h.getStyleClass().add("setting-row");
         control.setAccessibleText(title);
         if (control instanceof Region r) {
             r.setMinWidth(Region.USE_PREF_SIZE);

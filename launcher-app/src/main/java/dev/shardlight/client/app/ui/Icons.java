@@ -44,6 +44,13 @@ public final class Icons {
         + "M12 17.2a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2z";
     public static final String CLOSE = "M6 6l12 12M18 6 6 18";
     public static final String BACK = "M19.5 12h-15M10.5 6l-6 6 6 6";
+    public static final String FORWARD = "M4.5 12h15M13.5 6l6 6-6 6";
+    public static final String CHEVRON_RIGHT = "M9.5 6l6 6-6 6";
+    public static final String CHEVRON_DOWN = "M6 9.5l6 6 6-6";
+    public static final String MINUS = "M5 12h14";
+    public static final String SIDEBAR = "M5 4h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4zM9.5 4v16";
+    public static final String BELL = "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5h4";
+    public static final String COMMAND = "M5 4h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4zM7.5 9l3 3-3 3M12.5 15.5h4";
     public static final String REFRESH = "M20.5 12a8.5 8.5 0 1 1-2.5-6l2.5 2.5M20.5 3.5v5h-5";
     public static final String EXTERNAL = "M14 4h6v6M20 4l-9 9M18 13.5v5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h5";
     public static final String COPY = "M9.5 8.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 8 19v-9a1.5 1.5 0 0 1 1.5-1.5z"
@@ -83,6 +90,8 @@ public final class Icons {
         + "M9.5 9.5h5v5h-5zM9.5 2.5v3M14.5 2.5v3M9.5 18.5v3M14.5 18.5v3M2.5 9.5h3M2.5 14.5h3M18.5 9.5h3M18.5 14.5h3";
     public static final String MEMORY = "M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 15V8A1.5 1.5 0 0 1 4 6.5z"
         + "M7 10v3M10.5 10v3M13.5 10v3M17 10v3M6 16.5v3M18 16.5v3";
+    public static final String WIFI_OFF = "M3 3l18 18M8.8 16a5 5 0 0 1 6.4 0M5.5 12.5a9.5 9.5 0 0 1 4.2-2.3M14.6 10.3a9.5 9.5 0 0 1 3.9 2.2"
+        + "M2.5 9a14 14 0 0 1 4.3-2.7M11 5.1A14 14 0 0 1 21.5 9M12 19.5h.01";
     public static final String WIFI = "M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.8 16a5 5 0 0 1 6.4 0M12 19.5h.01";
 
     /** glyphs that are filled as well as outlined */
@@ -103,14 +112,19 @@ public final class Icons {
         // a clear 24x24 square keeps every glyph on the shared grid instead of centring it by its own bounds
         Rectangle grid = new Rectangle(24, 24, Color.TRANSPARENT);
         Group g = new Group(grid, p);
-        double scale = size / 24.0;
-        g.setScaleX(scale);
-        g.setScaleY(scale);
+        // icons follow the interface size setting, like text does
+        var scale = ThemeManager.scaleProperty();
+        g.scaleXProperty().bind(scale.multiply(size / 24.0));
+        g.scaleYProperty().bind(scale.multiply(size / 24.0));
         StackPane box = new StackPane(g);
         box.getStyleClass().add("icon-holder");
-        box.setMinSize(size, size);
-        box.setPrefSize(size, size);
-        box.setMaxSize(size, size);
+        var px = scale.multiply(size);
+        box.minWidthProperty().bind(px);
+        box.minHeightProperty().bind(px);
+        box.prefWidthProperty().bind(px);
+        box.prefHeightProperty().bind(px);
+        box.maxWidthProperty().bind(px);
+        box.maxHeightProperty().bind(px);
         box.setFocusTraversable(false);
         box.setMouseTransparent(true);
         return box;

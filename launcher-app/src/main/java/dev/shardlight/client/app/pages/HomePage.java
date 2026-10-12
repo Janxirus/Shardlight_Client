@@ -25,7 +25,7 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 import java.util.Optional;
 
-/** The dashboard: the selected project with a big Play button, alerts, recent projects and shortcuts. */
+/** The dashboard: the selected project (played from the Play bar), alerts, recent projects and shortcuts. */
 public final class HomePage implements Page {
     private final AppContext ctx;
     private final VBox root = new VBox(18);
@@ -135,19 +135,6 @@ public final class HomePage implements Page {
         VBox info = new VBox(8, name, chips, content, shard, played);
         HBox.setHgrow(info, Priority.ALWAYS);
 
-        boolean running = ctx.play().isRunning(p.id);
-        Button play = new Button(I18n.tr(running ? "ui.play.running" : "ui.play.play"));
-        play.setGraphic(Icons.of(running ? Icons.STOP : Icons.PLAY, 24));
-        play.getStyleClass().add("play-button");
-        if (running) {
-            play.getStyleClass().add("running");
-            dev.shardlight.client.app.ui.UiKit.tooltip(play, I18n.tr("ui.play.stopTip"));
-        }
-        play.setDefaultButton(true);
-        play.setMaxWidth(Double.MAX_VALUE);
-        play.setAccessibleText(I18n.tr(running ? "ui.play.stopAccessible" : "ui.play.playAccessible", p.name));
-        play.setOnAction(e -> ctx.play().play(p));
-
         ComboBox<Project> picker = new ComboBox<>();
         picker.getItems().setAll(projects);
         picker.setValue(projects.stream().filter(x -> x.id.equals(p.id)).findFirst().orElse(null));
@@ -163,7 +150,7 @@ public final class HomePage implements Page {
         });
         Button details = UiKit.button(I18n.tr("ui.home.openProject"), Icons.LIBRARY, () -> ctx.openProject(p.id));
         details.setMaxWidth(Double.MAX_VALUE);
-        VBox right = new VBox(10, play, picker, details);
+        VBox right = new VBox(10, picker, details);
         right.setMinWidth(250);
         right.setMaxWidth(280);
         right.setAlignment(Pos.TOP_CENTER);

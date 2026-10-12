@@ -41,7 +41,7 @@ public final class LibraryPage implements Page {
     private final TextField search = new TextField();
     private final ComboBox<String> sort = new ComboBox<>();
     private final ToggleButton trash = new ToggleButton();
-    private final FlowPane grid = new FlowPane(14, 14);
+    private final javafx.scene.layout.TilePane grid = new javafx.scene.layout.TilePane();
     private final HBox actions;
 
     public LibraryPage(AppContext ctx) {
@@ -62,6 +62,7 @@ public final class LibraryPage implements Page {
         trash.setOnAction(e -> refresh());
         HBox toolbar = new HBox(10, search, sort, UiKit.spacer(), trash);
         toolbar.setAlignment(Pos.CENTER_LEFT);
+        grid.getStyleClass().add("tile-grid");
         root.getChildren().addAll(toolbar, grid);
         actions = new HBox(8,
             UiKit.button(I18n.tr("ui.library.import"), Icons.ARCHIVE, () -> ProjectActions.importFile(ctx)),
@@ -151,8 +152,13 @@ public final class LibraryPage implements Page {
         if (ctx.play().isRunning(p.id)) {
             chips.getChildren().add(UiKit.chip(I18n.tr("ui.play.running"), "success"));
         }
+        // one line each, with the buttons on the bottom edge, so Play and Open line up across a row of tiles
         Label content = UiKit.label(ProjectText.contentSummary(p), "faint", "small");
+        content.setWrapText(false);
         Label played = UiKit.label(ProjectText.lastPlayed(p), "faint", "small");
+        played.setWrapText(false);
+        Region grow = new Region();
+        VBox.setVgrow(grow, Priority.ALWAYS);
 
         Button play = UiKit.primary(I18n.tr(ctx.play().isRunning(p.id) ? "ui.play.stop" : "ui.play.play"),
             ctx.play().isRunning(p.id) ? Icons.STOP : Icons.PLAY, () -> ctx.play().play(p));
@@ -160,8 +166,9 @@ public final class LibraryPage implements Page {
         Button open = UiKit.button(I18n.tr("ui.library.open"), null, () -> ctx.openProject(p.id));
         HBox buttons = new HBox(8, play, open);
 
-        VBox tile = new VBox(10, top, chips, content, played, buttons);
+        VBox tile = new VBox(10, top, chips, content, played, grow, buttons);
         tile.getStyleClass().add("project-tile");
+        dev.shardlight.client.app.ui.Motion.lift(tile);
         if (selected) {
             tile.getStyleClass().add("selected");
         }

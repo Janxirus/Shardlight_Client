@@ -208,4 +208,18 @@ public final class ProjectActions {
                     ctx.openProject(p.id);
                 }));
     }
+
+    /** apply a performance preset to {@code p} and say what changed (the palette's Switch to Ultra Performance) */
+    public static void applyPreset(AppContext ctx, Project p, dev.shardlight.client.preset.Preset target) {
+        String name = I18n.tr(target.nameKey());
+        Tasks.withProgress(ctx.overlay(), I18n.tr("ui.preset.applying", name), false,
+            (pr, c) -> ctx.services().setup().applyPreset(p, target), r -> {
+                ctx.projectsChanged();
+                ctx.overlay().toast("success", r.applied().isEmpty() ? I18n.tr("ui.preset.appliedNothing", name)
+                    : I18n.tr("ui.preset.applied", name, r.applied().size()));
+                for (String w : r.warnings()) {
+                    ctx.overlay().toast("warning", w);
+                }
+            });
+    }
 }

@@ -54,8 +54,18 @@ final class Capture {
         p.play();
     }
 
+    /** the whole current page, not just the part on screen, on the window's background */
+    private WritableImage fullPage() {
+        javafx.scene.layout.Region root = (javafx.scene.layout.Region) scene.getRoot();
+        javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+        if (root.getBackground() != null && !root.getBackground().getFills().isEmpty()) {
+            params.setFill(root.getBackground().getFills().get(0).getFill());
+        }
+        return ctx.shell().current().view().snapshot(params, null);
+    }
+
     private void save(String name) {
-        WritableImage img = scene.snapshot(null);
+        WritableImage img = name.startsWith("gallery-full") ? fullPage() : scene.snapshot(null);
         int w = (int) img.getWidth();
         int h = (int) img.getHeight();
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
