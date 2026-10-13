@@ -13,6 +13,7 @@ from Gradle properties or environment variables, and CI passes them from the rep
 | Actions name | Kind | Gradle property | What it does without it |
 |---|---|---|---|
 | `SHARDLIGHT_MSA_CLIENT_ID` | variable | `shardlight.msaClientId` | the project's app id from `gradle.properties` is used ([SIGN_IN.md](SIGN_IN.md)) |
+| `SHARDLIGHT_DISCORD_APP_ID` | variable | `shardlight.discordApplicationId` | the Discord status switch stays off until a player enters an application id ([DISCORD.md](DISCORD.md)) |
 | `SHARDLIGHT_CURSEFORGE_API_KEY` | **secret** | `shardlight.curseForgeApiKey` | CurseForge is off until a player enters their own key |
 | `SHARDLIGHT_UPDATE_MANIFEST_URL` | variable | `shardlight.updateManifestUrl` | update checks are off and Settings > Updates says so |
 | `SHARDLIGHT_UPDATE_PUBLIC_KEY` | variable | `shardlight.updatePublicKey` | update checks are off |

@@ -90,6 +90,9 @@ to the report. It contains no tokens.
 | `storage` | 5 | data folder per OS, overrides, JSON migration steps |
 | `update` | 23 | signed manifests, tampered or missing signatures, downgrades, skipped versions, verified downloads that are never run |
 | `util` | 9 | atomic writes, path safety, safe zip extraction |
+| `skin` | 38 | the skin texture layout (new and old 64x32 skins, slim arms, cape), flat previews, reading and checking PNGs, the local skin library, the Minecraft skin and cape requests against a local server (upload, cape change, errors, textures only from Mojang's host) |
+| `discord` | 13 | the Discord message frames, the handshake, the status text, clearing it, nothing sent when off or when Discord is missing, reconnecting |
+| `i18n` | 14 | language files from a folder and from the class path, fallback to English, language names, the two test languages, right-to-left detection, the translator template |
 | app: `I18nBundlesTest` | 4 | every key the source uses exists, every value is a valid pattern, apostrophes show correctly |
 
 ### The areas the specification asks for
@@ -134,6 +137,22 @@ Minecraft (docs/SIGN_IN.md) and Minecraft can't run in the build environment.
 | 8 | Back up and recover a project and a world | `ProjectFilesTest` | with a real world |
 | 9 | Measured FPS, frame time and memory per preset | not done; the app shows no numbers until something is measured | a repeatable benchmark on real hardware |
 | 10 | Clear warnings and recovery for wrong versions and failed downloads | install planner errors, checksum and retry tests, plain-language install messages | seeing them in the real app |
+
+## Skins, Discord status and languages (owner checks)
+
+None of these can be checked without a real account, Discord or a graphics card, so the tests use local stand-ins and
+this is the by-hand list:
+
+1. **Skins** (needs a signed-in account that owns the game). Settings > Accounts > Skins: the model shows your skin
+   and turns slowly; drag to turn it, scroll to zoom. Upload a skin (classic and then slim), choose a cape, remove it,
+   and check the skin in the game. Turn your skin back to the old one from the local library. With the network off the
+   section says what is wrong and keeps the library usable.
+2. **Discord**: follow the steps in [DISCORD.md](DISCORD.md).
+3. **Languages**: Settings > Appearance > Add a language, copy `ui.properties` to `ui_xx.properties` with a few
+   changed lines and `language.name`, restart and pick it; the changed lines show and the rest stay English. Try
+   `--lang ar-XB` for the mirrored layout and `--lang en-XA` for long text (see [LANGUAGES.md](LANGUAGES.md)).
+4. **3D on a real computer**: the screenshots here use a software renderer. On Windows check the model is smooth, not
+   black, and that the player head in the top bar matches.
 
 ## Manual test pass before a release
 

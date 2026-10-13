@@ -6,6 +6,20 @@ All notable changes to Shardlight Client. Versions follow [semantic versioning](
 
 ### Added
 
+- **Extras** (UI overhaul, part 7):
+  - Skins: Settings > Accounts > Skins shows your player in 3D (drag to turn, scroll to zoom), uploads a skin
+    (classic or slim), switches capes, and keeps a local library of the skins you used. With Minecraft's services
+    unreachable it says so and everything local still works. See docs/TESTING.md for what to check by hand.
+  - Discord status, off until turned on: "Playing <project> on Minecraft <version>" while the game runs, cleared
+    when it closes. It talks to the Discord app on the same computer and needs a Discord application ID
+    (docs/DISCORD.md); there is none built in.
+  - Languages: a picker in Settings > Appearance, translation files you can add yourself (docs/LANGUAGES.md),
+    right-to-left layout, and two test languages (`en-XA` long and accented, `ar-XB` mirrored). Text that clipped
+    in them is fixed: the project tabs scroll instead of shortening, filter segments wrap, stat cards grow, the
+    Settings menu widens and Discover categories are translated.
+  - Not included: the optional performance benchmark. It needs a Minecraft mod that cannot be built or run here, so
+    the Performance tab still shows only the numbers it measures itself.
+
 - **Core features** (UI overhaul, part 5):
   - Shardlight modules download from their Modrinth project (when the catalog names one) and then from their
     GitHub release; when neither has them the launcher says "not published yet" and offers to import a jar.
