@@ -226,7 +226,9 @@ public final class PlayFlow {
     private void started(Project project, GameProcess process) {
         ctx.overlay().toast("success", I18n.tr("ui.play.started", project.name));
         fire();
+        updateDiscord();
         process.onExit().whenComplete((exit, err) -> Fx.ui(() -> {
+            updateDiscord();
             fire();
             ctx.projectsChanged();
             if (err != null) {
@@ -235,6 +237,24 @@ public final class PlayFlow {
             }
             showEnded(project, exit);
         }));
+    }
+
+    /**
+     * Discord Rich Presence follows the games that run: the one that started last is shown, and when none is left the
+     * status is cleared. Does nothing unless the player switched it on in Settings.
+     */
+    private void updateDiscord() {
+        var discord = ctx.services().discord();
+        var newest = ctx.services().launches().runningAll().stream()
+            .max(java.util.Comparator.comparing(GameProcess::startedAt));
+        if (newest.isEmpty()) {
+            discord.clear();
+            return;
+        }
+        GameProcess g = newest.get();
+        Project p = ctx.services().projects().get(g.projectId()).orElse(null);
+        discord.show(dev.shardlight.client.discord.DiscordPresence.activityFor(p == null ? null : p.name,
+            p == null ? null : p.minecraftVersion, g.startedAt()));
     }
 
     private void failed(Project project, LaunchOptions options, Throwable err) {

@@ -13,6 +13,8 @@ import dev.shardlight.client.catalog.InstallPlanner;
 import dev.shardlight.client.catalog.ModrinthCatalog;
 import dev.shardlight.client.content.ContentService;
 import dev.shardlight.client.diagnostics.CrashAnalyzer;
+import dev.shardlight.client.discord.DiscordApplicationIds;
+import dev.shardlight.client.discord.DiscordPresence;
 import dev.shardlight.client.diagnostics.DiagnosticsExporter;
 import dev.shardlight.client.download.DownloadManager;
 import dev.shardlight.client.error.LauncherException;
@@ -78,6 +80,7 @@ public final class LauncherServices implements AutoCloseable {
     private final AccountService accounts;
     private final SkinService skins;
     private final SkinLibrary skinLibrary;
+    private final DiscordPresence discord;
     private final ProjectService projects;
     private final BackupService backups;
     private final WorldService worlds;
@@ -125,6 +128,7 @@ public final class LauncherServices implements AutoCloseable {
         this.accounts = new AccountService(paths, secrets, microsoft);
         this.skins = new SkinService(http, endpoints, accounts);
         this.skinLibrary = new SkinLibrary(paths);
+        this.discord = new DiscordPresence(() -> settings.get().privacy.discordRichPresence, DiscordApplicationIds.fromSettings(settings));
 
         this.projects = new ProjectService(paths);
         this.backups = new BackupService(paths, projects);
@@ -275,6 +279,11 @@ public final class LauncherServices implements AutoCloseable {
         return skins;
     }
 
+    /** Discord Rich Presence; does nothing unless the player switched it on and an application id is set */
+    public DiscordPresence discord() {
+        return discord;
+    }
+
     /** the skins kept on this computer */
     public SkinLibrary skinLibrary() {
         return skinLibrary;
@@ -374,6 +383,7 @@ public final class LauncherServices implements AutoCloseable {
         for (var p : launches.runningAll()) {
             LOG.info("Leaving the game of project " + p.projectId() + " running");
         }
+        discord.close();
         downloads.close();
     }
 }

@@ -80,8 +80,10 @@ public final class LauncherSettings {
     public static final class Privacy {
         /** no telemetry exists; kept so a future opt-in can't default to on */
         public boolean telemetry;
+        /** show "Playing <project> on Minecraft <version>" in Discord while the game runs (off until the player turns it on) */
         public boolean discordRichPresence;
-        public boolean discordShowServer;
+        /** the Discord application id; empty uses the one built into this launcher */
+        public String discordApplicationId = "";
     }
 
     public static final class Catalog {

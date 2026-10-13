@@ -16,9 +16,12 @@ import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.ToggleSwitch;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.auth.MicrosoftClientIds;
+import dev.shardlight.client.discord.DiscordApplicationIds;
+import dev.shardlight.client.discord.DiscordPresence;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.java.JavaInstall;
 import dev.shardlight.client.preset.Preset;
+import dev.shardlight.client.project.Project;
 import dev.shardlight.client.settings.LauncherSettings;
 import dev.shardlight.client.task.CancellationToken;
 import dev.shardlight.client.util.OsInfo;
@@ -41,6 +44,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
@@ -69,7 +73,7 @@ public final class SettingsPage implements Page {
     public static final List<String> SECTIONS = List.of("accounts", "appearance", "java", "performance", "downloads",
         "storage", "advanced", "about");
     /** older section names, each now a part of Advanced */
-    private static final List<String> ADVANCED_PARTS = List.of("content", "privacy", "updates");
+    private static final List<String> ADVANCED_PARTS = List.of("content", "privacy", "discord", "updates");
     /** languages with a full translation; "" follows the system */
     private static final List<String> LANGUAGES = List.of("", "en");
     private static final List<String> ACCENTS = DesignTokens.ACCENT_PRESETS;
@@ -80,6 +84,7 @@ public final class SettingsPage implements Page {
 
     private static final List<Entry> INDEX = List.of(
         new Entry("accounts", "accounts", "ui.settings.section.accounts", "ui.settings.section.accounts.about"),
+        new Entry("accounts", "skins", "ui.skins.title", "ui.skins.about"),
         new Entry("appearance", "theme", "ui.settings.theme", "ui.settings.themeAbout"),
         new Entry("appearance", "accent", "ui.settings.accent", "ui.settings.accentAbout"),
         new Entry("appearance", "highContrast", "ui.settings.highContrast", "ui.settings.highContrastAbout"),
@@ -109,6 +114,8 @@ public final class SettingsPage implements Page {
         new Entry("advanced", "defaultSource", "ui.settings.defaultSource", "ui.settings.defaultSourceAbout"),
         new Entry("advanced", "snapshots", "ui.settings.snapshots", "ui.settings.snapshotsAbout"),
         new Entry("advanced", "privacy", "ui.settings.section.privacy", "ui.settings.section.privacy.about"),
+        new Entry("advanced", "discord", "ui.settings.section.discord", "ui.settings.section.discord.about"),
+        new Entry("advanced", "discordApp", "ui.settings.discordApp", "ui.settings.discordAppAbout"),
         new Entry("advanced", "updates", "ui.settings.section.updates", "ui.settings.section.updates.about"),
         new Entry("advanced", "checkOnStart", "ui.settings.checkOnStart", "ui.settings.checkOnStartAbout"),
         new Entry("advanced", "channel", "ui.settings.channel", "ui.settings.channelAbout"),
@@ -198,6 +205,15 @@ public final class SettingsPage implements Page {
         search.field().clear();
         jumping = false;
         render();
+    }
+
+    /** --capture only: show the Accounts section with this Skins card in place of the live one */
+    public void previewSkins(Node skins) {
+        open("accounts");
+        int last = content.getChildren().size() - 1;
+        if (last >= 0) {
+            content.getChildren().set(last, skins);
+        }
     }
 
     /** --capture only: type into the search box */
@@ -448,6 +464,7 @@ public final class SettingsPage implements Page {
             () -> SignInDialog.show(ctx, a -> render()));
         content.getChildren().addAll(rows, new HBox(add));
         content.getChildren().add(UiKit.label(I18n.tr("ui.settings.secretStore", accounts.secretStoreName()), "faint", "small"));
+        content.getChildren().add(reg("skins", SkinsSection.build(ctx)));
     }
 
     private static String shortId(String id) {
@@ -788,6 +805,7 @@ public final class SettingsPage implements Page {
         signInApp(s);
         contentSources(s);
         privacy();
+        discord(s);
         updates(s);
     }
 
@@ -896,6 +914,56 @@ public final class SettingsPage implements Page {
         content.getChildren().addAll(UiKit.banner("success", I18n.tr("ui.settings.noTelemetry")),
             UiKit.section(I18n.tr("ui.settings.privacyConnections"), list),
             UiKit.label(I18n.tr("ui.settings.privacyLogs"), "faint", "small"));
+    }
+
+    /** Discord Rich Presence: one switch, off by default, and the application id it needs */
+    private void discord(LauncherSettings s) {
+        subheading("discord");
+        String builtIn = DiscordApplicationIds.buildDefault();
+        String shownId = DiscordApplicationIds.fromSettings(ctx.services().settings()).get();
+        boolean ready = !shownId.isEmpty();
+        ToggleSwitch on = flag(I18n.tr("ui.settings.discord"), st -> st.privacy.discordRichPresence,
+            (st, v) -> st.privacy.discordRichPresence = v);
+        StackPane onBox = new StackPane(on);
+        onBox.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        if (!ready) {
+            on.setDisable(true);
+            UiKit.tooltip(onBox, I18n.tr("ui.settings.discordNotReady"));
+        }
+        TextField id = new TextField(s.privacy.discordApplicationId == null ? "" : s.privacy.discordApplicationId);
+        id.setPromptText(builtIn.isEmpty() ? "123456789012345678" : I18n.tr("ui.settings.discordIdBuiltIn"));
+        id.setPrefColumnCount(22);
+        id.setAccessibleText(I18n.tr("ui.settings.discordApp"));
+        Label error = UiKit.label("", "danger-text", "small");
+        Button save = UiKit.button(I18n.tr("common.save"), null, () -> {
+            String v = id.getText() == null ? "" : id.getText().trim();
+            if (!v.isEmpty() && !DiscordApplicationIds.looksValid(v)) {
+                error.setText(I18n.tr("ui.settings.discordIdInvalid"));
+                return;
+            }
+            error.setText("");
+            change(I18n.tr("ui.settings.discordApp"), v.isEmpty() ? I18n.tr("ui.settings.discordIdBuiltIn") : v,
+                st -> st.privacy.discordApplicationId, (st, x) -> st.privacy.discordApplicationId = x, v);
+            render();
+        });
+        VBox appId = new VBox(6, new HBox(8, id, save), error);
+        List<Node> parts = new ArrayList<>();
+        if (!ready) {
+            parts.add(UiKit.banner("info", I18n.tr("ui.settings.discordSetup")));
+        }
+        parts.add(row("discord", I18n.tr("ui.settings.discord"), I18n.tr("ui.settings.discordAbout"), onBox));
+        Optional<Project> sample = ctx.selectedProject();
+        if (sample.isPresent() && ready) {
+            Project p = sample.get();
+            DiscordPresence.Activity a = DiscordPresence.activityFor(p.name, p.minecraftVersion, java.time.Instant.now());
+            VBox example = new VBox(2, UiKit.label(I18n.tr("ui.settings.discordExample"), "caption", "faint"),
+                UiKit.label(a.details(), "strong"), UiKit.label(a.state(), "muted"));
+            example.getStyleClass().add("discord-example");
+            parts.add(example);
+        }
+        parts.add(row("discordApp", I18n.tr("ui.settings.discordApp"), I18n.tr("ui.settings.discordAppAbout"), appId));
+        parts.add(UiKit.label(I18n.tr("ui.settings.discordPrivacy"), "faint", "small"));
+        content.getChildren().add(UiKit.card(parts.toArray(new Node[0])));
     }
 
     private void updates(LauncherSettings s) {

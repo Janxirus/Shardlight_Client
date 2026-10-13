@@ -1708,3 +1708,47 @@
     -fx-border-radius: 1em;
 }
 .crash-cause.known { -fx-border-color: -sl-danger; }
+
+/* Skins: the 3D viewer, the library tiles and the cape choices */
+.skin-viewer {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 1.429em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1.429em;
+    -fx-cursor: move;
+}
+.skin-viewer:focused { -fx-border-color: -sl-focus; -fx-border-width: 2; }
+.skins-layout { -fx-spacing: 1.714em; -fx-alignment: top-left; }
+.skin-tiles { -fx-hgap: 0.857em; -fx-vgap: 0.857em; }
+.skin-tile {
+    -fx-background-color: -sl-border-strong, -sl-raised;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0.714em, 0.643em;
+    -fx-padding: 0.714em;
+    -fx-min-width: 6.857em;
+    -fx-pref-width: 6.857em;
+    -fx-cursor: hand;
+}
+.skin-tile:hover { -fx-background-color: -sl-border-strong, -sl-fill; }
+.skin-tile:focused:focus-visible { -fx-background-color: -sl-focus, -sl-raised; -fx-background-insets: 0, 2; }
+.skin-tile.selected { -fx-background-color: -sl-accent, -sl-accent-subtle; -fx-background-insets: 0, 2; }
+.cape-choice {
+    -fx-background-color: -sl-border-strong, -sl-raised;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0.714em, 0.643em;
+    -fx-padding: 0.357em 0.857em;
+    -fx-text-fill: -sl-text;
+    -fx-cursor: hand;
+}
+.cape-choice:hover { -fx-background-color: -sl-border-strong, -sl-fill; }
+.cape-choice:focused:focus-visible { -fx-background-color: -sl-focus, -sl-raised; -fx-background-insets: 0, 2; }
+.cape-choice.selected { -fx-background-color: -sl-accent, -sl-accent-subtle; -fx-background-insets: 0, 2; -fx-text-fill: -sl-accent-fg; -sl-icon: -sl-accent-fg; }
+.cape-choice:disabled { -fx-opacity: 0.5; }
+
+/* Discord: what the status will read */
+.discord-example {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 0.714em;
+    -fx-padding: 0.714em 0.857em;
+    -fx-max-width: 22em;
+}

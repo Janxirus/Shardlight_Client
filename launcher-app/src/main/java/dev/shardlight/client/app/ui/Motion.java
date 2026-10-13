@@ -1,11 +1,13 @@
 package dev.shardlight.client.app.ui;
 
+import javafx.animation.AnimationTimer;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.ParallelTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.TranslateTransition;
+import javafx.beans.property.DoubleProperty;
 import javafx.scene.Node;
 import javafx.util.Duration;
 
@@ -202,6 +204,60 @@ public final class Motion {
         t.setCycleCount(Animation.INDEFINITE);
         t.setInterpolator(Interpolator.EASE_BOTH);
         return loop(node, t);
+    }
+
+    /** a model that turns about its own axis: see {@link #spin} */
+    public static final class Spinner {
+        private final AnimationTimer timer;
+        private volatile boolean paused;
+
+        private Spinner(AnimationTimer timer) {
+            this.timer = timer;
+        }
+
+        /** hold the turn while the player drags the model, and carry on after */
+        public void pause(boolean paused) {
+            this.paused = paused;
+        }
+
+        public boolean isPaused() {
+            return paused;
+        }
+
+        public void stop() {
+            timer.stop();
+        }
+    }
+
+    /**
+     * Turn a 3D model slowly by adding to {@code angle} (degrees) while {@code node} is in a scene. Reduce
+     * motion: nothing turns. Call {@link Spinner#pause} to hold it.
+     */
+    public static Spinner spin(Node node, DoubleProperty angle, double degreesPerSecond) {
+        long[] last = {0};
+        Spinner[] self = new Spinner[1];
+        AnimationTimer timer = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                if (last[0] != 0 && !self[0].paused && !reduced()) {
+                    angle.set(angle.get() + degreesPerSecond * (now - last[0]) / 1e9);
+                }
+                last[0] = now;
+            }
+        };
+        self[0] = new Spinner(timer);
+        node.sceneProperty().addListener((o, was, now) -> {
+            if (now == null) {
+                timer.stop();
+                last[0] = 0;
+            } else {
+                timer.start();
+            }
+        });
+        if (node.getScene() != null) {
+            timer.start();
+        }
+        return self[0];
     }
 
     /** endless animations stop once their node is no longer in a scene */

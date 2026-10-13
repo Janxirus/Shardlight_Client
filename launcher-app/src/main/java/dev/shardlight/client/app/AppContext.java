@@ -351,6 +351,12 @@ public final class AppContext {
                 steps.add("p6-" + id + suffix);
             }
         }
+        // Part 7: skins, the Discord switch and the language picker
+        for (String suffix : List.of("", "-light")) {
+            for (String id : CapturePart7.VIEWS) {
+                steps.add("p7-" + id + suffix);
+            }
+        }
         // CAPTURE_ONLY=<prefix>: only the views whose name starts with it (keeps a re-shoot short)
         String only = System.getenv("CAPTURE_ONLY");
         if (only != null && !only.isBlank()) {
@@ -368,6 +374,17 @@ public final class AppContext {
         shell.setCollapsed(false);
         overlay().clearToasts();
         return CapturePart6.show(this, raw.substring(3, light ? raw.length() - "-light".length() : raw.length()));
+    }
+
+    private boolean showPart7Capture(String raw) {
+        if (!raw.startsWith("p7-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        overlay().clearToasts();
+        return CapturePart7.show(this, raw.substring(3, light ? raw.length() - "-light".length() : raw.length()));
     }
 
     private static List<String> part4Views() {
@@ -602,7 +619,7 @@ public final class AppContext {
             overlay().closeTop();
         }
         overlay().closePopover();
-        if (showPart3Capture(id) || showPart4Capture(id) || showPart6Capture(id) || showShellCapture(id)) {
+        if (showPart3Capture(id) || showPart4Capture(id) || showPart6Capture(id) || showPart7Capture(id) || showShellCapture(id)) {
             return;
         }
         if (id.startsWith("project-") && PROJECT_TABS.contains(id.substring(8))) {

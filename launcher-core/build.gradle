@@ -25,6 +25,8 @@ tasks.named('processResources') {
         version          : project.version.toString(),
         msaClientId      : distributorValue('shardlight.msaClientId', 'SHARDLIGHT_MSA_CLIENT_ID',
                                        project.findProperty('default_msa_client_id') ?: ''),
+        discordApplicationId: distributorValue('shardlight.discordApplicationId', 'SHARDLIGHT_DISCORD_APP_ID',
+                                       project.findProperty('default_discord_application_id') ?: ''),
         curseForgeApiKey : distributorValue('shardlight.curseForgeApiKey', 'SHARDLIGHT_CURSEFORGE_API_KEY'),
         updateManifestUrl: distributorValue('shardlight.updateManifestUrl', 'SHARDLIGHT_UPDATE_MANIFEST_URL'),
         updatePublicKey  : distributorValue('shardlight.updatePublicKey', 'SHARDLIGHT_UPDATE_PUBLIC_KEY'),

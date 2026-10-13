@@ -19,7 +19,7 @@ public final class I18n {
     /** every bundle, searched in order; add new areas here */
     public static final List<String> BUNDLES = List.of(
         "i18n/common", "i18n/install", "i18n/auth", "i18n/project", "i18n/content",
-        "i18n/shardlight", "i18n/skin", "i18n/ui");
+        "i18n/shardlight", "i18n/skin", "i18n/discord", "i18n/ui");
 
     private static volatile Locale locale = Locale.getDefault();
     private static final ConcurrentHashMap<Locale, List<ResourceBundle>> CACHE = new ConcurrentHashMap<>();
