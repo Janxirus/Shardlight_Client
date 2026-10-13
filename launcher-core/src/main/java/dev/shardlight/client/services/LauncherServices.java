@@ -39,6 +39,8 @@ import dev.shardlight.client.project.WorldService;
 import dev.shardlight.client.settings.LauncherSettings;
 import dev.shardlight.client.settings.SettingsService;
 import dev.shardlight.client.shardlight.ShardlightCatalog;
+import dev.shardlight.client.skin.SkinLibrary;
+import dev.shardlight.client.skin.SkinService;
 import dev.shardlight.client.shardlight.ShardlightContentLibrary;
 import dev.shardlight.client.shardlight.ShardlightService;
 import dev.shardlight.client.storage.AppPaths;
@@ -74,6 +76,8 @@ public final class LauncherServices implements AutoCloseable {
     private final LaunchService launches;
     private final MicrosoftAuthService microsoft;
     private final AccountService accounts;
+    private final SkinService skins;
+    private final SkinLibrary skinLibrary;
     private final ProjectService projects;
     private final BackupService backups;
     private final WorldService worlds;
@@ -119,6 +123,8 @@ public final class LauncherServices implements AutoCloseable {
 
         this.microsoft = new MicrosoftAuthService(http, endpoints, this::microsoftClientId);
         this.accounts = new AccountService(paths, secrets, microsoft);
+        this.skins = new SkinService(http, endpoints, accounts);
+        this.skinLibrary = new SkinLibrary(paths);
 
         this.projects = new ProjectService(paths);
         this.backups = new BackupService(paths, projects);
@@ -262,6 +268,16 @@ public final class LauncherServices implements AutoCloseable {
 
     public AccountService accounts() {
         return accounts;
+    }
+
+    /** the signed-in account's skin and capes, through Minecraft services */
+    public SkinService skins() {
+        return skins;
+    }
+
+    /** the skins kept on this computer */
+    public SkinLibrary skinLibrary() {
+        return skinLibrary;
     }
 
     public ProjectService projects() {
