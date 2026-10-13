@@ -142,7 +142,8 @@ public final class SettingsPage implements Page {
         nav.setPadding(new Insets(4, 12, 4, 0));
         VBox side = new VBox(12, search, nav);
         side.setMinWidth(230);
-        side.setPrefWidth(230);
+        side.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        side.setMaxWidth(320);
         side.setPadding(new Insets(0, 12, 0, 0));
         side.getStyleClass().add("settings-side");
         content.setPadding(new Insets(4, 8, 24, 16));

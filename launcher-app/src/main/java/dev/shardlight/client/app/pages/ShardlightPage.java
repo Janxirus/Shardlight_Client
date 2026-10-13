@@ -81,7 +81,10 @@ public final class ShardlightPage implements Page {
 
     @Override
     public Node actions() {
-        HBox box = new HBox(UiKit.label(I18n.tr("ui.shardlight.project"), "muted"), target);
+        Label name = UiKit.label(I18n.tr("ui.shardlight.project"), "muted");
+        name.setWrapText(false);
+        name.setMinWidth(Region.USE_PREF_SIZE);
+        HBox box = new HBox(name, target);
         box.getStyleClass().add("button-row");
         return box;
     }

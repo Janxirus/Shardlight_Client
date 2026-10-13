@@ -12,7 +12,9 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -383,9 +385,23 @@ public final class UiKit {
     public static HBox segmented(List<String> options, int selected, Consumer<Integer> onSelect) {
         HBox box = new HBox();
         box.getStyleClass().add("segmented");
+        fillSegments(box, options, selected, onSelect);
+        return box;
+    }
+
+    /** like {@link #segmented}, for narrow places: the options move to a second row when the first is full */
+    public static FlowPane segmentedWrapping(List<String> options, int selected, Consumer<Integer> onSelect) {
+        FlowPane box = new FlowPane(2, 2);
+        box.getStyleClass().add("segmented");
+        fillSegments(box, options, selected, onSelect);
+        return box;
+    }
+
+    private static void fillSegments(Pane box, List<String> options, int selected, Consumer<Integer> onSelect) {
         ToggleGroup g = new ToggleGroup();
         for (int i = 0; i < options.size(); i++) {
             ToggleButton b = new ToggleButton(options.get(i));
+            b.setMinWidth(Region.USE_PREF_SIZE);
             b.setToggleGroup(g);
             b.setSelected(i == selected);
             int idx = i;
@@ -397,7 +413,6 @@ public final class UiKit {
             });
             box.getChildren().add(b);
         }
-        return box;
     }
 
     public static ProgressBar progress(double value) {

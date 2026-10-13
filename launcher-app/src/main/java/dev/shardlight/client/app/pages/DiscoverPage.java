@@ -46,6 +46,7 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
@@ -77,7 +78,7 @@ public final class DiscoverPage implements Page {
     private final ComboBox<Choice> versionBox = new ComboBox<>();
     private final ComboBox<Choice> loaderBox = new ComboBox<>();
     private final ComboBox<SortOrder> sort = new ComboBox<>();
-    private final HBox envBox;
+    private final FlowPane envBox;
     private final VBox categoryList = new VBox();
     private final Button showAllCategories = UiKit.button("", null, this::toggleCategories, "ghost", "small");
     private final VBox results = new VBox();
@@ -141,7 +142,7 @@ public final class DiscoverPage implements Page {
         loaderBox.setOnAction(e -> filtersChanged());
         fillLoaderChoices();
 
-        envBox = UiKit.segmented(List.of(I18n.tr("ui.discover.env.any"), I18n.tr("ui.discover.env.client"),
+        envBox = UiKit.segmentedWrapping(List.of(I18n.tr("ui.discover.env.any"), I18n.tr("ui.discover.env.client"),
             I18n.tr("ui.discover.env.server")), 0, i -> {
                 environment = i == 1 ? SearchQuery.Environment.CLIENT : i == 2 ? SearchQuery.Environment.SERVER : null;
                 filtersChanged();
@@ -425,6 +426,10 @@ public final class DiscoverPage implements Page {
     }
 
     private static String pretty(String category) {
+        String key = "ui.category." + category.toLowerCase(Locale.ROOT);
+        if (I18n.has(key)) {
+            return I18n.tr(key);
+        }
         String s = category.replace('-', ' ').replace('_', ' ');
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }

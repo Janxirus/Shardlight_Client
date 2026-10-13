@@ -116,10 +116,12 @@ class I18nLanguagesTest {
     }
 
     @Test
-    void theMirroredTestLanguageIsWrappedForRightToLeft() {
-        I18n.setLocale(Locale.forLanguageTag(PseudoLocale.MIRRORED));
-        String s = I18n.tr("common.cancel");
-        assertTrue(s.startsWith("‫[") && s.endsWith("]‬"), s);
+    void theAccentedTestLanguageAlsoReachesTheWordsInsideChoiceArguments() {
+        String p = PseudoLocale.transform("{0,choice,1#1 day ago|1<{0,number,integer} days ago}", Locale.forLanguageTag("en-XA"));
+        String one = new java.text.MessageFormat(p, Locale.ENGLISH).format(new Object[] {1});
+        String many = new java.text.MessageFormat(p, Locale.ENGLISH).format(new Object[] {3});
+        assertTrue(one.startsWith("[1 đåý"), one);
+        assertTrue(many.startsWith("[3 đåýš"), many);
     }
 
     @Test

@@ -1206,7 +1206,7 @@
 .world-card { -fx-pref-width: 15em; -fx-padding: 0 0 0.857em 0; -fx-spacing: 0.714em; }
 .world-picture, .world-sample { -fx-pref-height: 6em; -fx-background-radius: 1em 1em 0 0; }
 .world-sample { -fx-background-color: linear-gradient(to bottom, -sl-info-subtle, -sl-success-subtle); }
-.stat-card { -fx-pref-width: 14em; -fx-spacing: 0.857em; }
+.stat-card { -fx-min-width: 14em; -fx-spacing: 0.857em; }
 
 .row-actions { -fx-opacity: 0; -fx-spacing: 0.143em; }
 .list-cell:hover .row-actions, .list-cell:selected .row-actions,
@@ -1421,6 +1421,8 @@
 .project-page { -fx-spacing: 0; }
 .tab-strip { -fx-padding: 0 1.714em; }
 .tab-strip-tabs { -fx-spacing: 0.286em; }
+.tab-strip-scroll, .tab-strip-scroll:focused { -fx-padding: 0; -fx-background-insets: 0; -fx-background-color: transparent; }
+.tab-strip-scroll > .viewport { -fx-background-color: transparent; }
 .tab-strip-tab {
     -fx-background-color: transparent;
     -fx-background-radius: 0.714em;
