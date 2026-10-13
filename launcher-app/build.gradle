@@ -96,11 +96,16 @@ static String jpackageTool() {
 
 def jpackageCommon = { String type, File dest ->
     def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    def appVersion = project.version.toString().replaceAll(/[^0-9.]/, '')
+    if (os.contains('mac') && appVersion.startsWith('0.')) {
+        // macOS refuses a version that starts with 0, so a 0.x.y launcher is packaged as 1.x.y there (the in-app version stays 0.x.y)
+        appVersion = '1.' + appVersion.substring(2)
+    }
     def args = [jpackageTool(),
                 '--type', type,
                 '--dest', dest.absolutePath,
                 '--name', 'Shardlight Client',
-                '--app-version', project.version.toString().replaceAll(/[^0-9.]/, ''),
+                '--app-version', appVersion,
                 '--vendor', 'Janxirus',
                 '--description', 'Shardlight Client - Minecraft Java Edition launcher',
                 '--copyright', 'Copyright (c) Janxirus. All rights reserved.',

@@ -134,6 +134,8 @@ not wired in; it would replace that one script.
 
 ### macOS (the disk image)
 
+macOS refuses an app version that starts with 0, so while the launcher is a `0.x.y` version the disk image is packaged as `1.x.y` (the in-app version and the file name still say `0.x.y`). Once the launcher reaches 1.0.0 the two match.
+
 | Name | Kind | What it is |
 |---|---|---|
 | `MACOS_CERTIFICATE_P12_BASE64` | secret | your **Developer ID Application** certificate with its private key, exported as `.p12`, encoded as base64 (`base64 -i certificate.p12 | pbcopy`) |
