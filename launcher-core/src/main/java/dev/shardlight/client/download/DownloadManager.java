@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -67,6 +68,7 @@ public final class DownloadManager implements AutoCloseable {
     private final List<DownloadListener> listeners = new CopyOnWriteArrayList<>();
     private final Map<String, CancellationToken> itemCancels = new ConcurrentHashMap<>();
     private final AtomicLong ids = new AtomicLong();
+    private final Set<String> pausedGroups = ConcurrentHashMap.newKeySet();
 
     /**
      * @param cacheDir shared verified-file cache, or null for none
@@ -121,6 +123,36 @@ public final class DownloadManager implements AutoCloseable {
         CancellationToken t = itemCancels.get(itemId);
         if (t != null) {
             t.cancel();
+        }
+    }
+
+    /**
+     * Hold back every unfinished download of {@code group}. Running transfers stop at once and give up their slot;
+     * what was downloaded stays in the {@code .part} file. {@link #resumeGroup} carries on from there.
+     */
+    public void pauseGroup(String group) {
+        if (pausedGroups.add(group == null ? "" : group)) {
+            notifyGroup(group);
+        }
+    }
+
+    /** let a paused group go on */
+    public void resumeGroup(String group) {
+        if (pausedGroups.remove(group == null ? "" : group)) {
+            notifyGroup(group);
+        }
+    }
+
+    public boolean isPaused(String group) {
+        return pausedGroups.contains(group == null ? "" : group);
+    }
+
+    private void notifyGroup(String group) {
+        String g = group == null ? "" : group;
+        for (DownloadItem i : items()) {
+            if (!i.state().isFinished() && (i.group() == null ? "" : i.group()).equals(g)) {
+                notifyNow(i);
+            }
         }
     }
 
@@ -220,11 +252,12 @@ public final class DownloadManager implements AutoCloseable {
                 item.state(DownloadState.SKIPPED);
                 return;
             }
-            acquireSlot(cancel);
+            awaitResumed(item, cancel);
+            acquireSlot(item, cancel);
             try {
                 download(item, cancel);
             } finally {
-                releaseSlot();
+                releaseSlot(item);
             }
             toCache(r);
             item.state(DownloadState.DONE);
@@ -261,7 +294,7 @@ public final class DownloadManager implements AutoCloseable {
                 item.state(DownloadState.RUNNING);
                 notifyNow(item);
                 try {
-                    fetch(item, url, part, cancel);
+                    fetchPausable(item, url, part, cancel);
                     item.state(DownloadState.VERIFYING);
                     notifyNow(item);
                     verify(r, part);
@@ -301,6 +334,47 @@ public final class DownloadManager implements AutoCloseable {
             case HTTP_STATUS -> e.args().length > 1 && e.args()[1] instanceof Integer s && s >= 400 && s < 500 && s != 408;
             default -> false;
         };
+    }
+
+    /** thrown inside {@link #fetch} when the item's group is paused; the stream is closed and the .part file kept */
+    private static final class Paused extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        Paused() {
+            super(null, null, false, false);
+        }
+    }
+
+    /** fetch, and when the group is paused give up the slot, wait, take a slot again and carry on from the .part file */
+    private void fetchPausable(DownloadItem item, URI url, Path part, CancellationToken cancel) throws LauncherException {
+        while (true) {
+            try {
+                fetch(item, url, part, cancel);
+                return;
+            } catch (Paused p) {
+                releaseSlot(item);
+                item.speed(0);
+                awaitResumed(item, cancel);
+                acquireSlot(item, cancel);
+                item.state(DownloadState.RUNNING);
+                notifyNow(item);
+            }
+        }
+    }
+
+    /** returns when the item's group is not paused; the item shows as PAUSED meanwhile */
+    private void awaitResumed(DownloadItem item, CancellationToken cancel) throws LauncherException {
+        if (!isPaused(item.group())) {
+            return;
+        }
+        DownloadState before = item.state();
+        item.state(DownloadState.PAUSED);
+        notifyNow(item);
+        while (isPaused(item.group())) {
+            sleep(100, cancel);
+        }
+        item.state(before == DownloadState.PAUSED ? DownloadState.QUEUED : before);
+        notifyNow(item);
     }
 
     private void fetch(DownloadItem item, URI url, Path part, CancellationToken cancel) throws LauncherException {
@@ -368,6 +442,12 @@ public final class DownloadManager implements AutoCloseable {
                 }
                 if (cancel.isCancelled()) {
                     throw LauncherException.cancelled();
+                }
+                if (isPaused(item.group())) {
+                    item.bytes(done, total);
+                    item.state(DownloadState.PAUSED);
+                    notifyNow(item);
+                    throw new Paused();
                 }
             }
         } catch (IOException e) {
@@ -449,7 +529,7 @@ public final class DownloadManager implements AutoCloseable {
 
     // ---------------------------------------------------------------- helpers
 
-    private void acquireSlot(CancellationToken cancel) throws LauncherException {
+    private void acquireSlot(DownloadItem item, CancellationToken cancel) throws LauncherException {
         slotLock.lock();
         try {
             while (running >= maxConcurrent) {
@@ -465,16 +545,21 @@ public final class DownloadManager implements AutoCloseable {
                 }
             }
             running++;
+            item.slotHeld = true;
         } finally {
             slotLock.unlock();
         }
     }
 
-    private void releaseSlot() {
+    /** gives the item's slot back; safe to call when it holds none */
+    private void releaseSlot(DownloadItem item) {
         slotLock.lock();
         try {
-            running--;
-            slotFree.signal(); // one slot freed: wake one waiter, not the whole queue
+            if (item.slotHeld) {
+                item.slotHeld = false;
+                running--;
+                slotFree.signal(); // one slot freed: wake one waiter, not the whole queue
+            }
         } finally {
             slotLock.unlock();
         }

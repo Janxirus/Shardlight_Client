@@ -37,7 +37,9 @@ subprojects {
     }
 
     tasks.named('test', Test) {
-        useJUnitPlatform()
+        // tests tagged "live" or "installer" talk to the real services; they only run through liveTest (-PliveTests)
+        // and installerTest (-PinstallerTests)
+        useJUnitPlatform { excludeTags 'live', 'installer' }
         maxParallelForks = 1
         systemProperty 'java.awt.headless', 'true'
         testLogging {

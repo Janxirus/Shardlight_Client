@@ -1,6 +1,7 @@
 package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
+import dev.shardlight.client.app.ui.Cards;
 import dev.shardlight.client.app.ui.Dialogs;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.ProjectText;
@@ -10,13 +11,15 @@ import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.project.BackupInfo;
 import dev.shardlight.client.project.BackupScope;
 import dev.shardlight.client.project.Project;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,11 +27,12 @@ import java.util.Optional;
 final class BackupsTab {
     private final AppContext ctx;
     private final String projectId;
-    private final VBox root = new VBox(10);
+    private final VBox root = new VBox();
 
     BackupsTab(AppContext ctx, String projectId) {
         this.ctx = ctx;
         this.projectId = projectId;
+        root.getStyleClass().add("stack");
     }
 
     VBox view() {
@@ -49,23 +53,41 @@ final class BackupsTab {
         Button create = UiKit.primary(I18n.tr("ui.backup.new"), Icons.ARCHIVE, () -> create(p));
         Button folder = UiKit.iconButton(Icons.FOLDER, I18n.tr("ui.library.openFolder"),
             () -> ctx.openFolder(ctx.services().paths().backups().resolve(p.id)));
-        HBox bar = new HBox(8, create, UiKit.spacer(), folder);
-        bar.setAlignment(Pos.CENTER_LEFT);
+        HBox bar = new HBox(create, UiKit.spacer(), folder);
+        bar.getStyleClass().add("button-row");
         root.getChildren().addAll(bar, UiKit.label(I18n.tr("ui.backup.intro"), "muted", "small"));
         if (backups.isEmpty()) {
             root.getChildren().add(UiKit.emptyState(Icons.ARCHIVE, I18n.tr("ui.backup.emptyTitle"),
                 I18n.tr("ui.backup.emptyBody"), null));
             return;
         }
+        long total = backups.stream().mapToLong(BackupInfo::sizeBytes).sum();
+        String newest = backups.stream().filter(b -> !b.isPreRestore()).map(BackupInfo::createdAt)
+            .max(Comparator.naturalOrder()).map(ProjectText::ago).orElse(I18n.tr("ui.overview.noBackup"));
+        FlowPane stats = new FlowPane(
+            Cards.stat(Icons.ARCHIVE, String.valueOf(backups.size()), I18n.tr("ui.backup.statCount")),
+            Cards.stat(Icons.FOLDER, UiKit.bytes(total), I18n.tr("ui.backup.statSize")),
+            Cards.stat(Icons.CLOCK, newest, I18n.tr("ui.overview.lastBackup")));
+        stats.getStyleClass().add("stat-row");
+        root.getChildren().add(1, stats);
+        VBox list = new VBox();
+        list.getStyleClass().add("stack-tight");
         for (BackupInfo b : backups) {
-            root.getChildren().add(row(p, b));
+            list.getChildren().add(row(p, b));
         }
+        root.getChildren().add(list);
     }
 
     private Node row(Project p, BackupInfo b) {
         String what = "world".equals(b.kind()) ? I18n.tr("ui.backup.kindWorld", b.worldFolder()) : I18n.tr("ui.backup.kindProject");
-        VBox text = new VBox(2, UiKit.label(b.label() == null || b.label().isBlank() ? what : b.label() + "  ·  " + what, "project-name"),
-            UiKit.label(I18n.tr("ui.backup.row", ProjectText.ago(b.createdAt()), UiKit.bytes(b.sizeBytes())), "faint", "small"));
+        HBox title = new HBox(UiKit.label(b.label() == null || b.label().isBlank() ? what : b.label() + "  ·  " + what, "project-name"));
+        title.getStyleClass().add("card-title-row");
+        if (b.isPreRestore()) {
+            title.getChildren().add(UiKit.chip(I18n.tr("ui.backup.safety"), "info"));
+        }
+        Label when = UiKit.label(I18n.tr("ui.backup.row", ProjectText.ago(b.createdAt()), UiKit.bytes(b.sizeBytes())), "faint", "small");
+        VBox text = new VBox(title, when);
+        text.getStyleClass().add("row-text");
         HBox.setHgrow(text, Priority.ALWAYS);
         Button restore = UiKit.button(I18n.tr("ui.backup.restore"), Icons.REFRESH, () -> {
             if (ctx.play().isRunning(p.id)) {
@@ -89,9 +111,10 @@ final class BackupsTab {
                 ctx.services().backups().delete(b);
                 return true;
             }, x -> refresh())));
-        HBox row = new HBox(10, UiKit.iconBox(Icons.of(Icons.ARCHIVE, 18), 38), text, restore, delete);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.getStyleClass().addAll("card", "flat");
+        HBox actions = new HBox(restore, delete);
+        actions.getStyleClass().add("card-actions");
+        HBox row = new HBox(UiKit.iconBox(Icons.of("world".equals(b.kind()) ? Icons.WORLD : Icons.ARCHIVE, 18), 38), text, actions);
+        row.getStyleClass().addAll("card", "flat", "library-row");
         return row;
     }
 

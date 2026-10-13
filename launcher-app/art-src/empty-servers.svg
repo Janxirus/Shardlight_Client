@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+<defs><radialGradient id="g1"><stop offset="0" stop-color="#7c6cf2" stop-opacity="0.22"/><stop offset="1" stop-color="#7c6cf2" stop-opacity="0"/></radialGradient></defs>
+<circle cx="80.0" cy="62.0" r="66.0" fill="url(#g1)"/>
+<polygon points="40.0,30.0 122.0,30.0 40.0,50.0" fill="#897bf3"/>
+<polygon points="122.0,30.0 122.0,50.0 40.0,50.0" fill="#6b5dd0"/>
+<polygon points="52.0,40.0 56.0,40.0 54.0,43.5" fill="#c3c8d4"/>
+<polygon points="52.0,40.0 54.0,43.5 50.0,43.5" fill="#d1d6e3"/>
+<polygon points="52.0,40.0 50.0,43.5 48.0,40.0" fill="#e7edfa"/>
+<polygon points="52.0,40.0 48.0,40.0 50.0,36.5" fill="#e9eefb"/>
+<polygon points="52.0,40.0 50.0,36.5 54.0,36.5" fill="#e9eefb"/>
+<polygon points="52.0,40.0 54.0,36.5 56.0,40.0" fill="#e1e7f5"/>
+<polygon points="66.0,38.0 108.0,38.0 108.0,42.0 66.0,42.0" fill="#e6ecfa" fill-opacity="0.70"/>
+<polygon points="40.0,56.0 122.0,56.0 40.0,76.0" fill="#9098b1"/>
+<polygon points="122.0,56.0 122.0,76.0 40.0,76.0" fill="#727890"/>
+<polygon points="52.0,66.0 56.0,66.0 54.0,69.5" fill="#c3c8d4"/>
+<polygon points="52.0,66.0 54.0,69.5 50.0,69.5" fill="#d1d6e3"/>
+<polygon points="52.0,66.0 50.0,69.5 48.0,66.0" fill="#e7edfa"/>
+<polygon points="52.0,66.0 48.0,66.0 50.0,62.5" fill="#e9eefb"/>
+<polygon points="52.0,66.0 50.0,62.5 54.0,62.5" fill="#e9eefb"/>
+<polygon points="52.0,66.0 54.0,62.5 56.0,66.0" fill="#e1e7f5"/>
+<polygon points="66.0,64.0 108.0,64.0 108.0,68.0 66.0,68.0" fill="#e6ecfa" fill-opacity="0.70"/>
+<polygon points="40.0,82.0 122.0,82.0 40.0,102.0" fill="#4ec4b8"/>
+<polygon points="122.0,82.0 122.0,102.0 40.0,102.0" fill="#32a397"/>
+<polygon points="52.0,92.0 56.0,92.0 54.0,95.5" fill="#c3c8d4"/>
+<polygon points="52.0,92.0 54.0,95.5 50.0,95.5" fill="#d1d6e3"/>
+<polygon points="52.0,92.0 50.0,95.5 48.0,92.0" fill="#e7edfa"/>
+<polygon points="52.0,92.0 48.0,92.0 50.0,88.5" fill="#e9eefb"/>
+<polygon points="52.0,92.0 50.0,88.5 54.0,88.5" fill="#e9eefb"/>
+<polygon points="52.0,92.0 54.0,88.5 56.0,92.0" fill="#e1e7f5"/>
+<polygon points="66.0,90.0 108.0,90.0 108.0,94.0 66.0,94.0" fill="#e6ecfa" fill-opacity="0.70"/>
+</svg>

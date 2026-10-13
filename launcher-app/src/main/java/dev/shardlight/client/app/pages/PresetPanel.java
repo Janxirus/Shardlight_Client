@@ -1,9 +1,11 @@
 package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
+import dev.shardlight.client.app.ui.Cards;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.ToggleSwitch;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
@@ -11,8 +13,8 @@ import dev.shardlight.client.preset.ApplyReport;
 import dev.shardlight.client.preset.Preset;
 import dev.shardlight.client.preset.SettingChange;
 import dev.shardlight.client.preset.SettingDef;
+import dev.shardlight.client.preset.VanillaOptions;
 import dev.shardlight.client.project.Project;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -39,12 +41,13 @@ import java.util.Objects;
 public final class PresetPanel {
     private final AppContext ctx;
     private final String projectId;
-    private final VBox root = new VBox(16);
+    private final VBox root = new VBox();
     private Preset previewing;
 
     public PresetPanel(AppContext ctx, String projectId) {
         this.ctx = ctx;
         this.projectId = projectId;
+        root.getStyleClass().add("stack");
     }
 
     public VBox view() {
@@ -63,6 +66,7 @@ public final class PresetPanel {
             previewing = active;
         }
 
+        int ultraChanges = changeCount(p, Preset.ULTRA_PERFORMANCE);
         Button ultra = new Button(I18n.tr(active == Preset.ULTRA_PERFORMANCE ? "ui.preset.ultraActive" : "ui.preset.ultraOneClick"));
         ultra.setGraphic(Icons.of(Icons.BOLT, 18));
         ultra.getStyleClass().add("ultra-button");
@@ -71,42 +75,46 @@ public final class PresetPanel {
         }
         ultra.setAccessibleText(I18n.tr("ui.preset.ultraAccessible", p.name));
         ultra.setOnAction(e -> apply(p, Preset.ULTRA_PERFORMANCE));
-        Label ultraHint = UiKit.label(I18n.tr("ui.preset.ultraHint"), "muted", "small");
-        HBox.setHgrow(ultraHint, Priority.ALWAYS);
-        HBox top = new HBox(14, ultra, ultraHint);
-        top.setAlignment(Pos.CENTER_LEFT);
+        Button preview = UiKit.button(I18n.tr("ui.preset.previewUltra"), Icons.EYE_OFF, () -> {
+            previewing = Preset.ULTRA_PERFORMANCE;
+            refresh();
+        }, "ghost");
+        VBox ultraText = new VBox(UiKit.label(I18n.tr("ui.preset.ultraTitle"), "h3"),
+            UiKit.label(I18n.tr("ui.preset.ultraHint"), "muted", "small"),
+            UiKit.label(I18n.tr("ui.preset.changesCount", ultraChanges), "faint", "small"));
+        ultraText.getStyleClass().add("ultra-text");
+        HBox top = new HBox(Icons.of(Icons.BOLT, 28), ultraText, UiKit.spacer(), preview, ultra);
+        top.getStyleClass().addAll("card", "ultra-hero");
 
-        FlowPane cards = new FlowPane(10, 10);
+        FlowPane cards = new FlowPane();
+        cards.getStyleClass().add("preset-grid");
         for (Preset preset : Preset.values()) {
-            VBox card = new VBox(4, UiKit.label(I18n.tr(preset.nameKey()), "preset-name"),
-                UiKit.label(I18n.tr(preset.descriptionKey()), "muted", "small"));
-            FlowPane chips = new FlowPane(4, 4);
-            if (preset == Preset.DEFAULT) {
-                chips.getChildren().add(UiKit.chip(I18n.tr("ui.preset.default"), null));
-            }
+            VBox card = Cards.preset(presetIcon(preset), I18n.tr(preset.nameKey()), I18n.tr(preset.descriptionKey()),
+                preset == previewing);
+            FlowPane chips = new FlowPane();
+            chips.getStyleClass().add("chip-row");
             if (preset == active) {
                 chips.getChildren().add(UiKit.chip(I18n.tr("ui.preset.active"), "accent"));
+            }
+            if (preset == Preset.DEFAULT) {
+                chips.getChildren().add(UiKit.chip(I18n.tr("ui.preset.default"), null));
             }
             if (preset == Preset.ULTRA_QUALITY) {
                 chips.getChildren().add(UiKit.chip(I18n.tr("ui.preset.heavy"), "warning"));
             }
-            card.getChildren().add(chips);
-            card.getStyleClass().add("preset-card");
-            if (preset == previewing) {
-                card.getStyleClass().add("selected");
+            if (preset == Preset.ULTRA_PERFORMANCE) {
+                card.getStyleClass().add("ultra");
+                chips.getChildren().add(UiKit.chip(I18n.tr("ui.preset.oneClick"), "warning", Icons.BOLT));
             }
-            card.setFocusTraversable(true);
-            card.setAccessibleText(I18n.tr(preset.nameKey()) + ". " + I18n.tr(preset.descriptionKey()));
-            card.setOnMouseClicked(e -> {
+            if (preset != Preset.CUSTOM) {
+                chips.getChildren().add(UiKit.chip(I18n.tr("ui.preset.changesChip", changeCount(p, preset)), null));
+            }
+            card.getChildren().add(chips);
+            Cards.onOpen(card, () -> {
                 previewing = preset;
                 refresh();
             });
-            card.setOnKeyPressed(e -> {
-                if (e.getCode() == javafx.scene.input.KeyCode.ENTER || e.getCode() == javafx.scene.input.KeyCode.SPACE) {
-                    previewing = preset;
-                    refresh();
-                }
-            });
+            card.setAccessibleText(I18n.tr(preset.nameKey()) + ". " + I18n.tr(preset.descriptionKey()));
             cards.getChildren().add(card);
         }
 
@@ -123,14 +131,34 @@ public final class PresetPanel {
         root.getChildren().add(measurement(p));
     }
 
+    private static String presetIcon(Preset preset) {
+        return switch (preset) {
+            case ULTRA_PERFORMANCE -> Icons.BOLT;
+            case PERFORMANCE -> Icons.FORWARD;
+            case BALANCED -> Icons.GAUGE;
+            case QUALITY -> Icons.SPARKLE;
+            case ULTRA_QUALITY -> Icons.STAR;
+            case CUSTOM -> Icons.SLIDERS;
+        };
+    }
+
+    /** how many settings applying {@code preset} would change right now (0 when it can't be worked out) */
+    private int changeCount(Project p, Preset preset) {
+        try {
+            return ctx.services().presets().preview(p, preset).size();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private Node whatChanges(Project p, Preset target, Preset active) {
-        VBox box = new VBox(10);
-        box.getStyleClass().add("card");
+        VBox box = new VBox();
+        box.getStyleClass().addAll("card", "stack-tight");
         Label title = UiKit.label(I18n.tr("ui.preset.whatChanges", I18n.tr(target.nameKey())), "h3");
         Button applyButton = UiKit.primary(I18n.tr("ui.preset.apply", I18n.tr(target.nameKey())), Icons.CHECK,
             () -> apply(p, target));
-        HBox head = new HBox(10, title, UiKit.spacer(), applyButton);
-        head.setAlignment(Pos.CENTER_LEFT);
+        HBox head = new HBox(title, UiKit.spacer(), applyButton);
+        head.getStyleClass().add("button-row");
         box.getChildren().add(head);
         if (target == Preset.ULTRA_QUALITY) {
             box.getChildren().add(UiKit.banner("warning", I18n.tr("ui.preset.ultraQualityWarning")));
@@ -148,8 +176,7 @@ public final class PresetPanel {
             return box;
         }
         GridPane grid = new GridPane();
-        grid.setHgap(14);
-        grid.setVgap(6);
+        grid.getStyleClass().add("change-grid");
         ColumnConstraints grow = new ColumnConstraints();
         grow.setHgrow(Priority.ALWAYS);
         grid.getColumnConstraints().addAll(grow, new ColumnConstraints(), new ColumnConstraints(), new ColumnConstraints(),
@@ -168,7 +195,7 @@ public final class PresetPanel {
             grid.add(UiKit.label(I18n.tr("ui.preset.target." + d.target().name().toLowerCase(Locale.ROOT)), "muted", "small"), 1, row);
             grid.add(UiKit.label(value(c.current()), "muted"), 2, row);
             Label proposed = UiKit.label(value(c.proposed()));
-            proposed.setStyle("-fx-font-weight: bold;");
+            proposed.getStyleClass().add("strong");
             grid.add(proposed, 3, row);
             grid.add(UiKit.chip(I18n.tr("ui.preset.cost." + d.cost().name().toLowerCase(Locale.ROOT)),
                 switch (d.cost().name()) {
@@ -196,8 +223,8 @@ public final class PresetPanel {
     }
 
     private Node customEditor(Project p) {
-        VBox box = new VBox(6);
-        box.getStyleClass().add("card");
+        VBox box = new VBox();
+        box.getStyleClass().addAll("card", "stack-tight");
         box.getChildren().addAll(UiKit.label(I18n.tr("ui.preset.customTitle"), "h3"),
             UiKit.label(I18n.tr("ui.preset.customHint"), "muted", "small"));
         Map<String, Object> custom = p.preset.customOverrides;
@@ -239,7 +266,7 @@ public final class PresetPanel {
                 int v = current instanceof Number n ? n.intValue() : 0;
                 Spinner<Integer> s = new Spinner<>(Integer.MIN_VALUE / 2, Integer.MAX_VALUE / 2, v);
                 s.setEditable(true);
-                s.setPrefWidth(110);
+                s.setPrefWidth(ThemeManager.scaled(110));
                 s.valueProperty().addListener((o, a, b) -> {
                     if (b != null && !Objects.equals(a, b)) {
                         set(p, d, b);
@@ -251,7 +278,7 @@ public final class PresetPanel {
                 double v = current instanceof Number n ? n.doubleValue() : 0;
                 Spinner<Double> s = new Spinner<>(-1e9, 1e9, v, 0.05);
                 s.setEditable(true);
-                s.setPrefWidth(110);
+                s.setPrefWidth(ThemeManager.scaled(110));
                 s.valueProperty().addListener((o, a, b) -> {
                     if (b != null && !Objects.equals(a, b)) {
                         set(p, d, b);
@@ -261,7 +288,7 @@ public final class PresetPanel {
             }
             default -> {
                 TextField f = new TextField(current == null ? "" : String.valueOf(current));
-                f.setPrefWidth(160);
+                f.setPrefWidth(ThemeManager.scaled(160));
                 f.setOnAction(e -> set(p, d, f.getText()));
                 f.focusedProperty().addListener((o, a, b) -> {
                     if (!b) {
@@ -294,16 +321,24 @@ public final class PresetPanel {
     }
 
     private Node options(Project p) {
-        VBox box = new VBox(4);
-        box.getStyleClass().add("card");
+        VBox box = new VBox();
+        box.getStyleClass().addAll("card", "stack-tight");
         box.getChildren().add(UiKit.label(I18n.tr("ui.preset.options"), "h3"));
         ToggleSwitch vanilla = new ToggleSwitch(p.preset.applyVanillaVideoSettings);
         vanilla.selectedProperty().addListener((o, a, b) -> Tasks.quiet(ctx.overlay(),
             () -> ctx.services().projects().update(p.id, x -> x.preset.applyVanillaVideoSettings = b), x -> refresh()));
-        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.vanillaOptIn"), I18n.tr("ui.preset.vanillaOptInHint"), vanilla));
-        ToggleSwitch adaptive = new ToggleSwitch(false);
-        adaptive.setDisable(true);
-        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.adaptive"), I18n.tr("ui.preset.adaptiveHint"), adaptive));
+        boolean videoOk = ctx.services().presets().vanillaVideoAvailable(p);
+        vanilla.setDisable(!videoOk);
+        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.vanillaOptIn"), videoOk ? I18n.tr("ui.preset.vanillaOptInHint")
+            : I18n.tr("ui.preset.vanillaUnverified", VanillaOptions.VERIFIED_FOR, String.valueOf(p.minecraftVersion)), vanilla));
+        ToggleSwitch adaptive = new ToggleSwitch(p.preset.adaptiveQuality);
+        adaptive.selectedProperty().addListener((o, a, b) -> Tasks.quiet(ctx.overlay(), () -> {
+            ctx.services().presets().setAdaptiveQuality(ctx.services().projects().get(p.id).orElse(p), b, p.preset.adaptiveTargetFps);
+            return Boolean.TRUE;
+        }, x -> refresh()));
+        HBox adaptiveControl = new HBox(8, UiKit.chip(I18n.tr("ui.preset.preview"), "accent"), adaptive);
+        adaptiveControl.setAlignment(Pos.CENTER_RIGHT);
+        box.getChildren().add(UiKit.settingRow(I18n.tr("ui.preset.adaptive"), I18n.tr("ui.preset.adaptiveHint"), adaptiveControl));
         if (p.preset.lastApplied != null) {
             Button revert = UiKit.button(I18n.tr("ui.preset.revert"), Icons.REFRESH, () -> Tasks.quiet(ctx.overlay(),
                 () -> ctx.services().presets().revertLast(ctx.services().projects().get(p.id).orElse(p)), r -> {
@@ -319,11 +354,10 @@ public final class PresetPanel {
     }
 
     private Node measurement(Project p) {
-        VBox box = new VBox(6, UiKit.label(I18n.tr("ui.preset.measuredTitle"), "h3"),
+        VBox box = new VBox(UiKit.label(I18n.tr("ui.preset.measuredTitle"), "h3"),
             UiKit.label(I18n.tr("ui.preset.measuredNone"), "muted"),
             UiKit.label(I18n.tr("ui.preset.measuredHow"), "faint", "small"));
-        box.getStyleClass().addAll("card", "flat");
-        box.setPadding(new Insets(14));
+        box.getStyleClass().addAll("card", "flat", "stack-tight");
         return box;
     }
 

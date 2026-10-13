@@ -2,6 +2,9 @@ package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.ui.Dialogs;
+import dev.shardlight.client.app.ui.Fx;
+import dev.shardlight.client.app.ui.Lists;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
@@ -19,6 +22,9 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -37,20 +43,28 @@ import java.util.Optional;
  * remove (recoverable from the history), update from Modrinth, set the resource pack order, roll back.
  */
 final class ContentTab {
+    /** more rows than this scroll inside the table (see renderEntries) */
+    private static final int MAX_ROWS_SHOWN = 24;
+
     private final AppContext ctx;
     private final String projectId;
-    private final VBox root = new VBox(12);
-    private final VBox list = new VBox(6);
+    private final VBox root = new VBox();
+    private final VBox list = new VBox();
     private final TextField filter = new TextField();
     private ContentKind kind = ContentKind.MOD;
     private boolean showHistory;
     private boolean ordering;
     /** entry id -> newer Modrinth version, after "Check for updates" */
     private final Map<String, CatalogVersion> updates = new HashMap<>();
+    /** entry id -> what is wrong with it, from the content warnings (shown as a mark on the row) */
+    private final Map<String, String> issues = new HashMap<>();
 
     ContentTab(AppContext ctx, String projectId) {
         this.ctx = ctx;
         this.projectId = projectId;
+        root.getStyleClass().add("stack");
+        list.getStyleClass().add("stack-tight");
+        filter.getStyleClass().add("search-field");
         filter.setPromptText(I18n.tr("ui.content.filter"));
         filter.setAccessibleText(I18n.tr("ui.content.filter"));
         filter.textProperty().addListener((o, a, b) -> render());
@@ -70,7 +84,18 @@ final class ContentTab {
             return;
         }
         // reconcile with the folders first, so files added by hand show up
-        Tasks.quiet(ctx.overlay(), () -> ctx.services().content().scan(found.get()), entries -> render());
+        Tasks.quiet(ctx.overlay(), () -> ctx.services().content().scan(found.get()), entries -> {
+            render();
+            Fx.run(() -> ctx.services().content().warnings(found.get()), warnings -> {
+                issues.clear();
+                for (var w : warnings) {
+                    for (String id : w.entryIds()) {
+                        issues.merge(id, w.message(), (a, b) -> a + "\n" + b);
+                    }
+                }
+                render();
+            }, err -> { });
+        });
     }
 
     private void render() {
@@ -105,8 +130,8 @@ final class ContentTab {
         if (showHistory) {
             history.getStyleClass().add("primary");
         }
-        HBox top = new HBox(10, kinds, UiKit.spacer(), history);
-        top.setAlignment(Pos.CENTER_LEFT);
+        HBox top = new HBox(kinds, UiKit.spacer(), history);
+        top.getStyleClass().add("button-row");
         root.getChildren().add(top);
         if (showHistory) {
             renderHistory(p);
@@ -121,7 +146,8 @@ final class ContentTab {
         Button check = UiKit.button(I18n.tr("ui.content.checkUpdates"), Icons.REFRESH, () -> checkUpdates(p));
         Button folder = UiKit.iconButton(Icons.FOLDER, I18n.tr("ui.library.openFolder"),
             () -> ctx.openFolder(ctx.services().projects().gameDir(p).resolve(kind.folder())));
-        HBox actions = new HBox(8, add, file, check);
+        HBox actions = new HBox(add, file, check);
+        actions.getStyleClass().add("button-row");
         if (kind == ContentKind.RESOURCE_PACK) {
             Button order = UiKit.button(I18n.tr(ordering ? "ui.content.orderDone" : "ui.content.order"), Icons.LIBRARY, () -> {
                 ordering = !ordering;
@@ -131,12 +157,13 @@ final class ContentTab {
         }
         long updatable = updates.keySet().stream().filter(id -> p.content.stream().anyMatch(e -> e.id.equals(id) && !e.pinned)).count();
         if (updatable > 0) {
-            actions.getChildren().add(UiKit.button(I18n.tr("ui.content.updateAll", updatable), Icons.UPDATE, () -> updateAll(p)));
+            actions.getChildren().add(UiKit.button(I18n.tr("ui.content.updateAll", updatable), Icons.UPDATE, () -> updateAll(p,
+                p.content.stream().filter(e -> updates.containsKey(e.id) && !e.pinned).toList())));
         }
         HBox.setHgrow(filter, Priority.ALWAYS);
-        filter.setMaxWidth(320);
-        HBox bar = new HBox(8, actions, UiKit.spacer(), filter, folder);
-        bar.setAlignment(Pos.CENTER_LEFT);
+        filter.getStyleClass().add("content-filter");
+        HBox bar = new HBox(actions, UiKit.spacer(), filter, folder);
+        bar.getStyleClass().add("button-row");
         root.getChildren().add(bar);
 
         if (kind == ContentKind.MOD && p.loader.isVanilla()) {
@@ -165,72 +192,220 @@ final class ContentTab {
             .sorted((a, b) -> ProjectText.entryTitle(a).compareToIgnoreCase(ProjectText.entryTitle(b)))
             .toList();
         if (entries.isEmpty()) {
-            list.getChildren().add(UiKit.emptyState(Icons.PACKAGE, I18n.tr("ui.content.emptyTitle"),
-                I18n.tr("ui.content.emptyBody"), null));
+            list.getChildren().add(UiKit.emptyState(Icons.PACKAGE, I18n.tr(q.isEmpty() ? "ui.content.emptyTitle"
+                : "ui.content.noMatchesTitle"), I18n.tr(q.isEmpty() ? "ui.content.emptyBody" : "ui.content.noMatches"), null));
             return;
         }
-        for (ContentEntry e : entries) {
-            list.getChildren().add(row(p, e));
-        }
+        TableView<ContentEntry> table = Lists.table(new TableView<>(), null);
+        table.getStyleClass().add("content-table");
+        table.getItems().setAll(entries);
+        table.setFixedCellSize(ThemeManager.em(3.4));
+        // The table is as tall as its rows up to MAX_ROWS_SHOWN; a longer list (a big modpack) scrolls inside the table,
+        // so only the rows in view are built instead of one row with controls for every mod.
+        int shown = Math.min(entries.size(), MAX_ROWS_SHOWN);
+        double height = shown * table.getFixedCellSize() + ThemeManager.em(2.8);
+        table.setPrefHeight(height);
+        table.setMinHeight(height);
+        table.setMaxHeight(height);
+
+        TableColumn<ContentEntry, ContentEntry> on = entryColumn(I18n.tr("ui.content.col.on"), e -> {
+            ToggleSwitch sw = new ToggleSwitch(e.enabled, I18n.tr("ui.content.enabledFor", ProjectText.entryTitle(e)));
+            sw.selectedProperty().addListener((o, a, b) -> Tasks.quiet(ctx.overlay(), () -> {
+                ctx.services().content().setEnabled(p, e.id, b);
+                return b;
+            }, v -> {
+                ctx.overlay().toast("info", I18n.tr(v ? "ui.content.enabled" : "ui.content.disabled", ProjectText.entryTitle(e)));
+                ctx.projectsChanged();
+                render();
+            }));
+            return sw;
+        });
+        on.setPrefWidth(ThemeManager.em(5));
+        on.setSortable(false);
+
+        TableColumn<ContentEntry, ContentEntry> name = entryColumn(I18n.tr("ui.content.col.name"), e -> nameCell(e));
+        name.setComparator((a, b) -> ProjectText.entryTitle(a).compareToIgnoreCase(ProjectText.entryTitle(b)));
+        name.setPrefWidth(ThemeManager.em(24));
+
+        TableColumn<ContentEntry, ContentEntry> version = entryColumn(I18n.tr("ui.content.col.version"), e -> {
+            Label l = UiKit.label(e.versionNumber == null ? "-" : e.versionNumber, "mono", "muted");
+            l.setWrapText(false);
+            return l;
+        });
+        version.setComparator((a, b) -> String.valueOf(a.versionNumber).compareToIgnoreCase(String.valueOf(b.versionNumber)));
+        version.setPrefWidth(ThemeManager.em(9));
+
+        TableColumn<ContentEntry, ContentEntry> source = entryColumn(I18n.tr("ui.content.col.source"), e ->
+            UiKit.chip(I18n.tr("ui.content.source." + e.source.name().toLowerCase(Locale.ROOT)),
+                e.source == ContentSource.SHARDLIGHT ? "accent" : null));
+        source.setComparator((a, b) -> a.source.compareTo(b.source));
+        source.setPrefWidth(ThemeManager.em(9));
+
+        TableColumn<ContentEntry, ContentEntry> status = entryColumn(I18n.tr("ui.content.col.status"), e -> {
+            HBox h = new HBox();
+            h.getStyleClass().add("chip-row");
+            CatalogVersion update = updates.get(e.id);
+            if (update != null && !e.pinned) {
+                h.getChildren().add(UiKit.chip(I18n.tr("ui.content.updateTo", update.versionNumber()), "success", Icons.UPDATE));
+            }
+            if (e.pinned) {
+                h.getChildren().add(UiKit.chip(I18n.tr("ui.content.pinned"), "accent", Icons.PIN));
+            }
+            if (e.missing) {
+                h.getChildren().add(UiKit.chip(I18n.tr("ui.content.missing"), "danger"));
+            }
+            if (!e.enabled) {
+                h.getChildren().add(UiKit.chip(I18n.tr("ui.content.off"), "warning"));
+            }
+            return h;
+        });
+        status.setSortable(false);
+        status.setPrefWidth(ThemeManager.em(14));
+
+        TableColumn<ContentEntry, ContentEntry> actions = Lists.actionsColumn(e -> {
+            List<Button> buttons = new ArrayList<>();
+            CatalogVersion update = updates.get(e.id);
+            if (update != null && !e.pinned) {
+                buttons.add(UiKit.iconButton(Icons.UPDATE, I18n.tr("ui.content.update"), () -> updateOne(p, e, update)));
+            }
+            Button pin = UiKit.iconButton(Icons.PIN, I18n.tr(e.pinned ? "ui.content.unpin" : "ui.content.pin"),
+                () -> Tasks.quiet(ctx.overlay(), () -> {
+                    ctx.services().content().setPinned(p, e.id, !e.pinned);
+                    return true;
+                }, x -> render()));
+            if (e.pinned) {
+                pin.getStyleClass().add("accent-icon");
+            }
+            buttons.add(pin);
+            if (e.pageUrl != null) {
+                buttons.add(UiKit.iconButton(Icons.EXTERNAL, I18n.tr("ui.content.openPage"), () -> ctx.openUrl(e.pageUrl)));
+            }
+            buttons.add(UiKit.iconButton(Icons.TRASH, I18n.tr("ui.content.removeFor", ProjectText.entryTitle(e)),
+                () -> confirmRemove(p, e)));
+            return buttons;
+        });
+        actions.setPrefWidth(ThemeManager.em(11));
+
+        table.getColumns().add(on);
+        table.getColumns().add(name);
+        table.getColumns().add(version);
+        table.getColumns().add(source);
+        table.getColumns().add(status);
+        table.getColumns().add(actions);
+        table.getSortOrder().add(name);
+
+        HBox bulk = bulkBar();
+        table.getSelectionModel().getSelectedItems().addListener(
+            (javafx.collections.ListChangeListener<ContentEntry>) c -> updateBulk(bulk, p, table));
+        updateBulk(bulk, p, table);
+        list.getChildren().addAll(bulk, table);
     }
 
-    private Node row(Project p, ContentEntry e) {
-        ToggleSwitch on = new ToggleSwitch(e.enabled);
-        on.setAccessibleText(I18n.tr("ui.content.enabledFor", ProjectText.entryTitle(e)));
-        on.selectedProperty().addListener((o, a, b) -> Tasks.quiet(ctx.overlay(), () -> {
-            ctx.services().content().setEnabled(p, e.id, b);
-            return b;
-        }, v -> {
-            ctx.overlay().toast("info", I18n.tr(v ? "ui.content.enabled" : "ui.content.disabled", ProjectText.entryTitle(e)));
+    private static TableColumn<ContentEntry, ContentEntry> entryColumn(String title,
+                                                                        java.util.function.Function<ContentEntry, Node> graphic) {
+        TableColumn<ContentEntry, ContentEntry> c = new TableColumn<>(title);
+        c.setCellValueFactory(d -> new javafx.beans.property.ReadOnlyObjectWrapper<>(d.getValue()));
+        c.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(ContentEntry item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(null);
+                setGraphic(empty || item == null ? null : graphic.apply(item));
+            }
+        });
+        return c;
+    }
+
+    /** icon, name and file name; a warning mark that explains the problem when you point at it */
+    private Node nameCell(ContentEntry e) {
+        String icon = switch (e.kind) {
+            case RESOURCE_PACK -> Icons.IMAGE;
+            case SHADER_PACK -> Icons.SPARKLE;
+            default -> Icons.PACKAGE;
+        };
+        Label title = UiKit.label(ProjectText.entryTitle(e), "strong");
+        title.setWrapText(false);
+        VBox text = new VBox(title);
+        text.getStyleClass().add("cell-text");
+        if (e.fileName != null) {
+            Label file = UiKit.label(e.fileName, "faint", "tiny");
+            file.setWrapText(false);
+            text.getChildren().add(file);
+        }
+        HBox h = new HBox(UiKit.iconBox(Icons.of(icon, 16), ThemeManager.em(2.286)), text);
+        h.getStyleClass().add("name-cell");
+        if (e.dependency) {
+            h.getChildren().add(UiKit.chip(I18n.tr("ui.content.dependency"), null));
+        }
+        String issue = issues.get(e.id);
+        if (issue != null) {
+            Node mark = Icons.of(Icons.WARNING, 16);
+            mark.getStyleClass().add("warning-icon");
+            javafx.scene.layout.StackPane box = new javafx.scene.layout.StackPane(mark);
+            box.setFocusTraversable(true);
+            box.setAccessibleText(issue);
+            UiKit.tooltip(box, issue);
+            h.getChildren().add(box);
+        }
+        return h;
+    }
+
+    // ------------------------------------------------------------------ several at once
+
+    private static HBox bulkBar() {
+        HBox bar = new HBox();
+        bar.getStyleClass().add("bulk-bar");
+        return bar;
+    }
+
+    private void updateBulk(HBox bar, Project p, TableView<ContentEntry> table) {
+        List<ContentEntry> chosen = List.copyOf(table.getSelectionModel().getSelectedItems());
+        bar.setVisible(!chosen.isEmpty());
+        bar.setManaged(!chosen.isEmpty());
+        bar.getChildren().clear();
+        if (chosen.isEmpty()) {
+            return;
+        }
+        List<ContentEntry> updatable = chosen.stream().filter(e -> updates.containsKey(e.id) && !e.pinned).toList();
+        bar.getChildren().add(UiKit.label(I18n.tr("ui.content.selected", chosen.size()), "strong"));
+        bar.getChildren().add(UiKit.spacer());
+        if (!updatable.isEmpty()) {
+            bar.getChildren().add(UiKit.button(I18n.tr("ui.content.updateSelected", updatable.size()), Icons.UPDATE,
+                () -> updateAll(p, updatable)));
+        }
+        bar.getChildren().add(UiKit.button(I18n.tr("ui.content.enableSelected"), Icons.CHECK, () -> setEnabled(p, chosen, true)));
+        bar.getChildren().add(UiKit.button(I18n.tr("ui.content.disableSelected"), Icons.EYE_OFF, () -> setEnabled(p, chosen, false)));
+        bar.getChildren().add(UiKit.button(I18n.tr("ui.content.removeSelected"), Icons.TRASH, () -> removeAll(p, chosen), "danger"));
+        bar.getChildren().add(UiKit.iconButton(Icons.CLOSE, I18n.tr("ui.content.clearSelection"),
+            () -> table.getSelectionModel().clearSelection()));
+    }
+
+    private void setEnabled(Project p, List<ContentEntry> chosen, boolean on) {
+        Tasks.quiet(ctx.overlay(), () -> {
+            for (ContentEntry e : chosen) {
+                ctx.services().content().setEnabled(p, e.id, on);
+            }
+            return chosen.size();
+        }, n -> {
+            ctx.overlay().toast("info", I18n.tr(on ? "ui.content.enabledMany" : "ui.content.disabledMany", n));
             ctx.projectsChanged();
             render();
-        }));
-        Label title = UiKit.label(ProjectText.entryTitle(e), "project-name");
-        javafx.scene.layout.FlowPane meta = new javafx.scene.layout.FlowPane(6, 4);
-        if (e.versionNumber != null) {
-            meta.getChildren().add(UiKit.label(e.versionNumber, "muted", "small"));
-        }
-        meta.getChildren().add(UiKit.chip(I18n.tr("ui.content.source." + e.source.name().toLowerCase(Locale.ROOT)),
-            e.source == ContentSource.SHARDLIGHT ? "accent" : null));
-        if (e.dependency) {
-            meta.getChildren().add(UiKit.chip(I18n.tr("ui.content.dependency"), null));
-        }
-        if (e.missing) {
-            meta.getChildren().add(UiKit.chip(I18n.tr("ui.content.missing"), "danger"));
-        }
-        if (!e.enabled) {
-            meta.getChildren().add(UiKit.chip(I18n.tr("ui.content.off"), "warning"));
-        }
-        CatalogVersion update = updates.get(e.id);
-        if (update != null) {
-            meta.getChildren().add(UiKit.chip(I18n.tr("ui.content.updateTo", update.versionNumber()), "success", Icons.UPDATE));
-        }
-        VBox text = new VBox(3, title, meta);
-        if (e.fileName != null) {
-            text.getChildren().add(UiKit.label(e.fileName, "faint", "tiny"));
-        }
-        HBox.setHgrow(text, Priority.ALWAYS);
-        Button pin = UiKit.iconButton(Icons.PIN, I18n.tr(e.pinned ? "ui.content.unpin" : "ui.content.pin"),
-            () -> Tasks.quiet(ctx.overlay(), () -> {
-                ctx.services().content().setPinned(p, e.id, !e.pinned);
-                return true;
-            }, x -> render()));
-        if (e.pinned) {
-            pin.getStyleClass().add("accent-icon");
-        }
-        HBox row = new HBox(12, on, text);
-        row.setAlignment(Pos.CENTER_LEFT);
-        if (update != null && !e.pinned) {
-            row.getChildren().add(UiKit.button(I18n.tr("ui.content.update"), Icons.UPDATE, () -> updateOne(p, e, update)));
-        }
-        if (e.pageUrl != null) {
-            row.getChildren().add(UiKit.iconButton(Icons.EXTERNAL, I18n.tr("ui.content.openPage"), () -> ctx.openUrl(e.pageUrl)));
-        }
-        Button remove = UiKit.iconButton(Icons.TRASH, I18n.tr("ui.content.removeFor", ProjectText.entryTitle(e)),
-            () -> confirmRemove(p, e));
-        row.getChildren().addAll(pin, remove);
-        row.getStyleClass().addAll("card", "flat", "content-row");
-        return row;
+        });
+    }
+
+    private void removeAll(Project p, List<ContentEntry> chosen) {
+        List<String> names = chosen.stream().map(ProjectText::entryTitle).limit(8).toList();
+        ctx.overlay().confirm(I18n.tr("ui.content.removeManyTitle", chosen.size()), I18n.tr("ui.content.removeMessage"),
+            names, I18n.tr("ui.content.remove"), true, () -> Tasks.quiet(ctx.overlay(), () -> {
+                for (ContentEntry e : chosen) {
+                    ctx.services().content().remove(p, e.id);
+                }
+                return chosen.size();
+            }, n -> {
+                ctx.overlay().toast("success", I18n.tr("ui.content.removedMany", n));
+                ctx.projectsChanged();
+                render();
+            }));
     }
 
     private void confirmRemove(Project p, ContentEntry e) {
@@ -323,8 +498,7 @@ final class ContentTab {
             });
     }
 
-    private void updateAll(Project p) {
-        List<ContentEntry> todo = p.content.stream().filter(e -> updates.containsKey(e.id) && !e.pinned).toList();
+    private void updateAll(Project p, List<ContentEntry> todo) {
         Tasks.withProgress(ctx.overlay(), I18n.tr("ui.content.updatingAll", todo.size()), true, (pr, c) -> {
             int done = 0;
             for (ContentEntry e : todo) {
@@ -391,14 +565,16 @@ final class ContentTab {
 
     private void renderHistory(Project p) {
         Tasks.quiet(ctx.overlay(), () -> ctx.services().content().history(p), events -> {
-            VBox box = new VBox(6);
+            VBox box = new VBox();
+            box.getStyleClass().add("stack-tight");
             if (events.isEmpty()) {
                 box.getChildren().add(UiKit.label(I18n.tr("ui.content.historyEmpty"), "muted"));
             }
             for (HistoryEvent ev : events) {
                 Label what = UiKit.label(I18n.tr("ui.content.action." + ev.action(), ev.title() == null ? "" : ev.title()));
                 Label when = UiKit.label(ProjectText.ago(ev.time()), "faint", "small");
-                VBox text = new VBox(2, what, when);
+                VBox text = new VBox(what, when);
+                text.getStyleClass().add("row-text");
                 HBox.setHgrow(text, Priority.ALWAYS);
                 Button undo = UiKit.button(I18n.tr("ui.content.rollback"), Icons.REFRESH, () -> ctx.overlay().confirm(
                     I18n.tr("ui.content.rollbackTitle"), I18n.tr("ui.content.rollbackMessage", what.getText()), List.of(),
@@ -411,9 +587,8 @@ final class ContentTab {
                         render();
                     })));
                 undo.setDisable("rollback".equals(ev.action()));
-                HBox row = new HBox(10, text, undo);
-                row.setAlignment(Pos.CENTER_LEFT);
-                row.getStyleClass().addAll("card", "flat");
+                HBox row = new HBox(text, undo);
+                row.getStyleClass().addAll("card", "flat", "library-row");
                 box.getChildren().add(row);
             }
             root.getChildren().add(box);

@@ -134,27 +134,66 @@ public final class Overlay {
         return d;
     }
 
-    /** standard modal layout: title, body, buttons on the right */
+    /**
+     * The one dialog frame: a title, the body, and a footer with Cancel on the left and the main action on the
+     * right. Buttons flagged {@code setCancelButton(true)} go left; the others go right in the order given, and
+     * the primary one becomes the default button, so Enter confirms. A destructive (danger) button is never made
+     * the default: Enter would otherwise delete while Cancel has the focus. Esc closes a cancellable dialog.
+     */
     public static VBox modal(String title, Node body, Node... buttons) {
         Label t = UiKit.label(title, "modal-title");
+        t.setWrapText(true);
         HBox actions = new HBox(10);
         actions.getStyleClass().add("modal-actions");
-        actions.getChildren().addAll(buttons);
+        actions.setAlignment(Pos.CENTER);
+        fillActions(actions, buttons);
         VBox v = new VBox(t, body, actions);
         v.getStyleClass().add("modal");
         v.setAccessibleText(title);
         return v;
     }
 
+    /** (re)fill a modal's footer: cancel buttons left, the rest right, the primary one the default button */
+    public static void fillActions(HBox actions, Node... buttons) {
+        HBox start = new HBox(10);
+        HBox end = new HBox(10);
+        start.setAlignment(Pos.CENTER_LEFT);
+        end.setAlignment(Pos.CENTER_RIGHT);
+        Button main = null;
+        for (Node b : buttons) {
+            if (b instanceof Button x && x.isCancelButton()) {
+                start.getChildren().add(b);
+            } else if (b instanceof Button x) {
+                end.getChildren().add(b);
+                if (x.getStyleClass().contains("primary") && main == null) {
+                    main = x;
+                }
+            } else if (!(b instanceof Region r && r.getChildrenUnmodifiable().isEmpty())) {
+                end.getChildren().add(b);
+            }
+        }
+        if (main != null) {
+            main.setDefaultButton(true);
+        }
+        actions.getChildren().setAll(start, UiKit.spacer(), end);
+    }
+
     /**
      * Ask before something destructive. {@code details} lists exactly what will be affected; the confirm
-     * button is red when {@code danger}.
+     * button is red when {@code danger}, and the message and list then sit in a red panel, so what is lost is plain to see.
      */
     public void confirm(String title, String message, java.util.List<String> details, String confirmText, boolean danger,
                         Runnable onConfirm) {
-        VBox body = new VBox(8, UiKit.label(message));
+        Label text = UiKit.label(message);
+        text.setWrapText(true);
+        VBox body = new VBox(8, text);
         for (String d : details) {
-            body.getChildren().add(UiKit.label("• " + d, "muted"));
+            Label l = UiKit.label("• " + d, "muted");
+            l.setWrapText(true);
+            body.getChildren().add(l);
+        }
+        if (danger) {
+            body.getStyleClass().add("modal-lost");
         }
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);
@@ -167,7 +206,7 @@ public final class Overlay {
             d.close();
             onConfirm.run();
         });
-        cancel.requestFocus();
+        (danger ? cancel : ok).requestFocus();
     }
 
     /** a simple message with an OK button */

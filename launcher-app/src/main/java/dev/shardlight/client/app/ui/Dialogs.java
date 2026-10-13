@@ -31,7 +31,7 @@ public final class Dialogs {
         field.setAccessibleText(label);
         Label error = UiKit.label("", "danger-text", "small");
         VBox body = new VBox(8, UiKit.label(label, "small"), field, error);
-        body.setPrefWidth(440);
+        body.setPrefWidth(ThemeManager.scaled(440));
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);
         Button confirm = UiKit.primary(okText, null, () -> { });
@@ -60,7 +60,7 @@ public final class Dialogs {
     public static void options(Overlay overlay, String title, String intro, List<Option> options, String okText,
                                boolean danger, Consumer<List<Boolean>> ok) {
         VBox body = new VBox(10);
-        body.setPrefWidth(480);
+        body.setPrefWidth(ThemeManager.scaled(480));
         if (intro != null && !intro.isBlank()) {
             body.getChildren().add(UiKit.label(intro, "muted"));
         }
@@ -114,6 +114,17 @@ public final class Dialogs {
             files.forEach(f -> out.add(f.toPath()));
         }
         return out;
+    }
+
+    /** a choose-folder dialog starting in {@code initial} when that exists; null when cancelled */
+    public static Path chooseFolder(Window owner, String title, Path initial) {
+        javafx.stage.DirectoryChooser dc = new javafx.stage.DirectoryChooser();
+        dc.setTitle(title);
+        if (initial != null && java.nio.file.Files.isDirectory(initial)) {
+            dc.setInitialDirectory(initial.toFile());
+        }
+        File f = dc.showDialog(owner);
+        return f == null ? null : f.toPath();
     }
 
     public static Path saveFile(Window owner, String title, String initialName, String filterName, String extension) {

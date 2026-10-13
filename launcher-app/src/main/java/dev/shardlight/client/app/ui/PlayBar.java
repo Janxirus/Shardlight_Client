@@ -198,6 +198,9 @@ public final class PlayBar {
     }
 
     private void tick() {
+        if (Motion.suspended()) {
+            return; // minimised: the clock catches up on the first tick after the window is restored
+        }
         project().ifPresent(p -> {
             PlayFlow.State s = ctx.play().state(p.id);
             if (s.phase() == PlayFlow.Phase.RUNNING) {

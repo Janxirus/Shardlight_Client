@@ -269,6 +269,18 @@ public final class AccountService {
         }
     }
 
+    /** remember the skin an account now wears (after an upload), so the head shown in the app follows it */
+    public void updateSkin(String accountId, String skinUrl, String skinVariant) throws LauncherException {
+        String id = normalizeId(accountId);
+        mutate(f -> {
+            find(f, id).ifPresent(a -> {
+                a.skinUrl = skinUrl;
+                a.skinVariant = skinVariant;
+            });
+            return null;
+        });
+    }
+
     /** sign out: forget the account and delete its tokens; another account is selected if any is left */
     public void signOut(String accountId) throws LauncherException {
         String id = normalizeId(accountId);

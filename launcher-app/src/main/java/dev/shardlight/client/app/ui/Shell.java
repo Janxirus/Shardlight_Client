@@ -478,10 +478,12 @@ public final class Shell {
             } else {
                 Label title = UiKit.label(t, "page-title");
                 title.setWrapText(false);
-                title.setMinWidth(0);
+                // a plain page name always shows in full (the page's own actions give way); a long project name may shrink
+                title.setMinWidth(trail.size() == 1 ? Region.USE_PREF_SIZE : 0);
                 crumbs.getChildren().add(title);
             }
         }
+        crumbs.setMinWidth(trail.size() == 1 ? Region.USE_PREF_SIZE : 0);
         Node a = entry.page().actions();
         titleActions.getChildren().setAll(a == null ? new Node[0] : new Node[] {a});
     }

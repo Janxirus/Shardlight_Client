@@ -93,6 +93,20 @@ class GameInstallerTest {
     }
 
     @Test
+    void estimatesWhatIsStillMissingWithoutInstalling() throws Exception {
+        fx.publishTemplate("1.21.4.json", "release");
+        GameInstaller installer = installer(WINDOWS);
+        GameInstaller.InstallEstimate before = installer.estimate("1.21.4", CancellationToken.NONE);
+        assertTrue(before.files() > 0);
+        assertTrue(before.bytes() > 0);
+        assertFalse(Files.exists(paths.versions().resolve("1.21.4/1.21.4.jar")), "estimating does not install");
+        installer.install("1.21.4", new Stages(), CancellationToken.NONE);
+        GameInstaller.InstallEstimate after = installer.estimate("1.21.4", CancellationToken.NONE);
+        assertEquals(0, after.files());
+        assertEquals(0, after.bytes());
+    }
+
+    @Test
     void installsModernVanillaForWindows() throws Exception {
         String json = fx.publishTemplate("1.21.4.json", "release");
         Stages stages = new Stages();

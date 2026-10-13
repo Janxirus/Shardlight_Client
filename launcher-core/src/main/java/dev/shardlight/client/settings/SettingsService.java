@@ -96,6 +96,7 @@ public final class SettingsService {
         if (s.appearance.accent == null) s.appearance.accent = d.appearance.accent;
         if (s.appearance.language == null) s.appearance.language = d.appearance.language;
         if (s.catalog.defaultSource == null) s.catalog.defaultSource = d.catalog.defaultSource;
+        if (s.privacy.discordApplicationId == null) s.privacy.discordApplicationId = d.privacy.discordApplicationId;
         if (s.auth.microsoftClientId == null) s.auth.microsoftClientId = d.auth.microsoftClientId;
         if (s.updates.channel == null) s.updates.channel = d.updates.channel;
         s.downloads.maxConcurrent = Math.max(1, Math.min(16, s.downloads.maxConcurrent));

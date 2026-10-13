@@ -38,6 +38,11 @@ public final class ThemeManager {
         return ems * emPx;
     }
 
+    /** a size drawn at 100% (in pixels) at the current interface size, for the few widths layout code has to set */
+    public static double scaled(double pixelsAt100) {
+        return pixelsAt100 * emPx / 14;
+    }
+
     public static void install(Scene scene) {
         Fonts.load();
         scene.getStylesheets().add(ThemeManager.class.getResource("/app/shardlight.css").toExternalForm());

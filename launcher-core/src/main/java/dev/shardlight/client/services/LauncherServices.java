@@ -13,6 +13,8 @@ import dev.shardlight.client.catalog.InstallPlanner;
 import dev.shardlight.client.catalog.ModrinthCatalog;
 import dev.shardlight.client.content.ContentService;
 import dev.shardlight.client.diagnostics.CrashAnalyzer;
+import dev.shardlight.client.discord.DiscordApplicationIds;
+import dev.shardlight.client.discord.DiscordPresence;
 import dev.shardlight.client.diagnostics.DiagnosticsExporter;
 import dev.shardlight.client.download.DownloadManager;
 import dev.shardlight.client.error.LauncherException;
@@ -23,6 +25,10 @@ import dev.shardlight.client.log.Redactor;
 import dev.shardlight.client.minecraft.GameInstaller;
 import dev.shardlight.client.minecraft.VersionManifestService;
 import dev.shardlight.client.modpack.ModpackService;
+import dev.shardlight.client.storage.DiskUsage;
+import dev.shardlight.client.project.BackupScope;
+import dev.shardlight.client.modpack.ModpackUpdater;
+import dev.shardlight.client.content.DropService;
 import dev.shardlight.client.net.Endpoints;
 import dev.shardlight.client.net.HttpService;
 import dev.shardlight.client.preset.PresetEngine;
@@ -35,6 +41,8 @@ import dev.shardlight.client.project.WorldService;
 import dev.shardlight.client.settings.LauncherSettings;
 import dev.shardlight.client.settings.SettingsService;
 import dev.shardlight.client.shardlight.ShardlightCatalog;
+import dev.shardlight.client.skin.SkinLibrary;
+import dev.shardlight.client.skin.SkinService;
 import dev.shardlight.client.shardlight.ShardlightContentLibrary;
 import dev.shardlight.client.shardlight.ShardlightService;
 import dev.shardlight.client.storage.AppPaths;
@@ -70,6 +78,9 @@ public final class LauncherServices implements AutoCloseable {
     private final LaunchService launches;
     private final MicrosoftAuthService microsoft;
     private final AccountService accounts;
+    private final SkinService skins;
+    private final SkinLibrary skinLibrary;
+    private final DiscordPresence discord;
     private final ProjectService projects;
     private final BackupService backups;
     private final WorldService worlds;
@@ -81,6 +92,9 @@ public final class LauncherServices implements AutoCloseable {
     private final CatalogRegistry catalogs;
     private final InstallPlanner planner;
     private final ModpackService modpacks;
+    private final ModpackUpdater modpackUpdater;
+    private final DropService drops;
+    private final DiskUsage diskUsage;
     private final ShardlightCatalog shardlightCatalog;
     private final ShardlightContentLibrary shardlightLibrary;
     private final ShardlightService shardlight;
@@ -112,6 +126,9 @@ public final class LauncherServices implements AutoCloseable {
 
         this.microsoft = new MicrosoftAuthService(http, endpoints, this::microsoftClientId);
         this.accounts = new AccountService(paths, secrets, microsoft);
+        this.skins = new SkinService(http, endpoints, accounts);
+        this.skinLibrary = new SkinLibrary(paths);
+        this.discord = new DiscordPresence(() -> settings.get().privacy.discordRichPresence, DiscordApplicationIds.fromSettings(settings));
 
         this.projects = new ProjectService(paths);
         this.backups = new BackupService(paths, projects);
@@ -131,9 +148,13 @@ public final class LauncherServices implements AutoCloseable {
             (name, mc, loader) -> projects.create(new NewProjectRequest(name, null, "modpack", mc, loader,
                 Set.of(), null, null, null)),
             content, downloads, catalogs);
+        this.modpackUpdater = new ModpackUpdater(modpacks, projects, content, downloads,
+            (p, pl, ct) -> backups.backupProject(p.id, "Before modpack update", new BackupScope(false, true, true, true, false, true), pl, ct));
+        this.drops = new DropService(content, worlds, screenshots);
+        this.diskUsage = new DiskUsage(paths, projects, projects::list);
 
         this.shardlightCatalog = ShardlightCatalog.load();
-        this.shardlightLibrary = new ShardlightContentLibrary(paths, http, downloads, shardlightCatalog);
+        this.shardlightLibrary = new ShardlightContentLibrary(paths, http, downloads, shardlightCatalog, modrinth);
         this.shardlight = new ShardlightService(paths, projects, shardlightCatalog, shardlightLibrary);
         this.presets = new PresetEngine(projects);
         this.updates = UpdateService.fromBundledConfig(http, BuildInfo.VERSION, downloads);
@@ -253,6 +274,21 @@ public final class LauncherServices implements AutoCloseable {
         return accounts;
     }
 
+    /** the signed-in account's skin and capes, through Minecraft services */
+    public SkinService skins() {
+        return skins;
+    }
+
+    /** Discord Rich Presence; does nothing unless the player switched it on and an application id is set */
+    public DiscordPresence discord() {
+        return discord;
+    }
+
+    /** the skins kept on this computer */
+    public SkinLibrary skinLibrary() {
+        return skinLibrary;
+    }
+
     public ProjectService projects() {
         return projects;
     }
@@ -291,6 +327,18 @@ public final class LauncherServices implements AutoCloseable {
 
     public InstallPlanner planner() {
         return planner;
+    }
+
+    public ModpackUpdater modpackUpdater() {
+        return modpackUpdater;
+    }
+
+    public DropService drops() {
+        return drops;
+    }
+
+    public DiskUsage diskUsage() {
+        return diskUsage;
     }
 
     public ModpackService modpacks() {
@@ -335,6 +383,7 @@ public final class LauncherServices implements AutoCloseable {
         for (var p : launches.runningAll()) {
             LOG.info("Leaving the game of project " + p.projectId() + " running");
         }
+        discord.close();
         downloads.close();
     }
 }

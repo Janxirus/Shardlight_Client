@@ -64,3 +64,74 @@ with in Part 1 (design system and base controls); the rest belong to the later p
   bottom edge.
 - Large empty areas under short pages (Home, Discover while loading); no page width limit on wide windows.
 - Project page header: chips wrap onto a second line at the default window size.
+
+## Part 3: first run, Home, Library and the project page
+
+- **Fixed.** Home had a news-style row and fixed-size tiles; it now has a hero for the selected project
+  (art, version, loader, preset, modules, Play), a "Jump back in" row, and an alerts strip that appears only
+  when something needs attention. Last played and play time come from real launch records only.
+- **Fixed.** Library had one flat list; it now has grid and list views, sorting, filters, folders and drag to
+  reorder, with its own empty and no-match states.
+- **Fixed.** The project page showed everything in one scroll; it now has a header and eight tabs, each with
+  loading, empty and error states.
+- **Fixed.** Sign-in showed a code and little else; it now shows the waiting state, the player's head on
+  success, and a plain next step for every error code, including "waiting for Minecraft approval" with Retry.
+- **Left over.** The Settings and Backups tabs keep their earlier layouts (some fixed gaps); hover and drag
+  states cannot be captured in a screenshot; the player head and sign-in were not checked against a real
+  Microsoft account.
+
+![Home](images/ui-overhaul/part3-home-dark.jpg)
+![Library](images/ui-overhaul/part3-library-dark.jpg)
+![Project overview](images/ui-overhaul/part3-project-overview-dark.jpg)
+![Project mods](images/ui-overhaul/part3-project-content-dark.jpg)
+![Performance](images/ui-overhaul/part3-project-performance-dark.jpg)
+![First run](images/ui-overhaul/part3-firstrun-1-dark.jpg)
+![Sign-in](images/ui-overhaul/part3-signin-code-dark.jpg)
+![Home, light](images/ui-overhaul/part3-home-light.jpg)
+![Library, light](images/ui-overhaul/part3-library-light.jpg)
+
+## Part 4: Discover, Shardlight, Multiplayer, Downloads, Settings, wizard, dialogs
+
+- **Fixed.** Discover now starts with the search box, a filter rail and result cards with an Install button
+  that shows its state; the mod page has a gallery header, tabs, a version list and a dependency preview.
+  While loading it shows skeletons; offline it keeps the last results and shows a message with Retry.
+- **Fixed.** Shardlight shows four module cards with switches and 15 theme tiles; picking a theme applies it
+  to the current project.
+- **Fixed.** Multiplayer shows server cards with the MOTD in Minecraft colours, ping bars and a real player
+  count (only what was fetched), and Join with the chosen project. The add-server dialog tests the ping live.
+- **Fixed.** Downloads shows the active download with a ring, speed and ETA, pause, resume and cancel, a
+  queue, collapsible history and errors in place with Retry. The badge and the top bar follow the page.
+- **Fixed.** Settings has a left section list, a search that jumps to any setting, a live preview in
+  Appearance, one-line descriptions, and changes that apply at once with an Undo toast.
+- **Fixed.** The new-project wizard is three steps; loader, Java, memory and Shardlight sit in a collapsed
+  Advanced part. The review lists exactly what will be downloaded, with the Minecraft size measured from
+  what is missing on this computer.
+- **Fixed.** Every dialog uses one frame (Cancel left, main action right, Esc closes, Enter confirms). The
+  crash screen explains the likely cause in plain words and offers the fix, the log and a diagnostics zip.
+- **Fixed (follow-up).** The Backups tab has a summary (count, space used, last backup), an icon per backup kind
+  and a "Safety backup" chip; the install-plan dialog shows problems first, then one card per file with a
+  Dependency chip; the log analysis uses the crash screen's layout (likely cause with its fix button, other
+  findings below).
+- **Left over.** Enter does not confirm a danger dialog, on purpose. Loader, add-on and Shardlight module
+  sizes are not known before they download, so the review says so and does not add them to the total. The
+  Environment filter works for Modrinth only. Hover and drag states cannot be captured in a screenshot,
+  and nothing was checked against live Modrinth or Mojang servers (the cloud blocks them), so the
+  screenshots use made-up example data.
+
+![Discover](images/ui-overhaul/part4-discover.jpg)
+![Mod page](images/ui-overhaul/part4-catalog.jpg)
+![Discover offline](images/ui-overhaul/part4-discover-offline.jpg)
+![Shardlight](images/ui-overhaul/part4-shardlight.jpg)
+![Multiplayer](images/ui-overhaul/part4-multiplayer.jpg)
+![Add server](images/ui-overhaul/part4-multiplayer-add.jpg)
+![Downloads](images/ui-overhaul/part4-downloads.jpg)
+![Downloads error](images/ui-overhaul/part4-downloads-error.jpg)
+![Settings](images/ui-overhaul/part4-settings-appearance.jpg)
+![Settings search](images/ui-overhaul/part4-settings-search.jpg)
+![Wizard, template](images/ui-overhaul/part4-wizard-0.jpg)
+![Wizard, basics](images/ui-overhaul/part4-wizard-1.jpg)
+![Wizard, review](images/ui-overhaul/part4-wizard-2.jpg)
+![Crash screen](images/ui-overhaul/part4-crash.jpg)
+![Delete confirmation](images/ui-overhaul/part4-confirm-danger.jpg)
+![Light: Discover](images/ui-overhaul/part4-discover-light.jpg)
+![Light: Settings](images/ui-overhaul/part4-settings-appearance-light.jpg)

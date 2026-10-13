@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+<defs><radialGradient id="g1"><stop offset="0" stop-color="#7c6cf2" stop-opacity="0.22"/><stop offset="1" stop-color="#7c6cf2" stop-opacity="0"/></radialGradient><radialGradient id="g2"><stop offset="0" stop-color="#5b95d1" stop-opacity="0.34"/><stop offset="1" stop-color="#5b95d1" stop-opacity="0"/></radialGradient></defs>
+<circle cx="80.0" cy="62.0" r="66.0" fill="url(#g1)"/>
+<circle cx="80.0" cy="60.0" r="57.5" fill="url(#g2)"/>
+<polygon points="80.0,14.0 58.0,42.5 80.0,50.8" fill="#9486f4"/>
+<polygon points="58.0,42.5 67.9,69.2 80.0,50.8" fill="#7667e6"/>
+<polygon points="58.0,42.5 67.9,69.2 80.0,106.0" fill="#4d4396"/>
+<polygon points="80.0,14.0 102.0,42.5 80.0,50.8" fill="#52c6b9"/>
+<polygon points="102.0,42.5 92.1,69.2 80.0,50.8" fill="#34ab9e"/>
+<polygon points="102.0,42.5 92.1,69.2 80.0,106.0" fill="#206961"/>
+<polygon points="80.0,50.8 67.9,69.2 80.0,106.0 92.1,69.2" fill="#4b7aab"/>
+<polygon points="80.0,14.0 76.5,46.2 80.0,85.3 83.5,46.2" fill="#ffffff" fill-opacity="0.55"/>
+</svg>

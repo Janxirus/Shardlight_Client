@@ -132,6 +132,16 @@ public final class AppPaths {
         return root.resolve("trash");
     }
 
+    /** the player's local skin library (created when the first skin is saved) */
+    public Path skins() {
+        return root.resolve("skins");
+    }
+
+    /** translation files the player added: {@code <area>_<language>.properties} (created on request) */
+    public Path languages() {
+        return root.resolve("languages");
+    }
+
     public void createDirectories() throws IOException {
         for (Path p : new Path[] {root, logs(), cache(), versions(), libraries(), assets(), runtimes(), files(),
             content(), projects(), backups(), trash()}) {

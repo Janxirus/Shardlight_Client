@@ -2,6 +2,7 @@ package dev.shardlight.client.shardlight;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.shardlight.client.catalog.ModrinthCatalog;
 import dev.shardlight.client.content.ContentEntry;
 import dev.shardlight.client.content.ContentKind;
 import dev.shardlight.client.content.ContentSource;
@@ -11,6 +12,7 @@ import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.game.GameDirs;
 import dev.shardlight.client.game.OptionsTxt;
 import dev.shardlight.client.loader.LoaderType;
+import dev.shardlight.client.net.Endpoints;
 import dev.shardlight.client.net.HttpService;
 import dev.shardlight.client.project.Project;
 import dev.shardlight.client.storage.AppPaths;
@@ -29,6 +31,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +70,7 @@ class ShardlightServiceTest {
         HttpService http = HttpService.forTests();
         downloads = new DownloadManager(http, paths.files(), 2, 1);
         downloads.setBackoffMillis(5);
-        library = new ShardlightContentLibrary(paths, http, downloads, catalog, server.uri("/github/"));
+        library = new ShardlightContentLibrary(paths, http, downloads, catalog, server.uri("/github/"), null);
         service = new ShardlightService(paths, projects, catalog, library);
     }
 
@@ -279,21 +282,91 @@ class ShardlightServiceTest {
     void theLatestReleaseJarIsDownloadedIntoTheLibrary() throws Exception {
         byte[] jar = modJar("shardmap", "1.5.0", "~26.3");
         release("shardmap-1.5.0.jar", jar, true);
-        LibraryItem item = library.downloadLatestRelease("map", null, CancellationToken.NONE).orElseThrow();
+        LibraryItem item = library.downloadLatest("map", null, CancellationToken.NONE).orElseThrow();
         assertEquals("map", item.moduleOrThemeId());
         assertEquals("1.5.0", item.version());
         assertEquals(0, server.hits("/dl/sources.jar"), "source jars are never picked");
         assertEquals("application/vnd.github+json", server.requests().get(0).header("Accept"));
 
-        LibraryItem again = library.downloadLatestRelease("map", null, CancellationToken.NONE).orElseThrow();
+        LibraryItem again = library.downloadLatest("map", null, CancellationToken.NONE).orElseThrow();
         assertEquals(item.id(), again.id());
         assertEquals(1, library.items().size());
+    }
+
+    // ---------------------------------------------------------------- Modrinth as the second source
+
+    /** a library whose catalog gives the Map module a Modrinth project, talking to the local server */
+    ShardlightContentLibrary libraryWithModrinthMap() throws Exception {
+        List<ShardlightModule> modules = new ArrayList<>();
+        for (ShardlightModule m : catalog.modules()) {
+            modules.add(!m.id().equals("map") ? m : new ShardlightModule(m.id(), m.modId(), m.nameKey(), m.descriptionKey(),
+                m.minecraftVersions(), m.loaders(), m.minLoaderVersion(), m.javaMajor(), m.requires(), m.worksBetterWith(),
+                m.configFile(), "shardlight-map", m.pageUrl(), m.sources()));
+        }
+        HttpService http = HttpService.forTests();
+        return new ShardlightContentLibrary(paths, http, downloads, new ShardlightCatalog(modules, catalog.themes()),
+            server.uri("/github/"), new ModrinthCatalog(http, Endpoints.local(server.base())));
+    }
+
+    void modrinthVersion(byte[] jar, String channel) {
+        server.json("/modrinth/v2/project/shardlight-map/version", "[{\"id\":\"v1\",\"project_id\":\"abc\","
+            + "\"version_number\":\"1.5.0\",\"version_type\":\"" + channel + "\",\"game_versions\":[\"26.3\"],"
+            + "\"loaders\":[\"fabric\"],\"date_published\":\"2026-10-01T00:00:00Z\",\"dependencies\":[],\"files\":[{\"url\":\""
+            + server.uri("/dl/mr-shardmap.jar") + "\",\"filename\":\"shardmap-1.5.0.jar\",\"size\":" + jar.length
+            + ",\"primary\":true,\"hashes\":{\"sha1\":\"" + Hashing.hash(jar, HashAlgo.SHA1) + "\",\"sha512\":\""
+            + Hashing.hash(jar, HashAlgo.SHA512) + "\"}}]}]");
+        server.bytes("/dl/mr-shardmap.jar", jar);
+    }
+
+    @Test
+    void aModrinthProjectIsUsedBeforeTheGithubRelease() throws Exception {
+        byte[] jar = modJar("shardmap", "1.5.0", "~26.3");
+        modrinthVersion(jar, "release");
+        release("shardmap-1.5.0.jar", modJar("shardmap", "9.9.9", "~26.3"), false);
+        LibraryItem item = libraryWithModrinthMap().downloadLatest("map", null, CancellationToken.NONE).orElseThrow();
+        assertEquals("1.5.0", item.version());
+        assertEquals(0, server.hits("/github/repos/Janxirus/Shardlight_map/releases/latest"), "GitHub isn't asked");
+    }
+
+    @Test
+    void aModuleWithoutAModrinthProjectYetFallsBackToGithub() throws Exception {
+        release("shardmap-1.5.0.jar", modJar("shardmap", "1.5.0", "~26.3"), true);
+        LibraryItem item = libraryWithModrinthMap().downloadLatest("map", null, CancellationToken.NONE).orElseThrow();
+        assertEquals("1.5.0", item.version());
+        assertEquals(1, server.hits("/modrinth/v2/project/shardlight-map/version"), "Modrinth was asked first");
+    }
+
+    @Test
+    void whenNeitherSourceHasTheModuleItIsNotPublishedYet() throws Exception {
+        assertEquals("shardlight.download.notPublished", assertThrows(LauncherException.class,
+            () -> libraryWithModrinthMap().downloadLatest("map", null, CancellationToken.NONE)).messageKey());
+        // a Modrinth project with no version for 26.3 on Fabric counts as not published too
+        server.json("/modrinth/v2/project/shardlight-map/version", "[]");
+        assertEquals("shardlight.download.notPublished", assertThrows(LauncherException.class,
+            () -> libraryWithModrinthMap().downloadLatest("map", null, CancellationToken.NONE)).messageKey());
+    }
+
+    @Test
+    void anUnreachableSourceIsNotReportedAsNotPublished() throws Exception {
+        server.text("/modrinth/v2/project/shardlight-map/version", 500, "down");
+        LauncherException e = assertThrows(LauncherException.class,
+            () -> libraryWithModrinthMap().downloadLatest("map", null, CancellationToken.NONE));
+        assertNotEquals("shardlight.download.notPublished", e.messageKey(), "GitHub said 404, Modrinth said nothing");
+        assertEquals(ErrorCode.HTTP_STATUS, e.code());
+    }
+
+    @Test
+    void aModrinthJarThatDoesNotMatchItsHashIsRefused() throws Exception {
+        modrinthVersion(modJar("shardmap", "1.5.0", "~26.3"), "release");
+        server.bytes("/dl/mr-shardmap.jar", modJar("shardmap", "1.5.0-tampered", "~26.3"));
+        assertThrows(LauncherException.class, () -> libraryWithModrinthMap().downloadLatest("map", null, CancellationToken.NONE));
+        assertTrue(library.items().isEmpty());
     }
 
     @Test
     void releaseProblemsAreExplained() throws Exception {
         LauncherException missing = assertThrows(LauncherException.class,
-            () -> library.downloadLatestRelease("map", null, CancellationToken.NONE));
+            () -> library.downloadLatest("map", null, CancellationToken.NONE));
         assertEquals("shardlight.download.notPublished", missing.messageKey(), "a private or unpublished repository");
 
         server.handle("/github/repos/Janxirus/Shardlight_map/releases/latest", ex -> {
@@ -301,22 +374,22 @@ class ShardlightServiceTest {
             TestHttpServer.respond(ex, 403, "{\"message\":\"API rate limit exceeded\"}");
         });
         assertEquals(ErrorCode.RATE_LIMITED, assertThrows(LauncherException.class,
-            () -> library.downloadLatestRelease("map", null, CancellationToken.NONE)).code());
+            () -> library.downloadLatest("map", null, CancellationToken.NONE)).code());
 
         release("shardmap-1.5.0.jar", modJar("shardparty", "1.2.1", "26.3"), false);
         assertEquals("shardlight.download.wrongModule", assertThrows(LauncherException.class,
-            () -> library.downloadLatestRelease("map", null, CancellationToken.NONE)).messageKey());
+            () -> library.downloadLatest("map", null, CancellationToken.NONE)).messageKey());
 
         byte[] good = modJar("shardmap", "1.5.0", "~26.3");
         release("shardmap-1.5.0.jar", good, true);
         server.bytes("/dl/shardmap-1.5.0.jar", modJar("shardmap", "1.5.0-tampered", "~26.3"));
-        assertThrows(LauncherException.class, () -> library.downloadLatestRelease("map", null, CancellationToken.NONE));
+        assertThrows(LauncherException.class, () -> library.downloadLatest("map", null, CancellationToken.NONE));
         assertTrue(library.items().isEmpty());
 
         server.json("/github/repos/Janxirus/Shardlight_map/releases/latest", "{\"tag_name\":\"v1\",\"assets\":[]}");
-        assertTrue(library.downloadLatestRelease("map", null, CancellationToken.NONE).isEmpty());
+        assertTrue(library.downloadLatest("map", null, CancellationToken.NONE).isEmpty());
         assertEquals(ErrorCode.NOT_FOUND, assertThrows(LauncherException.class,
-            () -> library.downloadLatestRelease("nope", null, null)).code());
+            () -> library.downloadLatest("nope", null, null)).code());
     }
 
     @Test

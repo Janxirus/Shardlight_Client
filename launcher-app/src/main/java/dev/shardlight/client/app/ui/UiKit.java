@@ -12,7 +12,9 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -84,7 +86,7 @@ public final class UiKit {
         Tooltip tip = new Tooltip(text);
         tip.setShowDelay(TOOLTIP_DELAY);
         tip.setWrapText(true);
-        tip.setMaxWidth(380);
+        tip.setMaxWidth(ThemeManager.scaled(380));
         Tooltip.install(n, tip);
     }
 
@@ -126,6 +128,16 @@ public final class UiKit {
         if (icon != null) {
             l.setGraphic(Icons.of(icon, 13));
         }
+        return l;
+    }
+
+    /** a chip whose text may be long (module lists): it stops at {@code maxEm}, cuts with an ellipsis and shows the full text as a tooltip */
+    public static Label chipCapped(String text, String variant, String icon, double maxEm) {
+        Label l = chip(text, variant, icon);
+        l.setMinWidth(0);
+        l.setMaxWidth(ThemeManager.em(maxEm));
+        l.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        tooltip(l, text);
         return l;
     }
 
@@ -182,7 +194,8 @@ public final class UiKit {
 
     /** an empty state with a title: icon, title, one sentence, one action (may be null) */
     public static VBox emptyState(String icon, String title, String body, Node action) {
-        VBox v = empty(Icons.of(icon, 40), body, action);
+        // the launcher's own illustration when there is one for this icon, else the plain icon
+        VBox v = empty(Art.emptyIllustration(icon, 11.4).map(n -> (Node) n).orElseGet(() -> Icons.of(icon, 40)), body, action);
         v.getChildren().add(1, label(title, "h3"));
         return v;
     }
@@ -309,7 +322,7 @@ public final class UiKit {
         Tooltip tip = new Tooltip();
         tip.setShowDelay(TOOLTIP_DELAY);
         tip.setWrapText(true);
-        tip.setMaxWidth(380);
+        tip.setMaxWidth(ThemeManager.scaled(380));
         Runnable update = () -> {
             Object r = c.getProperties().get(DISABLED_REASON);
             if (c.isDisabled() && r instanceof String reason) {
@@ -383,9 +396,23 @@ public final class UiKit {
     public static HBox segmented(List<String> options, int selected, Consumer<Integer> onSelect) {
         HBox box = new HBox();
         box.getStyleClass().add("segmented");
+        fillSegments(box, options, selected, onSelect);
+        return box;
+    }
+
+    /** like {@link #segmented}, for narrow places: the options move to a second row when the first is full */
+    public static FlowPane segmentedWrapping(List<String> options, int selected, Consumer<Integer> onSelect) {
+        FlowPane box = new FlowPane(2, 2);
+        box.getStyleClass().add("segmented");
+        fillSegments(box, options, selected, onSelect);
+        return box;
+    }
+
+    private static void fillSegments(Pane box, List<String> options, int selected, Consumer<Integer> onSelect) {
         ToggleGroup g = new ToggleGroup();
         for (int i = 0; i < options.size(); i++) {
             ToggleButton b = new ToggleButton(options.get(i));
+            b.setMinWidth(Region.USE_PREF_SIZE);
             b.setToggleGroup(g);
             b.setSelected(i == selected);
             int idx = i;
@@ -397,7 +424,6 @@ public final class UiKit {
             });
             box.getChildren().add(b);
         }
-        return box;
     }
 
     public static ProgressBar progress(double value) {
@@ -450,6 +476,14 @@ public final class UiKit {
             i++;
         }
         return String.format(I18n.locale(), v >= 100 ? "%.0f %s" : "%.1f %s", v, u[i]);
+    }
+
+    /** time left: seconds under a minute, else minutes and hours */
+    public static String eta(long millis) {
+        if (millis < 60_000) {
+            return I18n.tr("ui.duration.seconds", Math.max(1, (millis + 500) / 1000));
+        }
+        return duration(millis);
     }
 
     public static String duration(long millis) {

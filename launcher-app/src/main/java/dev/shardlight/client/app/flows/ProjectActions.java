@@ -4,6 +4,7 @@ import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.ui.Dialogs;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.modpack.ModpackInfo;
@@ -108,6 +109,9 @@ public final class ProjectActions {
             details.add(I18n.tr("ui.project.removeScreenshots", plan.screenshots()));
             details.add(I18n.tr("ui.project.removeMods", plan.mods(), plan.resourcePacks()));
             details.add(I18n.tr("ui.project.removeSize", UiKit.bytes(plan.totalBytes())));
+            if (p.gameDirLocation != null) {
+                details.add(I18n.tr("ui.project.removeOutside", p.gameDirLocation));
+            }
             ctx.overlay().confirm(I18n.tr("ui.project.trashTitle", p.name), I18n.tr("ui.project.trashMessage"), details,
                 I18n.tr("ui.project.trash"), true, () -> Tasks.quiet(ctx.overlay(),
                     () -> ctx.services().projects().archive(p.id), (ArchivedProject a) -> {
@@ -127,9 +131,11 @@ public final class ProjectActions {
     public static void deletePermanently(AppContext ctx, ArchivedProject a, Runnable after) {
         TextField confirmName = new TextField();
         confirmName.setAccessibleText(I18n.tr("ui.trash.typeName", a.name()));
-        VBox body = new VBox(10, UiKit.label(I18n.tr("ui.trash.deleteMessage", a.name(), UiKit.bytes(a.sizeBytes()))),
-            UiKit.label(I18n.tr("ui.trash.typeName", a.name()), "muted", "small"), confirmName);
-        body.setPrefWidth(460);
+        VBox body = new VBox(10, UiKit.label(I18n.tr("ui.trash.deleteMessage", a.name(), UiKit.bytes(a.sizeBytes()))));
+        ctx.services().projects().archivedGameDir(a.trashId()).ifPresent(outside ->
+            body.getChildren().add(UiKit.banner("warning", I18n.tr("ui.trash.deleteOutside", outside.toString()))));
+        body.getChildren().addAll(UiKit.label(I18n.tr("ui.trash.typeName", a.name()), "muted", "small"), confirmName);
+        body.setPrefWidth(ThemeManager.scaled(460));
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);
         Button delete = new Button(I18n.tr("ui.trash.deleteForever"));
@@ -160,6 +166,11 @@ public final class ProjectActions {
         if (file == null) {
             return;
         }
+        importDropped(ctx, file);
+    }
+
+    /** the same import for a file that is already chosen (picked in the dialog or dropped on the window) */
+    public static void importDropped(AppContext ctx, Path file) {
         String lower = file.getFileName().toString().toLowerCase(Locale.ROOT);
         Tasks.quiet(ctx.overlay(), () -> {
             try {

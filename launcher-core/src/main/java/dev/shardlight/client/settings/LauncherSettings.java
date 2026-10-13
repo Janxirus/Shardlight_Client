@@ -14,9 +14,11 @@ public final class LauncherSettings {
     public List<String> recentProjects = new ArrayList<>();
     public boolean firstRunDone;
     public Appearance appearance = new Appearance();
+    public Library library = new Library();
     public Downloads downloads = new Downloads();
     public JavaDefaults java = new JavaDefaults();
     public Privacy privacy = new Privacy();
+    public Performance performance = new Performance();
     public Catalog catalog = new Catalog();
     public Auth auth = new Auth();
     public Updates updates = new Updates();
@@ -38,6 +40,25 @@ public final class LauncherSettings {
         public boolean sidebarCollapsed;
     }
 
+    /** how the Library page shows projects: view, sort, a custom order and the player's folders */
+    public static final class Library {
+        /** "grid" or "list" */
+        public String view = "grid";
+        /** "recent", "name", "created" or "custom" */
+        public String sort = "recent";
+        /** project ids in the order the player dragged them to (used by the custom sort) */
+        public List<String> order = new ArrayList<>();
+        public List<Group> groups = new ArrayList<>();
+
+        /** a folder of projects; a project belongs to at most one */
+        public static final class Group {
+            public String id;
+            public String name;
+            public boolean collapsed;
+            public List<String> projects = new ArrayList<>();
+        }
+    }
+
     public static final class Downloads {
         public int maxConcurrent = 6;
         public int maxRetries = 3;
@@ -51,11 +72,18 @@ public final class LauncherSettings {
         public boolean preferMojangRuntime = true;
     }
 
+    public static final class Performance {
+        /** the {@code Preset} a new project starts with when its template does not pick one (enum name) */
+        public String defaultPreset = "BALANCED";
+    }
+
     public static final class Privacy {
         /** no telemetry exists; kept so a future opt-in can't default to on */
         public boolean telemetry;
+        /** show "Playing <project> on Minecraft <version>" in Discord while the game runs (off until the player turns it on) */
         public boolean discordRichPresence;
-        public boolean discordShowServer;
+        /** the Discord application id; empty uses the one built into this launcher */
+        public String discordApplicationId = "";
     }
 
     public static final class Catalog {

@@ -8,7 +8,6 @@ import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.TaskProgress;
 import dev.shardlight.client.app.ui.Tasks;
 import dev.shardlight.client.app.ui.UiKit;
-import dev.shardlight.client.diagnostics.Finding;
 import dev.shardlight.client.error.ErrorCode;
 import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.i18n.I18n;
@@ -21,7 +20,6 @@ import dev.shardlight.client.task.CancellationToken;
 import dev.shardlight.client.task.ProgressListener;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
-import javafx.scene.layout.VBox;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -228,7 +226,9 @@ public final class PlayFlow {
     private void started(Project project, GameProcess process) {
         ctx.overlay().toast("success", I18n.tr("ui.play.started", project.name));
         fire();
+        updateDiscord();
         process.onExit().whenComplete((exit, err) -> Fx.ui(() -> {
+            updateDiscord();
             fire();
             ctx.projectsChanged();
             if (err != null) {
@@ -239,11 +239,30 @@ public final class PlayFlow {
         }));
     }
 
+    /**
+     * Discord Rich Presence follows the games that run: the one that started last is shown, and when none is left the
+     * status is cleared. Does nothing unless the player switched it on in Settings.
+     */
+    private void updateDiscord() {
+        var discord = ctx.services().discord();
+        var newest = ctx.services().launches().runningAll().stream()
+            .max(java.util.Comparator.comparing(GameProcess::startedAt));
+        if (newest.isEmpty()) {
+            discord.clear();
+            return;
+        }
+        GameProcess g = newest.get();
+        Project p = ctx.services().projects().get(g.projectId()).orElse(null);
+        discord.show(dev.shardlight.client.discord.DiscordPresence.activityFor(p == null ? null : p.name,
+            p == null ? null : p.minecraftVersion, g.startedAt()));
+    }
+
     private void failed(Project project, LaunchOptions options, Throwable err) {
         if (err instanceof LauncherException le && le.code() == ErrorCode.AUTH_EXPIRED) {
             fire();
             Button signIn = UiKit.primary(I18n.tr("ui.play.signInAgain"), Icons.USER, () -> { });
             Button close = new Button(I18n.tr("common.close"));
+            close.setCancelButton(true);
             Overlay.Dialog d = ctx.overlay().show(Overlay.modal(I18n.tr("ui.play.failedTitle"),
                 UiKit.label(le.userMessage()), close, signIn), true, false);
             close.setOnAction(e -> d.close());
@@ -267,36 +286,7 @@ public final class PlayFlow {
                 UiKit.duration(exit.playTime().toMillis())));
             return;
         }
-        VBox body = new VBox(10);
-        body.setPrefWidth(620);
-        body.getChildren().add(UiKit.label(I18n.tr("ui.play.crashed", exit.exitCode())));
-        for (Finding f : exit.findings()) {
-            Object[] args = f.args() == null ? new Object[0] : f.args().toArray();
-            String kind = switch (f.severity().name()) {
-                case "ERROR" -> "danger";
-                case "WARNING" -> "warning";
-                default -> "info";
-            };
-            VBox text = new VBox(2, UiKit.label(I18n.tr(f.titleKey(), args), "h3"),
-                UiKit.label(I18n.tr(f.detailKey(), args), "muted"));
-            body.getChildren().add(UiKit.banner(kind, text));
-        }
-        if (exit.findings().isEmpty()) {
-            body.getChildren().add(UiKit.label(I18n.tr("ui.play.noFindings"), "muted"));
-        }
-        body.getChildren().add(UiKit.label(I18n.tr("ui.play.crashHint"), "faint", "small"));
-        Button close = new Button(I18n.tr("common.close"));
-        Button report = UiKit.button(I18n.tr("ui.play.openCrashReport"), Icons.LOGS, () -> { });
-        report.setDisable(exit.crashReport().isEmpty());
-        Button export = UiKit.button(I18n.tr("ui.diagnostics.export"), Icons.ARCHIVE, () -> { });
-        Overlay.Dialog d = ctx.overlay().show(Overlay.modal(I18n.tr("ui.play.crashedTitle", project.name), body,
-            report, export, close), true, true);
-        close.setOnAction(e -> d.close());
-        report.setOnAction(e -> exit.crashReport().map(Path::getParent).ifPresent(ctx::openFolder));
-        export.setOnAction(e -> {
-            d.close();
-            exportDiagnostics(ctx, project);
-        });
+        CrashScreen.show(ctx, project, exit);
     }
 
     /** write a privacy-checked diagnostics zip to the launcher's logs folder and show it */
@@ -313,6 +303,13 @@ public final class PlayFlow {
         });
     }
 
+    private volatile String availableUpdate;
+
+    /** the version of a newer launcher found by the start-up check, if any */
+    public Optional<String> availableUpdate() {
+        return Optional.ofNullable(availableUpdate);
+    }
+
     /** on start: look for a newer launcher when updates are set up for this build (never installs anything) */
     public void checkForUpdatesQuietly() {
         var updates = ctx.services().updates();
@@ -322,6 +319,7 @@ public final class PlayFlow {
         }
         Fx.run(() -> updates.check(settings.channel, new dev.shardlight.client.task.CancellationToken()), info -> info
             .ifPresent(u -> {
+                availableUpdate = u.version();
                 ctx.shell().setBadge("settings", 1);
                 ctx.overlay().toast("info", I18n.tr("ui.update.available", u.version()),
                     new Overlay.Action(I18n.tr("ui.toast.open"), () -> ctx.openSettings("updates")));

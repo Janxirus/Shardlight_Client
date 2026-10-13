@@ -1,13 +1,22 @@
 package dev.shardlight.client.app.ui;
 
+import javafx.animation.AnimationTimer;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.ParallelTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.TranslateTransition;
+import javafx.beans.property.DoubleProperty;
 import javafx.scene.Node;
+import javafx.stage.Stage;
 import javafx.util.Duration;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
  * Every animation in the launcher goes through here, so timing and easing stay consistent and Reduce motion
@@ -46,7 +55,45 @@ public final class Motion {
     /** how far pages, panels and toasts travel as they enter, in pixels */
     public static final double ENTER_OFFSET = 8;
 
+    /** every endless animation, so they can all be held while the window is minimised */
+    private static final Set<Animation> ENDLESS = Collections.newSetFromMap(new WeakHashMap<>());
+    /** the ones that were running when the window was minimised, to resume when it comes back */
+    private static final Set<Animation> HELD = new HashSet<>();
+    private static volatile boolean suspended;
+
     private Motion() {
+    }
+
+    /** true while the window is minimised: nothing animates and timers that only update the screen do nothing */
+    public static boolean suspended() {
+        return suspended;
+    }
+
+    /** hold every endless animation while {@code stage} is minimised, and carry on when it is restored */
+    public static void watchWindow(Stage stage) {
+        stage.iconifiedProperty().addListener((o, was, minimised) -> setSuspended(minimised));
+    }
+
+    static synchronized void setSuspended(boolean hold) {
+        if (suspended == hold) {
+            return;
+        }
+        suspended = hold;
+        if (hold) {
+            for (Animation a : List.copyOf(ENDLESS)) {
+                if (a.getStatus() == Animation.Status.RUNNING) {
+                    a.pause();
+                    HELD.add(a);
+                }
+            }
+        } else {
+            for (Animation a : HELD) {
+                if (a.getStatus() == Animation.Status.PAUSED) {
+                    a.play();
+                }
+            }
+            HELD.clear();
+        }
     }
 
     public static boolean reduced() {
@@ -140,6 +187,26 @@ public final class Motion {
         return play(t);
     }
 
+    /**
+     * Slide and stretch an underline to span {@code x} .. {@code x + width}. The bar is a node one pixel wide laid
+     * out at the left edge of its track: it moves with translation and stretches with scale, so no layout runs.
+     */
+    public static Animation slideBar(Node bar, Speed speed, double x, double width) {
+        double tx = x + width / 2 - 0.5;
+        if (reduced()) {
+            bar.setTranslateX(tx);
+            bar.setScaleX(width);
+            return null;
+        }
+        TranslateTransition t = new TranslateTransition(speed.duration(), bar);
+        t.setToX(tx);
+        t.setInterpolator(ENTER);
+        ScaleTransition s = new ScaleTransition(speed.duration(), bar);
+        s.setToX(width);
+        s.setInterpolator(ENTER);
+        return play(new ParallelTransition(t, s));
+    }
+
     /** how far cards rise under the pointer, in pixels */
     public static final double LIFT = 2;
 
@@ -184,16 +251,80 @@ public final class Motion {
         return loop(node, t);
     }
 
-    /** endless animations stop once their node is no longer in a scene */
-    private static Animation loop(Node node, Animation a) {
+    /** a model that turns about its own axis: see {@link #spin} */
+    public static final class Spinner {
+        private final AnimationTimer timer;
+        private volatile boolean paused;
+
+        private Spinner(AnimationTimer timer) {
+            this.timer = timer;
+        }
+
+        /** hold the turn while the player drags the model, and carry on after */
+        public void pause(boolean paused) {
+            this.paused = paused;
+        }
+
+        public boolean isPaused() {
+            return paused;
+        }
+
+        public void stop() {
+            timer.stop();
+        }
+    }
+
+    /**
+     * Turn a 3D model slowly by adding to {@code angle} (degrees) while {@code node} is in a scene. Reduce
+     * motion: nothing turns. Call {@link Spinner#pause} to hold it.
+     */
+    public static Spinner spin(Node node, DoubleProperty angle, double degreesPerSecond) {
+        long[] last = {0};
+        Spinner[] self = new Spinner[1];
+        AnimationTimer timer = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                if (suspended) {
+                    last[0] = 0;
+                    return;
+                }
+                if (last[0] != 0 && !self[0].paused && !reduced()) {
+                    angle.set(angle.get() + degreesPerSecond * (now - last[0]) / 1e9);
+                }
+                last[0] = now;
+            }
+        };
+        self[0] = new Spinner(timer);
         node.sceneProperty().addListener((o, was, now) -> {
             if (now == null) {
-                a.stop();
-            } else if (a.getStatus() != Animation.Status.RUNNING) {
-                a.play();
+                timer.stop();
+                last[0] = 0;
+            } else {
+                timer.start();
             }
         });
         if (node.getScene() != null) {
+            timer.start();
+        }
+        return self[0];
+    }
+
+    /** endless animations stop once their node is no longer in a scene */
+    private static Animation loop(Node node, Animation a) {
+        synchronized (Motion.class) {
+            ENDLESS.add(a);
+        }
+        node.sceneProperty().addListener((o, was, now) -> {
+            if (now == null) {
+                a.stop();
+                synchronized (Motion.class) {
+                    HELD.remove(a);
+                }
+            } else if (a.getStatus() != Animation.Status.RUNNING && !suspended) {
+                a.play();
+            }
+        });
+        if (node.getScene() != null && !suspended) {
             a.play();
         }
         return a;

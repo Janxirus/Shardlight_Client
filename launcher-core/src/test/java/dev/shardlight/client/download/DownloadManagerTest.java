@@ -160,4 +160,51 @@ class DownloadManagerTest {
             assertEquals(ErrorCode.UNSAFE_PATH, e.code());
         }
     }
+
+    @Test
+    void pausingAGroupHoldsItAndResumingFinishesFromThePartFile() throws Exception {
+        List<String> ranges = new java.util.concurrent.CopyOnWriteArrayList<>();
+        server.handle("/slow.bin", ex -> {
+            String range = ex.getRequestHeaders().getFirst("Range");
+            ranges.add(range == null ? "" : range);
+            int from = range == null ? 0 : Integer.parseInt(range.substring("bytes=".length(), range.indexOf('-')));
+            ex.getResponseHeaders().add("Content-Type", "application/octet-stream");
+            ex.sendResponseHeaders(from > 0 ? 206 : 200, data.length - from);
+            try (java.io.OutputStream out = ex.getResponseBody()) {
+                for (int at = from; at < data.length; at += 20_000) {
+                    out.write(data, at, Math.min(20_000, data.length - at));
+                    out.flush();
+                    Thread.sleep(25);
+                }
+            } catch (java.io.IOException | InterruptedException e) {
+                // the client paused or went away
+            }
+        });
+        Path target = dir.resolve("slow.bin");
+        DownloadJob job = dm.submit("pausable", List.of(DownloadRequest.sha1(server.uri("/slow.bin"), target,
+            Hashing.hash(data, HashAlgo.SHA1), data.length)), new CancellationToken());
+        DownloadItem item = dm.items().get(0);
+        waitFor(() -> item.bytesDone() > 0);
+        dm.pauseGroup("pausable");
+        waitFor(() -> item.state() == DownloadState.PAUSED);
+        long held = item.bytesDone();
+        assertTrue(held < data.length, "paused before the end");
+        Thread.sleep(300);
+        assertEquals(held, item.bytesDone(), "nothing is downloaded while paused");
+        assertEquals(DownloadState.PAUSED, item.state());
+        assertTrue(dm.isPaused("pausable"));
+        dm.resumeGroup("pausable");
+        job.await(ProgressListener.NONE, "stage");
+        assertArrayEquals(data, Files.readAllBytes(target));
+        assertEquals(DownloadState.DONE, item.state());
+        assertTrue(ranges.size() >= 2 && ranges.get(1).startsWith("bytes="), "the second request resumes with a Range: " + ranges);
+    }
+
+    private static void waitFor(java.util.function.BooleanSupplier condition) throws InterruptedException {
+        long end = System.currentTimeMillis() + 10_000;
+        while (!condition.getAsBoolean()) {
+            assertTrue(System.currentTimeMillis() < end, "timed out");
+            Thread.sleep(10);
+        }
+    }
 }

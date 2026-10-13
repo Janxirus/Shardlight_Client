@@ -3,6 +3,10 @@ package dev.shardlight.client.app;
 import dev.shardlight.client.diagnostics.Finding;
 import dev.shardlight.client.game.GameDirs;
 import dev.shardlight.client.launch.GameExit;
+import dev.shardlight.client.error.LauncherException;
+import dev.shardlight.client.error.ErrorCode;
+import dev.shardlight.client.download.DownloadState;
+import dev.shardlight.client.download.DownloadItem;
 import dev.shardlight.client.loader.LoaderSpec;
 import dev.shardlight.client.loader.LoaderType;
 import dev.shardlight.client.nbt.NbtCompound;
@@ -10,6 +14,7 @@ import dev.shardlight.client.nbt.NbtIo;
 import dev.shardlight.client.preset.Preset;
 import dev.shardlight.client.project.BackupScope;
 import dev.shardlight.client.project.JavaSettings;
+import dev.shardlight.client.project.LibraryView;
 import dev.shardlight.client.project.NewProjectRequest;
 import dev.shardlight.client.project.Project;
 import dev.shardlight.client.project.ServerEntry;
@@ -32,6 +37,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Level;
@@ -66,6 +72,12 @@ final class CaptureSeed {
                 "EMBER", Preset.BALANCED, new JavaSettings()));
             fill(ctx, p);
             ctx.selectProject(p.id);
+            List<String> ids = projects.list().stream().map(x -> x.id).toList();
+            ctx.services().settings().update(st -> {
+                var folder = LibraryView.addGroup(st.library, "Testing");
+                projects.list().stream().filter(x -> x.name.equals("Map only")).findFirst()
+                    .ifPresent(x -> LibraryView.move(st.library, ids, x.id, folder.id, null));
+            });
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Couldn't create the capture example projects", e);
         }
@@ -120,7 +132,20 @@ final class CaptureSeed {
             "[20:14:06] [Render thread/INFO]: Backend library: LWJGL version 3.4.3",
             "[20:14:09] [Render thread/INFO]: Reloading ResourceManager: vanilla, fabric, file/Faithful 32x.zip",
             "[20:14:12] [Render thread/INFO]: Sound engine started",
+            "[20:14:13] [Render thread/WARN]: Mod 'zoomify' is disabled and was skipped",
+            "[20:21:05] [Render thread/ERROR]: Failed to load a texture for minecraft:textures/gui/sprites/hud/missing.png",
+            "java.io.FileNotFoundException: minecraft:textures/gui/sprites/hud/missing.png",
+            "\tat net.minecraft.client.renderer.texture.SimpleTexture.load(SimpleTexture.java:44)",
+            "[20:21:06] [Render thread/DEBUG]: Using the fallback missing texture",
             "[20:31:40] [Render thread/INFO]: Stopping!", ""), StandardCharsets.UTF_8);
+        Path crashes = Files.createDirectories(game.resolve("crash-reports"));
+        Files.writeString(crashes.resolve("crash-2026-10-12_20.31.40-client.txt"), String.join("\n",
+            "---- Minecraft Crash Report ----",
+            "Description: Initializing game",
+            "net.fabricmc.loader.impl.FormattedException: Some of your mods are incompatible with the game or each other!",
+            " - Mod 'Sodium Extra' (sodium-extra) 0.7.0 requires version 0.7.0 or later of mod 'Sodium' (sodium), which is missing!",
+            " - Mod 'Old Zoom' (oldzoom) 1.2 requires version 1.21.4 of 'Minecraft' (minecraft), but only the wrong version is present: 26.3!",
+            ""), StandardCharsets.UTF_8);
 
         services.backups().backupProject(p.id, "Before trying shaders", BackupScope.EVERYTHING, ProgressListener.NONE,
             CancellationToken.NONE);
@@ -133,7 +158,10 @@ final class CaptureSeed {
     }
 
     /** a crash as the crash dialog shows it, for the screenshots */
-    static GameExit exampleCrash(LauncherServices services) {
+    static GameExit exampleCrash(LauncherServices services, boolean known) {
+        if (!known) {
+            return new GameExit(137, true, false, Optional.empty(), Duration.ofSeconds(8), List.of());
+        }
         List<String> output = List.of("[main/INFO]: Loading Minecraft 26.3 with Fabric Loader 0.19.5",
             "net.fabricmc.loader.impl.FormattedException: Some of your mods are incompatible with the game or each other!",
             " - Mod 'Sodium Extra' (sodium-extra) 0.7.0 requires version 0.7.0 or later of mod 'Sodium' (sodium), which is missing!",
@@ -198,5 +226,28 @@ final class CaptureSeed {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(img, "png", out);
         return out.toByteArray();
+    }
+
+    /** made-up downloads for the Downloads screenshots: "" a busy page, "-empty", "-error" */
+    static List<DownloadItem> exampleDownloads(String kind) {
+        if (kind.equals("-empty")) {
+            return List.of();
+        }
+        List<DownloadItem> items = new ArrayList<>();
+        if (kind.equals("-error")) {
+            LauncherException failure = new LauncherException(ErrorCode.NETWORK, "error.network", "resources.download.minecraft.net",
+                "connection reset");
+            items.add(DownloadItem.example("a1", "Install 26.3", "client.jar", DownloadState.DONE, 31_000_000L, 31_000_000L, 0, null));
+            items.add(DownloadItem.example("a2", "Install 26.3", "icons.png", DownloadState.FAILED, 0, 120_000L, 0, failure));
+            items.add(DownloadItem.example("a3", "Install 26.3", "pack.png", DownloadState.FAILED, 0, 90_000L, 0, failure));
+            return items;
+        }
+        items.add(DownloadItem.example("b1", "Install 26.3", "client.jar", DownloadState.DONE, 31_000_000L, 31_000_000L, 0, null));
+        items.add(DownloadItem.example("b2", "Install 26.3", "libraries", DownloadState.RUNNING, 212_000_000L, 612_000_000L, 9_400_000L, null));
+        items.add(DownloadItem.example("b3", "Install 26.3", "sounds", DownloadState.QUEUED, 0, 40_000_000L, 0, null));
+        items.add(DownloadItem.example("c1", "Fabric API", "fabric-api.jar", DownloadState.QUEUED, 0, 2_400_000L, 0, null));
+        items.add(DownloadItem.example("d1", "Sodium", "sodium.jar", DownloadState.DONE, 1_300_000L, 1_300_000L, 0, null));
+        items.add(DownloadItem.example("d2", "Install 1.21.4", "client.jar", DownloadState.DONE, 29_000_000L, 29_000_000L, 0, null));
+        return items;
     }
 }

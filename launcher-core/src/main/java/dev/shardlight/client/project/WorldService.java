@@ -10,6 +10,7 @@ import dev.shardlight.client.task.CancellationToken;
 import dev.shardlight.client.task.ProgressListener;
 import dev.shardlight.client.util.AtomicFiles;
 import dev.shardlight.client.util.PathSafety;
+import dev.shardlight.client.util.SafeZip;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -105,6 +106,67 @@ public final class WorldService {
             }
         } finally {
             mutation.unlock();
+        }
+    }
+
+    /**
+     * Add a world from a folder or a .zip (with {@code level.dat} at its top or inside one top folder) as a new world
+     * in {@code saves/}. The world is assembled in a hidden folder and appears in one rename; it is named after its
+     * in-game name, made unique, and the source is never changed.
+     */
+    public WorldInfo importWorld(Project p, Path source, ProgressListener progress, CancellationToken cancel)
+        throws LauncherException {
+        ProgressListener pl = progress == null ? ProgressListener.NONE : progress;
+        CancellationToken ct = cancel == null ? CancellationToken.NONE : cancel;
+        Path projectDir = projects.projectDir(p.id);
+        String base = source.getFileName().toString().replaceAll("(?i)\\.zip$", "");
+        mutation.lock();
+        try {
+            Path staging = projectDir.resolve(ProjectService.STAGING_PREFIX + "world-" + UUID.randomUUID());
+            try {
+                Files.createDirectories(staging);
+                if (Files.isDirectory(source)) {
+                    FileTrees.copyTree(source, staging, rel -> !FileTrees.isSessionLock(rel),
+                        new FileTrees.Copy(pl, "project.world.stage.importing", FileTrees.sizeOf(source), ct));
+                } else {
+                    SafeZip.extract(source, worldPrefix(source), staging, ProjectService.IMPORT_LIMITS,
+                        rel -> !FileTrees.isSessionLock(rel), ct);
+                }
+                readLevel(staging, base); // refuses anything that isn't a readable world
+                String name = readWorld(staging).name();
+                Path saves = savesDir(p);
+                Files.createDirectories(saves);
+                String target = uniqueWorldFolder(saves, name.isBlank() ? base : name);
+                mover.move(staging, saves.resolve(target));
+                LOG.info("Imported world " + target + " into " + p.id);
+                return readWorld(saves.resolve(target));
+            } catch (IOException e) {
+                throw ProjectService.fileError(e, source);
+            } finally {
+                discard(projectDir, staging);
+            }
+        } finally {
+            mutation.unlock();
+        }
+    }
+
+    /** "" when level.dat is at the top of the zip, "Folder/" when everything is inside one folder */
+    private static String worldPrefix(Path zip) throws LauncherException {
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip.toFile())) {
+            if (zf.getEntry(LEVEL_DAT) != null) {
+                return "";
+            }
+            var en = zf.entries();
+            while (en.hasMoreElements()) {
+                String n = en.nextElement().getName().replace('\\', '/');
+                int slash = n.indexOf('/');
+                if (slash > 0 && n.equals(n.substring(0, slash) + "/" + LEVEL_DAT)) {
+                    return n.substring(0, slash + 1);
+                }
+            }
+            throw new LauncherException(ErrorCode.INVALID_DATA, "project.world.unreadable", zip.getFileName().toString());
+        } catch (IOException e) {
+            throw new LauncherException(ErrorCode.INVALID_ARCHIVE, e, "error.archive.invalid", zip.getFileName().toString(), e.getMessage());
         }
     }
 

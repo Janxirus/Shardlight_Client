@@ -99,6 +99,10 @@ public final class ModrinthCatalog implements CatalogProvider {
                 facets.add(List.of("categories:" + c.trim()));
             }
         }
+        if (q.environment() != null) {
+            String side = q.environment() == SearchQuery.Environment.CLIENT ? "client_side" : "server_side";
+            facets.add(List.of(side + ":required", side + ":optional"));
+        }
         int limit = Math.min(MAX_LIMIT, q.limit());
         Map<String, String> query = new LinkedHashMap<>();
         if (!q.text().isBlank()) {

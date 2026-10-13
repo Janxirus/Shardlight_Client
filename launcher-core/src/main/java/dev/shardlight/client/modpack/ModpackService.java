@@ -94,7 +94,7 @@ public final class ModpackService {
     private static final long MAX_PACK_DOWNLOAD_BYTES = 64L << 30;
     private static final long MAX_ICON_BYTES = 4L << 20;
     private static final long MAX_OVERRIDE_FILE_BYTES = 256L << 20;
-    private static final Pattern MODRINTH_CDN = Pattern.compile("^/data/([A-Za-z0-9]{8})/versions/([A-Za-z0-9]{8})/[^/]+$");
+    static final Pattern MODRINTH_CDN = Pattern.compile("^/data/([A-Za-z0-9]{8})/versions/([A-Za-z0-9]{8})/[^/]+$");
     private static final Map<String, LoaderType> MRPACK_LOADERS = Map.of(
         "fabric-loader", LoaderType.FABRIC, "quilt-loader", LoaderType.QUILT, "forge", LoaderType.FORGE,
         "neoforge", LoaderType.NEOFORGE);
@@ -173,9 +173,9 @@ public final class ModpackService {
             cm.minecraft(), cm.loader(), required, problems);
     }
 
-    private enum Format { MRPACK, CURSEFORGE }
+    enum Format { MRPACK, CURSEFORGE }
 
-    private static Format detect(Path file) throws LauncherException {
+    static Format detect(Path file) throws LauncherException {
         if (file == null || !Files.isRegularFile(file)) {
             throw new LauncherException(ErrorCode.NOT_FOUND, "modpack.error.fileMissing", String.valueOf(file));
         }
@@ -200,7 +200,7 @@ public final class ModpackService {
         throw new LauncherException(ErrorCode.INVALID_ARCHIVE, "modpack.error.unknownFormat", file.getFileName().toString());
     }
 
-    private static String readEntry(Path zip, String name) throws LauncherException {
+    static String readEntry(Path zip, String name) throws LauncherException {
         byte[] b = SafeZip.read(zip, name, MAX_MANIFEST_BYTES);
         if (b == null) {
             throw new LauncherException(ErrorCode.INVALID_ARCHIVE, "modpack.error.unknownFormat", zip.getFileName().toString());
@@ -290,6 +290,7 @@ public final class ModpackService {
             SafeZip.extract(file, "overrides/", gameDir, SafeZip.Limits.DEFAULT, null, ct);
             SafeZip.extract(file, "client-overrides/", gameDir, SafeZip.Limits.DEFAULT, null, ct);
             pl.stage("modpack.stage.finishing");
+            ModpackUpdater.baselineOf(m, file).write(projects.projectDir(project.id));
             List<ExistingFile> records = new ArrayList<>();
             List<Integer> indexes = new ArrayList<>();
             for (int i = 0; i < wanted.size(); i++) {
@@ -321,7 +322,7 @@ public final class ModpackService {
     }
 
     /** best effort: titles, pages and ids from Modrinth (network failures are ignored) */
-    private List<ExistingFile> enrichFromModrinth(List<ExistingFile> records, List<Mrpack.FileRef> wanted, List<Integer> indexes,
+    List<ExistingFile> enrichFromModrinth(List<ExistingFile> records, List<Mrpack.FileRef> wanted, List<Integer> indexes,
                                                   Mrpack m, CancellationToken ct) throws LauncherException {
         Optional<CatalogProvider> p = catalogs.get(CatalogRegistry.MODRINTH);
         if (p.isEmpty() || !(p.get() instanceof ModrinthCatalog mr) || records.isEmpty()) {
@@ -363,7 +364,7 @@ public final class ModpackService {
         return out;
     }
 
-    private List<URI> allowedUrls(List<String> urls) {
+    List<URI> allowedUrls(List<String> urls) {
         List<URI> out = new ArrayList<>();
         for (String s : urls) {
             URI u = JsonFields.uri(s);
@@ -376,7 +377,7 @@ public final class ModpackService {
     }
 
     /** mods/x.jar, resourcepacks/x.zip, shaderpacks/x.zip directly in their folder */
-    private static ContentKind contentKindOf(String path) {
+    static ContentKind contentKindOf(String path) {
         String p = path.replace('\\', '/');
         int slash = p.indexOf('/');
         if (slash <= 0 || p.indexOf('/', slash + 1) >= 0 || slash == p.length() - 1) {
@@ -495,6 +496,7 @@ public final class ModpackService {
             pl.stage("modpack.stage.overrides");
             SafeZip.extract(zip, cm.overrides() + "/", gameDir, SafeZip.Limits.DEFAULT, null, ct);
             pl.stage("modpack.stage.finishing");
+            recordCurseBaseline(project, cm, zip, records);
             content.recordExisting(project, records);
             content.scan(project);
             Project saved = projects.get(project.id).orElse(project);
@@ -506,6 +508,29 @@ public final class ModpackService {
             discardQuietly(project);
             throw LauncherException.io(e, String.valueOf(project.id));
         }
+    }
+
+    /** remember the files as the pack shipped them (CurseForge packs can't be updated in place yet, but the original is kept) */
+    private void recordCurseBaseline(Project project, CurseManifest cm, Path zip, List<ExistingFile> records) throws LauncherException {
+        Path gameDir = projects.gameDir(project);
+        PackBaseline b = new PackBaseline();
+        b.format = "curseforge";
+        b.packName = cm.name();
+        b.packVersion = cm.version();
+        b.minecraft = cm.minecraft();
+        b.loader = cm.loader();
+        for (ExistingFile f : records) {
+            Path file = gameDir.resolve(f.kind().folder()).resolve(f.fileName());
+            if (Files.isRegularFile(file)) {
+                try {
+                    b.files.put(f.kind().folder() + "/" + f.fileName(), Hashing.hash(file, HashAlgo.SHA1));
+                } catch (IOException e) {
+                    throw LauncherException.io(e, file.toString());
+                }
+            }
+        }
+        b.files.putAll(ModpackUpdater.overrideHashes(zip, cm.overrides() + "/"));
+        b.write(projects.projectDir(project.id));
     }
 
     // ================================================================== mrpack export

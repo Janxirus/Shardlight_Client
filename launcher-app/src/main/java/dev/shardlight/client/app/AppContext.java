@@ -1,6 +1,9 @@
 package dev.shardlight.client.app;
 
+import dev.shardlight.client.app.flows.DropFlow;
+import dev.shardlight.client.app.flows.FirstRun;
 import dev.shardlight.client.app.flows.PlayFlow;
+import dev.shardlight.client.app.flows.SignInDialog;
 import dev.shardlight.client.app.pages.DiscoverPage;
 import dev.shardlight.client.app.pages.DownloadsPage;
 import dev.shardlight.client.app.pages.HomePage;
@@ -70,7 +73,9 @@ public final class AppContext {
         this.stage = stage;
         this.host = host;
         LauncherSettings.Appearance a = services.settings().get().appearance;
-        applyLanguage(a.language);
+        I18n.setExternalDirectory(services.paths().languages());
+        String forced = System.getProperty("shardlight.language");
+        applyLanguage(forced != null && !forced.isBlank() ? forced : a.language);
         UiSettings.setReducedMotion(a.reducedMotion);
         ThemeManager.setScale(a.scale);
         this.shell = new Shell(ThemeManager.accent(a));
@@ -269,18 +274,58 @@ public final class AppContext {
         I18n.setLocale(tag == null || tag.isBlank() ? Locale.getDefault() : Locale.forLanguageTag(tag));
     }
 
+    /** start Shardlight Client again with the same command (a new language needs it); the old window closes */
+    public void restart() {
+        ProcessHandle.Info info = ProcessHandle.current().info();
+        Optional<String> command = info.command();
+        if (command.isEmpty()) {
+            overlay().toast("info", I18n.tr("ui.restart.manual"));
+            return;
+        }
+        List<String> line = new ArrayList<>();
+        line.add(command.get());
+        info.arguments().ifPresent(args -> line.addAll(List.of(args)));
+        try {
+            new ProcessBuilder(line).start();
+            Platform.exit();
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Couldn't start Shardlight Client again", e);
+            overlay().toast("info", I18n.tr("ui.restart.manual"));
+        }
+    }
+
     void attach(Scene s) {
         this.scene = s;
+        DropFlow.install(this, s);
         services.settings().addListener(st -> Fx.ui(() -> {
             UiSettings.setReducedMotion(st.appearance.reducedMotion);
             ThemeManager.apply(s, st.appearance);
+            fitMinimumSize();
             shell.setCollapsed(st.appearance.sidebarCollapsed);
             applyTitleBar();
         }));
     }
 
+    /**
+     * The smallest window is the smallest the layouts were designed for, in interface units: 68.6 x 45.7 em (960 x 640
+     * px at 100%). It grows with the interface size setting so a larger size never squeezes a page; on a small screen
+     * it stops at what the screen can show.
+     */
+    void fitMinimumSize() {
+        javafx.geometry.Rectangle2D screen = javafx.stage.Screen.getPrimary().getVisualBounds();
+        stage.setMinWidth(Math.min(ThemeManager.em(68.57), screen.getWidth()));
+        stage.setMinHeight(Math.min(ThemeManager.em(45.71), screen.getHeight()));
+    }
+
     void afterShow() {
         TaskProgress.attach(stage);
+        if (!services.settings().get().firstRunDone) {
+            if (FirstRun.due(this)) {
+                Platform.runLater(() -> FirstRun.show(this));
+            } else {
+                FirstRun.markDone(this);
+            }
+        }
         Platform.runLater(this::applyTitleBar);
         play.checkForUpdatesQuietly();
     }
@@ -303,17 +348,18 @@ public final class AppContext {
 
     /** the pages, tabs, sections and dialogs --capture saves, in order */
     List<String> captureSteps() {
+        if (Boolean.getBoolean("shardlight.captureMatrix")) {
+            return matrixSteps();
+        }
         List<String> steps = new ArrayList<>(List.of("home", "library"));
         for (String tab : PROJECT_TABS) {
             steps.add("project-" + tab);
         }
         steps.addAll(List.of("wizard", "discover", "shardlight", "multiplayer", "downloads"));
-        for (String section : List.of("accounts", "appearance", "java", "downloads", "content", "privacy", "updates",
-            "storage", "about")) {
+        for (String section : SettingsPage.SECTIONS) {
             steps.add("settings-" + section);
         }
-        steps.addAll(List.of("signin", "crash", "home-light", "library-light", "project-light", "discover-light",
-            "settings-light"));
+        steps.addAll(List.of("crash", "home-light", "library-light", "discover-light", "settings-light"));
         // Part 2: the shell and the component gallery
         steps.addAll(List.of("gallery", "gallery-full", "palette", "notifications", "collapsed"));
         for (String page : List.of("home", "gallery")) {
@@ -324,17 +370,273 @@ public final class AppContext {
             }
         }
         steps.addAll(List.of("gallery-full-light", "gallery-full-contrast"));
+        // Part 3: first run, sign-in, Home, Library and the project page, each in dark and light
+        for (String suffix : List.of("", "-light")) {
+            for (String id : part3Views()) {
+                steps.add("p3-" + id + suffix);
+            }
+        }
+        // Part 4: Discover, the mod page, Shardlight, Multiplayer, Downloads, Settings, the wizard, dialogs and the crash screen
+        for (String suffix : List.of("", "-light")) {
+            for (String id : part4Views()) {
+                steps.add("p4-" + id + suffix);
+            }
+        }
+        // Part 6: update preview, drop confirmation, move dialog and Storage
+        for (String suffix : List.of("", "-light")) {
+            for (String id : CapturePart6.VIEWS) {
+                steps.add("p6-" + id + suffix);
+            }
+        }
+        // Part 7: skins, the Discord switch and the language picker
+        for (String suffix : List.of("", "-light")) {
+            for (String id : CapturePart7.VIEWS) {
+                steps.add("p7-" + id + suffix);
+            }
+        }
+        // CAPTURE_ONLY=<prefix>: only the views whose name starts with it (keeps a re-shoot short)
+        String only = System.getenv("CAPTURE_ONLY");
+        if (only != null && !only.isBlank()) {
+            steps.removeIf(s -> !s.startsWith(only));
+        }
         return steps;
+    }
+
+    /**
+     * --capture-matrix: every view once in each look (dark, light and high contrast, at 100% and 150%). A step is
+     * "m/<theme>/<scale>/<view>"; the picture is saved as "<theme>-<scale>/<view>.png".
+     */
+    private List<String> matrixSteps() {
+        List<String> views = new ArrayList<>();
+        part3Views().forEach(v -> views.add("p3-" + v));
+        part4Views().forEach(v -> views.add("p4-" + v));
+        CapturePart6.VIEWS.forEach(v -> views.add("p6-" + v));
+        CapturePart7.VIEWS.forEach(v -> views.add("p7-" + v));
+        views.addAll(List.of("gallery", "palette", "notifications", "collapsed"));
+        String only = System.getenv("CAPTURE_ONLY");
+        if (only != null && !only.isBlank()) {
+            views.removeIf(v -> !v.startsWith(only));
+        }
+        List<String> steps = new ArrayList<>();
+        // CAPTURE_LOOKS=dark-100,light-150: only those looks (keeps a re-shoot short)
+        String looks = System.getenv("CAPTURE_LOOKS");
+        for (String theme : List.of("dark", "light", "contrast")) {
+            for (String scale : List.of("100", "150")) {
+                if (looks != null && !looks.isBlank() && !List.of(looks.split(",")).contains(theme + "-" + scale)) {
+                    continue;
+                }
+                for (String v : views) {
+                    steps.add("m/" + theme + "/" + scale + "/" + v);
+                }
+            }
+        }
+        return steps;
+    }
+
+    private String lockedTheme;
+    private double lockedScale = 1;
+
+    private boolean showPart6Capture(String raw) {
+        if (!raw.startsWith("p6-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        overlay().clearToasts();
+        return CapturePart6.show(this, raw.substring(3, light ? raw.length() - "-light".length() : raw.length()));
+    }
+
+    private boolean showPart7Capture(String raw) {
+        if (!raw.startsWith("p7-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        overlay().clearToasts();
+        return CapturePart7.show(this, raw.substring(3, light ? raw.length() - "-light".length() : raw.length()));
+    }
+
+    private static List<String> part4Views() {
+        List<String> ids = new ArrayList<>(List.of("discover", "discover-loading", "discover-empty", "discover-offline",
+            "discover-offline-empty", "catalog", "shardlight", "multiplayer", "multiplayer-add", "downloads", "downloads-empty",
+            "downloads-error"));
+        for (String section : SettingsPage.SECTIONS) {
+            ids.add("settings-" + section);
+        }
+        ids.addAll(List.of("settings-search", "settings-undo", "wizard-0", "wizard-1", "wizard-1-advanced", "wizard-1-loading",
+            "wizard-2", "confirm", "confirm-danger", "text-dialog", "modpack-export", "crash", "crash-unknown"));
+        return ids;
+    }
+
+    /** one Part 4 capture ("p4-<view>", optionally ending in "-light"); false when {@code raw} is not one */
+    private boolean showPart4Capture(String raw) {
+        if (!raw.startsWith("p4-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        String id = raw.substring(3, light ? raw.length() - "-light".length() : raw.length());
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        overlay().clearToasts();
+        if (id.startsWith("discover")) {
+            shell.navigate("discover");
+            if (shell.current() instanceof DiscoverPage dp) {
+                switch (id) {
+                    case "discover-loading" -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.SLOW), true);
+                    case "discover-empty" -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.EMPTY), true);
+                    case "discover-offline" -> {
+                        dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OK), true);
+                        after(300, () -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OFFLINE), false));
+                    }
+                    case "discover-offline-empty" -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OFFLINE), true);
+                    default -> dp.previewCatalog(new CaptureCatalog(CaptureCatalog.Mode.OK), true);
+                }
+            }
+        } else if (id.equals("catalog")) {
+            shell.navigate("discover");
+            CaptureCatalog catalog = new CaptureCatalog(CaptureCatalog.Mode.OK);
+            try {
+                var item = catalog.search(new dev.shardlight.client.catalog.SearchQuery("", dev.shardlight.client.content.ContentKind.MOD,
+                    null, null, List.of(), dev.shardlight.client.catalog.SortOrder.RELEVANCE, 0, 10, null),
+                    dev.shardlight.client.task.CancellationToken.NONE).hits().get(0);
+                shell.push(new dev.shardlight.client.app.pages.CatalogProjectPage(this, catalog, item, selectedProject().orElse(null)));
+            } catch (LauncherException e) {
+                LOG.log(Level.WARNING, "Capture catalog failed", e);
+            }
+        } else if (id.equals("shardlight")) {
+            shell.navigate("shardlight");
+        } else if (id.startsWith("multiplayer")) {
+            shell.navigate("multiplayer");
+            if (shell.current() instanceof MultiplayerPage mp) {
+                mp.previewServers();
+                if (id.equals("multiplayer-add")) {
+                    after(300, mp::previewAdd);
+                }
+            }
+        } else if (id.startsWith("downloads")) {
+            shell.navigate("downloads");
+            if (shell.current() instanceof DownloadsPage dp) {
+                dp.previewItems(CaptureSeed.exampleDownloads(id.substring(9)));
+            }
+        } else if (id.startsWith("settings-")) {
+            shell.navigate("settings");
+            if (shell.current() instanceof SettingsPage sp) {
+                String what = id.substring(9);
+                switch (what) {
+                    case "search" -> sp.previewSearch("mem");
+                    case "undo" -> sp.previewUndo();
+                    default -> sp.open(what);
+                }
+            }
+        } else if (id.startsWith("wizard-")) {
+            shell.navigate("library");
+            if (shell.current() instanceof LibraryPage lp) {
+                lp.previewEmpty(false);
+                lp.previewView(false);
+            }
+            String[] parts = id.split("-");
+            int step = Integer.parseInt(parts[1]);
+            NewProjectWizard.preview(this, step == 0 ? null : "shardlight-default", step, id.endsWith("advanced"), !id.endsWith("loading"));
+        } else {
+            shell.navigate("library");
+            if (shell.current() instanceof LibraryPage lp) {
+                lp.previewEmpty(false);
+                lp.previewView(false);
+            }
+            switch (id) {
+                case "confirm" -> overlay().confirm(I18n.tr("ui.settings.signOutTitle", "Player"), I18n.tr("ui.settings.signOutMessage"),
+                    List.of(), I18n.tr("ui.settings.signOut"), false, () -> { });
+                case "confirm-danger" -> overlay().confirm(I18n.tr("ui.backup.restoreTitle"), I18n.tr("ui.backup.restoreMessage",
+                    "Survival island"), List.of(I18n.tr("ui.backup.restoreSafety")), I18n.tr("ui.backup.restore"), true, () -> { });
+                case "text-dialog" -> dev.shardlight.client.app.ui.Dialogs.text(overlay(), I18n.tr("ui.project.renameTitle"),
+                    I18n.tr("ui.project.nameLabel"), "Shardlight Survival", I18n.tr("ui.project.rename"), v -> null, v -> { });
+                case "modpack-export" -> selectedProject().ifPresent(p -> dev.shardlight.client.app.pages.ModpackExportDialog.show(this, p));
+                case "crash", "crash-unknown" -> selectedProject().ifPresent(p -> play.showEnded(p,
+                    CaptureSeed.exampleCrash(services, id.equals("crash"))));
+                default -> { }
+            }
+        }
+        return true;
+    }
+
+    /** run {@code r} on the UI thread after {@code millis} (--capture only) */
+    private static void after(int millis, Runnable r) {
+        javafx.animation.PauseTransition t = new javafx.animation.PauseTransition(javafx.util.Duration.millis(millis));
+        t.setOnFinished(e -> r.run());
+        t.play();
+    }
+
+    private static List<String> part3Views() {
+        List<String> ids = new ArrayList<>(List.of("firstrun-0", "firstrun-1", "firstrun-2", "signin-getting", "signin-code",
+            "signin-success", "signin-approval", "signin-network", "signin-xbox", "home", "library", "library-list",
+            "library-empty"));
+        for (String tab : PROJECT_TABS) {
+            ids.add("project-" + tab);
+        }
+        ids.addAll(List.of("project-screenshots-viewer", "project-logs-explain"));
+        return ids;
+    }
+
+    /** one Part 3 capture ("p3-<view>", optionally ending in "-light"); false when {@code raw} is not one */
+    private boolean showPart3Capture(String raw) {
+        if (!raw.startsWith("p3-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        String id = raw.substring(3, light ? raw.length() - "-light".length() : raw.length());
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        if (id.startsWith("firstrun-")) {
+            shell.navigate("home");
+            FirstRun.preview(this, Integer.parseInt(id.substring(9)));
+        } else if (id.startsWith("signin-")) {
+            shell.navigate("home");
+            SignInDialog.preview(this, id.substring(7));
+        } else if (id.equals("home")) {
+            shell.navigate("home");
+        } else if (id.startsWith("library")) {
+            shell.navigate("library");
+            if (shell.current() instanceof LibraryPage lp) {
+                lp.previewEmpty(id.equals("library-empty"));
+                lp.previewView(id.equals("library-list"));
+            }
+        } else if (id.startsWith("project-")) {
+            String tab = id.substring(8);
+            boolean viewer = tab.equals("screenshots-viewer");
+            boolean explain = tab.equals("logs-explain");
+            if (viewer) {
+                tab = "screenshots";
+            } else if (explain) {
+                tab = "logs";
+            }
+            showProjectTab(PROJECT_TABS.indexOf(tab));
+            if (shell.current() instanceof ProjectPage page) {
+                if (viewer) {
+                    page.previewViewer();
+                } else if (explain) {
+                    page.previewExplain();
+                }
+            }
+        }
+        return true;
     }
 
     /** show the app in {@code theme} (dark, light or contrast) at {@code scale} for --capture, not saved */
     private void captureLook(String theme, double scale) {
+        if (lockedTheme != null) {
+            // a --capture-matrix step: the look is the step's, whatever the view would normally pick
+            theme = lockedTheme;
+            scale = lockedScale;
+        }
         LauncherSettings.Appearance a = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
             LauncherSettings.Appearance.class);
         a.theme = theme.equals("light") ? "light" : "dark";
         a.highContrast = theme.equals("contrast");
         a.scale = scale;
         ThemeManager.apply(scene, a);
+        fitMinimumSize();
     }
 
     private boolean showShellCapture(String id) {
@@ -387,15 +689,20 @@ public final class AppContext {
         return true;
     }
 
-    private static final List<String> PROJECT_TABS = List.of("overview", "content", "worlds", "backups", "screenshots",
-        "performance", "settings", "logs");
+    private static final List<String> PROJECT_TABS = ProjectPage.TABS;
 
     void showForCapture(String id) {
+        if (id.startsWith("m/")) {
+            String[] parts = id.split("/", 4);
+            lockedTheme = parts[1];
+            lockedScale = Integer.parseInt(parts[2]) / 100.0;
+            id = parts[3];
+        }
         while (overlay().hasOpenDialog()) {
             overlay().closeTop();
         }
         overlay().closePopover();
-        if (showShellCapture(id)) {
+        if (showPart3Capture(id) || showPart4Capture(id) || showPart6Capture(id) || showPart7Capture(id) || showShellCapture(id)) {
             return;
         }
         if (id.startsWith("project-") && PROJECT_TABS.contains(id.substring(8))) {
@@ -414,21 +721,16 @@ public final class AppContext {
                 shell.navigate("library");
                 newProject("shardlight-default");
             }
-            case "signin" -> {
-                shell.navigate("home");
-                dev.shardlight.client.app.flows.SignInDialog.show(this, a -> { });
-            }
             case "crash" -> {
                 shell.navigate("home");
-                selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services)));
+                selectedProject().ifPresent(p -> play.showEnded(p, CaptureSeed.exampleCrash(services, true)));
             }
-            case "home-light", "library-light", "project-light", "discover-light", "settings-light" -> {
+            case "home-light", "library-light", "discover-light", "settings-light" -> {
                 LauncherSettings.Appearance light = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
                     LauncherSettings.Appearance.class);
                 light.theme = "light";
                 ThemeManager.apply(scene, light);
                 switch (id) {
-                    case "project-light" -> showProjectTab(1);
                     case "settings-light" -> {
                         shell.navigate("settings");
                         if (shell.current() instanceof SettingsPage sp) {

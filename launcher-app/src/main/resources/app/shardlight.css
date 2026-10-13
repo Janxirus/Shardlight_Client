@@ -64,6 +64,16 @@
     -sl-shadow-2: rgba(0, 0, 0, 0.42);
     -sl-shadow-3: rgba(0, 0, 0, 0.55);
     -sl-overlay: rgba(5, 6, 10, 0.68);
+    /* text and chips drawn on project art: the art is a picture, so these do not change with the light base */
+    -sl-on-art: #ffffff;
+    -sl-art-scrim-top: rgba(8, 10, 16, 0.10);
+    -sl-art-scrim-bottom: rgba(8, 10, 16, 0.86);
+    -sl-art-chip: rgba(8, 10, 16, 0.62);
+    -sl-art-chip-hover: rgba(8, 10, 16, 0.80);
+    -sl-art-chip-pressed: rgba(8, 10, 16, 0.92);
+    /* a server's message of the day is drawn on the dark panel the game uses, in both light and dark */
+    -sl-motd-bg: #121214;
+    -sl-motd-text: #e8e8ee;
     /* names kept from before the design system */
     -sl-bg-2: -sl-sunken;
     -sl-surface-2: -sl-raised;
@@ -267,6 +277,14 @@
 .button.icon-only { -fx-padding: 0.5em; }
 .button.large { -fx-font-size: 1.071em; -fx-padding: 0.714em 1.429em; }
 .button.small { -fx-font-size: 0.857em; -fx-padding: 0.286em 0.714em; }
+/* Click targets: nothing you press is smaller than 32 x 32 px (2.286em), whatever size it looks. A small button
+ * keeps its small text and padding but not a smaller target. */
+.button, .toggle-button, .menu-button, .split-menu-button { -fx-min-height: 2.286em; }
+.button.icon-only { -fx-min-width: 2.286em; }
+/* a small button's em is its own, smaller font: 32 px is 2.667em there */
+.button.small { -fx-min-height: 2.667em; }
+.button.icon-only.small { -fx-min-width: 2.667em; }
+.check-box, .radio-button { -fx-min-height: 2.286em; }
 
 .play-button {
     -fx-background-color: linear-gradient(to right, -sl-accent 0%, -sl-accent-hover 45%, -sl-accent-2 100%);
@@ -761,6 +779,7 @@
     -fx-text-fill: -sl-text-3;
     -fx-font-weight: normal;
     -fx-pref-width: 12em;
+    -fx-min-width: 2.6em;
     -fx-alignment: center-left;
     -fx-cursor: text;
     -sl-icon: -sl-text-3;
@@ -992,7 +1011,21 @@
 }
 .modal.wide { -fx-max-width: 56em; }
 .modal-title { -fx-font-size: 1.429em; -fx-font-weight: bold; }
-.modal-actions { -fx-spacing: 0.571em; -fx-alignment: center-right; }
+.modal-actions { -fx-spacing: 0.571em; -fx-alignment: center; }
+.modal-lost {
+    -fx-background-color: -sl-danger-subtle;
+    -fx-background-radius: 0.714em;
+    -fx-padding: 0.857em;
+}
+
+/* a file is being dragged over the window */
+.root.drop-active {
+    -fx-border-color: -sl-accent;
+    -fx-border-style: dashed;
+    -fx-border-width: 0.143em;
+    -fx-border-insets: 0.571em;
+    -fx-border-radius: 1.143em;
+}
 
 .device-code {
     -fx-font-size: 2.143em;
@@ -1098,7 +1131,7 @@
 }
 .filter-chip > .label { -fx-text-fill: -sl-accent-fg; -fx-font-size: 0.857em; }
 .button.chip-remove { -fx-padding: 0.214em; -sl-icon: -sl-accent-fg; }
-.chip-row { -fx-hgap: 0.429em; -fx-vgap: 0.429em; }
+.chip-row { -fx-hgap: 0.429em; -fx-vgap: 0.429em; -fx-min-width: 0; }
 
 .button.loading, .button.loading:disabled { -fx-opacity: 1; }
 .button.copied { -sl-icon: -sl-success; }
@@ -1182,7 +1215,7 @@
 .world-card { -fx-pref-width: 15em; -fx-padding: 0 0 0.857em 0; -fx-spacing: 0.714em; }
 .world-picture, .world-sample { -fx-pref-height: 6em; -fx-background-radius: 1em 1em 0 0; }
 .world-sample { -fx-background-color: linear-gradient(to bottom, -sl-info-subtle, -sl-success-subtle); }
-.stat-card { -fx-pref-width: 14em; -fx-spacing: 0.857em; }
+.stat-card { -fx-min-width: 14em; -fx-spacing: 0.857em; }
 
 .row-actions { -fx-opacity: 0; -fx-spacing: 0.143em; }
 .list-cell:hover .row-actions, .list-cell:selected .row-actions,
@@ -1314,3 +1347,420 @@
 }
 .root.high-contrast .popover { -fx-effect: null; -fx-border-color: -sl-border-strong; -fx-border-radius: 0.714em; }
 .root.high-contrast .tooltip { -fx-effect: null; -fx-border-color: -sl-tooltip-text; -fx-border-radius: 0.429em; }
+
+/* ============================================================ Part 3: first run, Home, Library, project page */
+
+/* ---- layout helpers: spacing is a style class, never a number in Java ---- */
+.stack { -fx-spacing: 1.143em; }
+.stack-tight { -fx-spacing: 0.571em; }
+.button-row { -fx-spacing: 0.571em; -fx-hgap: 0.571em; -fx-vgap: 0.571em; -fx-alignment: center-left; }
+.stat-row { -fx-spacing: 0.857em; -fx-hgap: 0.857em; -fx-vgap: 0.857em; }
+.tab-bar { -fx-spacing: 0.571em; -fx-hgap: 0.571em; -fx-vgap: 0.571em; -fx-alignment: center-left; }
+.page-actions { -fx-spacing: 0.571em; -fx-alignment: center-right; }
+.page-column { -fx-max-width: 80em; }
+.tab-body { -fx-padding: 1.143em 1.714em 1.714em 1.714em; -fx-spacing: 1.143em; }
+
+/* ---- text and controls drawn on project art ---- */
+.label.on-art, .on-art > .label { -fx-text-fill: -sl-on-art; -sl-icon: -sl-on-art; }
+.chip.on-art {
+    -fx-background-color: -sl-art-chip;
+    -fx-border-color: transparent;
+    -fx-text-fill: -sl-on-art;
+    -sl-icon: -sl-on-art;
+}
+.button.on-art, .button.art-action {
+    -fx-background-color: -sl-art-chip;
+    -fx-text-fill: -sl-on-art;
+    -sl-icon: -sl-on-art;
+}
+.button.on-art:hover, .button.art-action:hover { -fx-background-color: -sl-art-chip-hover; -fx-text-fill: -sl-on-art; }
+.button.on-art:pressed, .button.art-action:pressed { -fx-background-color: -sl-art-chip-pressed; }
+.button.on-art:focus-visible, .button.art-action:focus-visible {
+    -fx-background-color: -sl-on-art, -sl-art-chip-hover;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 0.714em, 0.571em;
+}
+
+.project-art { -fx-background-color: -sl-fill; }
+.home-backdrop-fade { -fx-background-color: linear-gradient(to bottom, transparent 0%, transparent 35%, -sl-bg 100%); }
+.hero-scrim { -fx-background-color: linear-gradient(to bottom, -sl-art-scrim-top 0%, -sl-art-scrim-bottom 100%); }
+.hero-panel, .project-header { -fx-background-radius: 1.429em; -fx-min-height: 11.4em; }
+.hero-content { -fx-padding: 1.714em; -fx-spacing: 1.143em; -fx-alignment: bottom-left; }
+.hero-info { -fx-spacing: 0.571em; -fx-alignment: bottom-left; }
+.hero-actions { -fx-spacing: 0.571em; -fx-alignment: bottom-right; }
+.header-text { -fx-spacing: 0.571em; -fx-alignment: bottom-left; }
+.header-actions { -fx-spacing: 0.571em; -fx-alignment: bottom-right; }
+.project-header { -fx-min-height: 11.4em; }
+
+/* ---- Home ---- */
+.home { -fx-spacing: 1.714em; }
+.alert-strip { -fx-spacing: 0.571em; }
+.welcome { -fx-padding: 2.286em; -fx-spacing: 1.143em; -fx-alignment: center; }
+.jump-row { -fx-hgap: 1em; -fx-vgap: 1em; }
+.jump-card { -fx-padding: 0; -fx-spacing: 0; -fx-pref-width: 15.7em; -fx-cursor: hand; }
+.jump-art { -fx-background-radius: 1em 1em 0 0; }
+
+/* ---- Library ---- */
+.library { -fx-spacing: 1.143em; }
+.library-content { -fx-spacing: 1.714em; }
+.toolbar { -fx-spacing: 0.571em; -fx-hgap: 0.571em; -fx-vgap: 0.571em; -fx-alignment: center-left; }
+.library-search { -fx-min-width: 12em; }
+.content-filter { -fx-max-width: 22.857em; }
+.icon-segmented .toggle-button { -fx-padding: 0.357em 0.571em; }
+.filter-row { -fx-spacing: 0.429em; }
+.library-section { -fx-spacing: 0.857em; -fx-background-radius: 1em; }
+.section-header { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.library-grid { -fx-hgap: 1.143em; -fx-vgap: 1.143em; }
+.library-list { -fx-spacing: 0.429em; }
+.library-card { -fx-padding: 0; -fx-spacing: 0; -fx-pref-width: 17em; }
+.card-art { -fx-background-radius: 1em 1em 0 0; }
+.hover-actions { -fx-spacing: 0.286em; -fx-padding: 0.571em; }
+.card-body { -fx-spacing: 0.286em; -fx-padding: 0.857em; }
+.card-meta { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.library-row { -fx-padding: 0.571em 0.857em; -fx-spacing: 0.857em; -fx-alignment: center-left; }
+.row-text { -fx-spacing: 0.071em; }
+.library-section.drop-target, .library-card.drop-target, .library-row.drop-target {
+    -fx-border-color: -sl-accent-fg;
+    -fx-border-width: 2;
+    -fx-border-radius: 1em;
+    -fx-border-style: dashed;
+}
+.drop-hint { -fx-text-fill: -sl-text-3; -fx-padding: 1.143em; -fx-alignment: center; }
+
+/* ---- project page: tab strip with a sliding underline ---- */
+.project-page { -fx-spacing: 0; }
+.tab-strip { -fx-padding: 0 1.714em; }
+.tab-strip-tabs { -fx-spacing: 0.286em; }
+.tab-strip-scroll, .tab-strip-scroll:focused { -fx-padding: 0; -fx-background-insets: 0; -fx-background-color: transparent; }
+.tab-strip-scroll > .viewport { -fx-background-color: transparent; }
+.tab-strip-tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0.714em;
+    -fx-text-fill: -sl-text-2;
+    -fx-padding: 0.714em 1em;
+    -fx-cursor: hand;
+}
+.tab-strip-tab:hover { -fx-background-color: -sl-hover; -fx-text-fill: -sl-text; }
+.tab-strip-tab:selected { -fx-background-color: transparent; -fx-text-fill: -sl-text; -fx-font-weight: bold; }
+.tab-strip-tab:focus-visible {
+    -fx-background-color: -sl-focus, -sl-bg;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 0.714em, 0.571em;
+}
+.tab-strip-track { -fx-min-height: 0.143em; -fx-pref-height: 0.143em; -fx-background-color: -sl-border; }
+.tab-strip-bar { -fx-pref-height: 0.143em; -fx-min-height: 0.143em; -fx-background-color: -sl-accent; -fx-background-radius: 0.143em; }
+
+/* ---- Overview ---- */
+.modules-card { -fx-spacing: 0.714em; }
+
+/* ---- Mods and content ---- */
+.bulk-bar {
+    -fx-background-color: -sl-accent-subtle;
+    -fx-background-radius: 0.714em;
+    -fx-padding: 0.429em 0.857em;
+    -fx-spacing: 0.571em;
+    -fx-alignment: center-left;
+}
+.content-table { -fx-pref-height: 28em; }
+.name-cell { -fx-spacing: 0.714em; -fx-alignment: center-left; }
+.cell-text { -fx-spacing: 0.071em; }
+
+/* ---- Worlds ---- */
+.world-grid { -fx-hgap: 1em; -fx-vgap: 1em; }
+.world-card { -fx-pref-width: 17em; }
+.world-card .chip-row, .world-card .card-actions { -fx-padding: 0 0.857em; }
+
+/* ---- Screenshots ---- */
+.masonry { -fx-padding: 0; }
+.shot-tile {
+    -fx-background-radius: 0.714em;
+    -fx-background-color: -sl-fill;
+    -fx-cursor: hand;
+}
+.shot-tile:hover { -fx-background-color: -sl-fill-strong; }
+.shot-tile:focus-visible { -fx-border-color: -sl-focus; -fx-border-width: 2; -fx-border-radius: 0.714em; }
+.shot-caption {
+    -fx-background-color: linear-gradient(to bottom, transparent, -sl-art-scrim-bottom);
+    -fx-background-radius: 0 0 0.714em 0.714em;
+    -fx-padding: 1.143em 0.714em 0.571em 0.714em;
+}
+.modal-overlay.viewer-layer { -fx-padding: 1.143em; }
+.modal.viewer {
+    -fx-max-width: 100em;
+    -fx-background-color: -sl-sunken;
+    -fx-padding: 0.857em;
+    -fx-spacing: 0.714em;
+}
+.viewer-bar { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.viewer-stage { -fx-background-color: transparent; }
+
+/* ---- Logs ---- */
+.log-view .list-cell { -fx-font-family: "Monospaced"; -fx-font-size: 0.857em; -fx-padding: 0.071em 0.571em; -fx-text-fill: -sl-text-2; }
+.log-view .list-cell.log-error { -fx-text-fill: -sl-danger; }
+.log-view .list-cell.log-warn { -fx-text-fill: -sl-warning; }
+.log-view .list-cell.log-info { -fx-text-fill: -sl-text; }
+.log-view .list-cell.log-debug { -fx-text-fill: -sl-text-3; }
+.log-view { -fx-pref-height: 28em; -fx-background-color: -sl-border, -sl-sunken; }
+.analysis { -fx-spacing: 0.571em; }
+.crash-row { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+
+/* ---- Performance: presets and the one-click Ultra Performance ---- */
+.ultra-hero {
+    -fx-background-color: linear-gradient(to bottom right, -sl-warning-subtle 0%, -sl-surface 70%);
+    -fx-border-color: -sl-warning;
+    -fx-border-radius: 1em;
+    -fx-background-radius: 1em;
+    -fx-padding: 1.143em 1.429em;
+    -fx-spacing: 1.143em;
+    -fx-alignment: center-left;
+}
+.ultra-text { -fx-spacing: 0.286em; }
+.preset-grid { -fx-hgap: 1em; -fx-vgap: 1em; }
+.preset-grid .preset-card { -fx-pref-width: 14em; -fx-min-height: 18.5em; }
+.preset-card.ultra { -fx-border-color: -sl-warning; }
+.preset-card.ultra.selected { -fx-border-color: -sl-warning; -fx-background-color: -sl-warning-subtle; }
+.change-grid { -fx-hgap: 1.143em; -fx-vgap: 0.286em; }
+
+/* ---- sign-in dialog ---- */
+.modal.signin { -fx-max-width: 34em; -fx-pref-width: 34em; }
+.signin-body, .signin-content { -fx-spacing: 1.143em; }
+.signin-code-row { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.signin-waiting { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.signin-steps { -fx-spacing: 0.286em; }
+.signin-success { -fx-spacing: 1.143em; -fx-alignment: center-left; }
+.signin-who { -fx-spacing: 0.143em; }
+.signin-status { -fx-spacing: 0.429em; -fx-alignment: center-left; }
+.signin-error { -fx-spacing: 0.857em; -fx-alignment: top-left; }
+.signin-error-text { -fx-spacing: 0.286em; }
+.signin-skeleton { -fx-spacing: 0.571em; -fx-pref-height: 4em; -fx-background-color: -sl-fill; -fx-background-radius: 0.714em; }
+
+/* ---- first run ---- */
+.modal.firstrun { -fx-max-width: 52em; -fx-pref-width: 52em; }
+.firstrun-body { -fx-spacing: 1.143em; -fx-min-height: 22em; }
+.firstrun-step { -fx-spacing: 1.143em; }
+.firstrun-cards { -fx-hgap: 0.857em; -fx-vgap: 0.857em; -fx-spacing: 0.857em; }
+.firstrun-cards .preset-card { -fx-pref-width: 15.5em; -fx-min-height: 11em; }
+
+/* cards of unequal height line up at the top of their row */
+.preset-grid, .firstrun-cards, .world-grid, .library-grid, .jump-row { -fx-row-valignment: top; }
+
+/* ============================================================ Part 4: Discover, Shardlight, Multiplayer, Downloads, Settings, wizard, dialogs */
+
+/* ---- Discover ---- */
+.discover-search-row { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+.discover-search { -fx-min-height: 3.143em; -fx-font-size: 1.143em; }
+.discover-body { -fx-spacing: 1.143em; -fx-alignment: top-left; }
+.filter-rail { -fx-pref-width: 17em; -fx-min-width: 17em; -fx-max-width: 17em; -fx-spacing: 0.857em; }
+.filter-list { -fx-spacing: 0.571em; }
+.discover-main { -fx-spacing: 0.857em; }
+.discover-results { -fx-spacing: 0.857em; }
+.discover-results .mod-result-card, .discover-result { -fx-pref-width: 20em; -fx-max-width: 100em; -fx-padding: 1.143em; }
+.discover-more { -fx-alignment: center; }
+.split-button { -fx-spacing: 0; -fx-alignment: center; -fx-fill-height: true; }
+.split-button > .split-main { -fx-background-radius: 0.714em 0 0 0.714em, 0.643em 0 0 0.643em; }
+.split-button > .split-arrow {
+    -fx-background-color: -sl-border-strong, -sl-raised;
+    -fx-background-insets: 0, 1 1 1 0;
+    -fx-background-radius: 0 0.714em 0.714em 0, 0 0.643em 0.643em 0;
+    -fx-padding: 0.429em 0.571em;
+}
+.split-button > .split-arrow:hover { -fx-background-color: -sl-border-strong, -sl-fill; }
+.split-button.primary-split > .split-arrow { -fx-background-color: -sl-accent-pressed, -sl-accent; -sl-icon: -sl-accent-text; }
+.split-button.primary-split > .split-arrow:hover { -fx-background-color: -sl-accent-pressed, -sl-accent-hover; }
+.split-button > .split-main.installed { -sl-icon: -sl-success; }
+
+/* ---- a catalog project ---- */
+.catalog-title { -fx-spacing: 1.143em; -fx-alignment: top-left; }
+.catalog-action { -fx-alignment: top-right; }
+.catalog-body { -fx-spacing: 1.714em; -fx-alignment: top-left; }
+.catalog-main { -fx-spacing: 0.571em; }
+.catalog-side { -fx-pref-width: 24em; -fx-min-width: 24em; -fx-max-width: 24em; -fx-spacing: 0.857em; }
+.catalog-description { -fx-max-width: 52em; }
+.gallery-hero {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 1em;
+    -fx-pref-height: 20em; -fx-min-height: 20em; -fx-max-height: 20em;
+    -fx-alignment: center;
+}
+.gallery-hero.empty { -fx-pref-height: 8em; -fx-min-height: 8em; -fx-max-height: 8em; }
+.gallery-thumbs { -fx-spacing: 0.571em; -fx-padding: 0.571em 0 0 0; }
+.gallery-thumb {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 0.571em;
+    -fx-border-color: transparent;
+    -fx-border-radius: 0.571em;
+    -fx-border-width: 2;
+    -fx-cursor: hand;
+    -fx-opacity: 0.75;
+}
+.gallery-thumb:hover { -fx-opacity: 1; }
+.gallery-thumb.selected { -fx-border-color: -sl-accent-fg; -fx-opacity: 1; }
+.gallery-thumb:focus-visible { -fx-border-color: -sl-focus; }
+.plan-row { -fx-spacing: 0.714em; -fx-alignment: center-left; -fx-padding: 0.571em 0.857em; }
+.version-row { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+
+/* ---- Shardlight page ---- */
+.page-intro { -fx-max-width: 52em; }
+.module-grid { -fx-hgap: 1.143em; -fx-vgap: 1.143em; -fx-row-valignment: top; }
+.module-card { -fx-pref-width: 32em; -fx-min-height: 12em; -fx-spacing: 0.857em; }
+.module-head { -fx-spacing: 1.143em; -fx-alignment: top-left; }
+.module-art { -fx-background-color: -sl-sunken; -fx-background-radius: 1em; -fx-padding: 0.286em; }
+.card-foot-row { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.theme-grid { -fx-hgap: 1em; -fx-vgap: 1em; -fx-row-valignment: top; }
+.theme-tile { -fx-pref-width: 12.5em; -fx-spacing: 0.429em; }
+.theme-tile .theme-preview { -fx-pref-height: 7em; -fx-background-color: -sl-sunken; -fx-background-radius: 0.714em; }
+.theme-tile.selected { -fx-background-color: -sl-accent-subtle; }
+
+/* ---- Multiplayer: server cards, message of the day, ping bars ---- */
+.server-list { -fx-spacing: 0.857em; }
+.server-card-row { -fx-spacing: 1.143em; -fx-alignment: center-left; -fx-padding: 1.143em; }
+.server-text { -fx-spacing: 0.286em; }
+.server-stats { -fx-spacing: 0.429em; -fx-alignment: center-right; -fx-min-width: 8em; }
+.server-ping { -fx-spacing: 0.571em; -fx-alignment: center-right; }
+.motd-box {
+    -fx-background-color: -sl-motd-bg;
+    -fx-background-radius: 0.429em;
+    -fx-padding: 0.429em 0.714em;
+}
+.motd { -fx-line-spacing: 0.071em; }
+.motd-text { -fx-font-family: "JetBrains Mono"; -fx-font-size: 0.857em; }
+.ping-bars { -fx-spacing: 0.143em; -fx-alignment: bottom-left; -fx-min-width: 2.286em; }
+.ping-bar { -fx-background-color: -sl-fill-strong; -fx-background-radius: 0.071em; -fx-pref-width: 0.286em; -fx-min-width: 0.286em; }
+.ping-bar.bar-1 { -fx-pref-height: 0.429em; -fx-min-height: 0.429em; }
+.ping-bar.bar-2 { -fx-pref-height: 0.714em; -fx-min-height: 0.714em; }
+.ping-bar.bar-3 { -fx-pref-height: 1em; -fx-min-height: 1em; }
+.ping-bar.bar-4 { -fx-pref-height: 1.286em; -fx-min-height: 1.286em; }
+.ping-bar.bar-5 { -fx-pref-height: 1.571em; -fx-min-height: 1.571em; }
+.ping-bar.on.good { -fx-background-color: -sl-success; }
+.ping-bar.on.fair { -fx-background-color: -sl-warning; }
+.ping-bar.on.poor { -fx-background-color: -sl-danger; }
+.server-offline .ping-bars { -fx-opacity: 0.6; }
+.add-server { -fx-spacing: 1.143em; -fx-pref-width: 32em; }
+.ping-result { -fx-spacing: 0.571em; }
+.ping-result-row { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+
+/* ---- disclosure (collapsed sections) ---- */
+.disclosure { -fx-spacing: 0.286em; }
+.disclosure-header { -fx-alignment: center-left; -fx-content-display: left; -fx-graphic-text-gap: 0.571em; }
+.disclosure-content { -fx-padding: 0.571em 0 0 0; }
+
+/* ---- Downloads ---- */
+.downloads-summary { -fx-padding: 0 0 0.286em 0; }
+.download-hero { -fx-spacing: 1.143em; -fx-padding: 1.429em; }
+.download-hero-top { -fx-spacing: 1.429em; -fx-alignment: center-left; }
+.download-ring { -fx-alignment: center; }
+.progress-ring.large {
+    -fx-min-width: 5.143em; -fx-min-height: 5.143em;
+    -fx-pref-width: 5.143em; -fx-pref-height: 5.143em;
+    -fx-max-width: 5.143em; -fx-max-height: 5.143em;
+}
+.progress-ring.large .ring-track, .progress-ring.large .ring-bar { -fx-stroke-width: 6; }
+.download-title { -fx-spacing: 0.714em; -fx-alignment: center-left; }
+.download-row { -fx-spacing: 0.714em; }
+.download-row-head { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+.download-file-row { -fx-spacing: 0.571em; -fx-alignment: center-left; }
+.download-details { -fx-padding: 0.571em 0 0 0; }
+
+/* Settings: search hits, the setting a search jumped to, and the Appearance preview */
+.settings-side { -fx-border-color: transparent; }
+.setting-hit { -fx-cursor: hand; }
+.setting-hit:hover { -fx-background-color: -sl-hover; }
+.setting-found {
+    -fx-background-color: -sl-accent-subtle;
+    -fx-background-radius: 0.714em;
+    -fx-background-insets: 0 -0.571em 0 -0.571em;
+}
+.appearance-preview {
+    -fx-background-color: -sl-bg;
+    -fx-background-radius: 1em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1em;
+    -fx-max-width: 34em;
+}
+.preview-side {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 1em 0 0 1em;
+    -fx-padding: 0.857em;
+    -fx-min-width: 8em;
+}
+.preview-pill {
+    -fx-padding: 0.357em 0.714em;
+    -fx-background-radius: 0.714em;
+    -fx-text-fill: -sl-text-2;
+}
+.preview-pill.selected { -fx-background-color: -sl-accent-subtle; -fx-text-fill: -sl-accent-fg; -fx-font-weight: bold; }
+.preview-main { -fx-padding: 1.143em; }
+.preview-dot {
+    -fx-background-color: -sl-accent;
+    -fx-background-radius: 1em;
+    -fx-min-width: 0.714em; -fx-min-height: 0.714em; -fx-max-width: 0.714em; -fx-max-height: 0.714em;
+}
+
+/* New project wizard */
+.wizard-body { -fx-spacing: 0.857em; }
+.wizard-page { -fx-padding: 0 0.571em 0.571em 0; }
+.template-grid { -fx-hgap: 0.714em; -fx-vgap: 0.714em; }
+.template-card { -fx-pref-width: 24em; -fx-min-height: 7.5em; }
+.download-preview {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 1em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1em;
+    -fx-padding: 0.286em 0.857em;
+}
+.download-preview-row { -fx-padding: 0.571em 0; }
+.download-preview-row.ruled { -fx-border-color: -sl-border transparent transparent transparent; }
+
+/* Crash screen */
+.crash-cause {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 1em;
+    -fx-padding: 1.143em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1em;
+}
+.crash-cause.known { -fx-border-color: -sl-danger; }
+
+/* Skins: the 3D viewer, the library tiles and the cape choices */
+.skin-viewer {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 1.429em;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 1.429em;
+    -fx-cursor: move;
+}
+.skin-viewer:focused { -fx-border-color: -sl-focus; -fx-border-width: 2; }
+.skins-layout { -fx-spacing: 1.714em; -fx-alignment: top-left; }
+.skin-tiles { -fx-hgap: 0.857em; -fx-vgap: 0.857em; }
+.skin-tile {
+    -fx-background-color: -sl-border-strong, -sl-raised;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0.714em, 0.643em;
+    -fx-padding: 0.714em;
+    -fx-min-width: 6.857em;
+    -fx-pref-width: 6.857em;
+    -fx-cursor: hand;
+}
+.skin-tile:hover { -fx-background-color: -sl-border-strong, -sl-fill; }
+.skin-tile:focused:focus-visible { -fx-background-color: -sl-focus, -sl-raised; -fx-background-insets: 0, 2; }
+.skin-tile.selected { -fx-background-color: -sl-accent, -sl-accent-subtle; -fx-background-insets: 0, 2; }
+.cape-choice {
+    -fx-background-color: -sl-border-strong, -sl-raised;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0.714em, 0.643em;
+    -fx-padding: 0.357em 0.857em;
+    -fx-text-fill: -sl-text;
+    -fx-cursor: hand;
+}
+.cape-choice:hover { -fx-background-color: -sl-border-strong, -sl-fill; }
+.cape-choice:focused:focus-visible { -fx-background-color: -sl-focus, -sl-raised; -fx-background-insets: 0, 2; }
+.cape-choice.selected { -fx-background-color: -sl-accent, -sl-accent-subtle; -fx-background-insets: 0, 2; -fx-text-fill: -sl-accent-fg; -sl-icon: -sl-accent-fg; }
+.cape-choice:disabled { -fx-opacity: 0.5; }
+
+/* Discord: what the status will read */
+.discord-example {
+    -fx-background-color: -sl-sunken;
+    -fx-background-radius: 0.714em;
+    -fx-padding: 0.714em 0.857em;
+    -fx-max-width: 22em;
+}

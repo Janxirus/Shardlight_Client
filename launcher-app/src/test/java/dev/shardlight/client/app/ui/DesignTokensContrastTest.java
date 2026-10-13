@@ -53,6 +53,7 @@ class DesignTokensContrastTest {
             for (String s : STATUS) {
                 check(failures, t, "-sl-" + s, "-sl-" + s + "-subtle", DesignTokens.AA_TEXT);
                 check(failures, t, "-sl-text", "-sl-" + s + "-subtle", DesignTokens.AA_TEXT);
+                check(failures, t, "-sl-text-2", "-sl-" + s + "-subtle", DesignTokens.AA_TEXT);
             }
             check(failures, t, "-sl-on-danger", "-sl-danger", DesignTokens.AA_TEXT);
             check(failures, t, "-sl-on-danger", "-sl-danger-hover", DesignTokens.AA_TEXT);
@@ -65,6 +66,38 @@ class DesignTokensContrastTest {
             }
         }
         assertTrue(failures.isEmpty(), "Contrast below WCAG AA:\n" + String.join("\n", failures));
+    }
+
+    /** text on project art sits on a translucent chip or scrim, so check it over the worst case: pure white art */
+    @Test
+    void textOnProjectArtPassesAAOverWhiteArt() {
+        Map<String, Color> tokens = themes().get(0).tokens();
+        Color text = tokens.get("-sl-on-art");
+        for (String name : List.of("-sl-art-chip", "-sl-art-chip-hover", "-sl-art-chip-pressed", "-sl-art-scrim-bottom")) {
+            Color over = tokens.get(name);
+            double a = over.getOpacity();
+            Color flat = Color.color(over.getRed() * a + (1 - a), over.getGreen() * a + (1 - a), over.getBlue() * a + (1 - a));
+            double ratio = DesignTokens.contrast(text, flat);
+            assertTrue(ratio >= DesignTokens.AA_TEXT, name + " over white art = " + ratio);
+        }
+    }
+
+    /** the message of the day sits on its own dark panel; server colours are lightened until they pass too */
+    @Test
+    void messageOfTheDayPassesAAOnItsPanel() {
+        List<String> failures = new ArrayList<>();
+        for (Theme t : themes()) {
+            check(failures, t, "-sl-motd-text", "-sl-motd-bg", DesignTokens.AA_TEXT);
+            assertEquals(MotdText.BACKGROUND, t.tokens().get("-sl-motd-bg"));
+            for (int rgb = 0; rgb < 0x1000000; rgb += 0x0F0F13) {
+                Color c = MotdText.readable(Color.rgb(rgb >> 16, (rgb >> 8) & 0xff, rgb & 0xff));
+                double ratio = DesignTokens.contrast(c, MotdText.BACKGROUND);
+                if (ratio < DesignTokens.AA_TEXT) {
+                    failures.add(Integer.toHexString(rgb) + " became " + DesignTokens.web(c) + " = " + ratio);
+                }
+            }
+        }
+        assertTrue(failures.isEmpty(), String.join("\n", failures));
     }
 
     @Test

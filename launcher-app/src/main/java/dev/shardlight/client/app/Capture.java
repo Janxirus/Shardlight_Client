@@ -21,6 +21,10 @@ final class Capture {
     private final AppContext ctx;
     private final Scene scene;
     private final Path dir;
+    /** accessibility finding -> the views it was seen in (see A11yAudit) */
+    private final java.util.Map<String, List<String>> findings = new java.util.TreeMap<>();
+    /** set when --capture ended with accessibility findings and shardlight.auditStrict is on; Main turns it into the exit code */
+    static volatile boolean failed;
 
     Capture(AppContext ctx, Scene scene, Path dir) {
         this.ctx = ctx;
@@ -39,6 +43,7 @@ final class Capture {
 
     private void next(List<Runnable> steps, int i, Runnable done) {
         if (i >= steps.size()) {
+            writeReport();
             done.run();
             return;
         }
@@ -64,7 +69,39 @@ final class Capture {
         return ctx.shell().current().view().snapshot(params, null);
     }
 
-    private void save(String name) {
+    private void audit(String step) {
+        List<String> issues = new ArrayList<>(A11yAudit.scan(scene.getRoot()));
+        issues.addAll(A11yAudit.overflow(scene));
+        if (Boolean.getBoolean("shardlight.tabWalk")) {
+            issues.addAll(A11yAudit.tabWalk(scene));
+        }
+        for (String issue : issues) {
+            List<String> views = findings.computeIfAbsent(issue, k -> new ArrayList<>());
+            if (views.size() < 3) {
+                views.add(step);
+            }
+        }
+    }
+
+    private void writeReport() {
+        StringBuilder sb = new StringBuilder("Accessibility findings: " + findings.size() + "\n\n");
+        findings.forEach((issue, views) -> sb.append(issue).append("\n    seen in ").append(String.join(", ", views)).append('\n'));
+        try {
+            Files.createDirectories(dir);
+            Files.writeString(dir.resolve("accessibility-report.txt"), sb.toString());
+        } catch (IOException e) {
+            LOG.warning("Couldn't write the accessibility report: " + e.getMessage());
+        }
+        LOG.info("Accessibility findings: " + findings.size());
+        if (!findings.isEmpty() && Boolean.getBoolean("shardlight.auditStrict")) {
+            failed = true;
+        }
+    }
+
+    private void save(String step) {
+        audit(step);
+        // a matrix step "m/<theme>/<scale>/<view>" is saved as <theme>-<scale>/<view>.png
+        String name = step.startsWith("m/") ? step.split("/", 4)[1] + "-" + step.split("/", 4)[2] + "/" + step.split("/", 4)[3] : step;
         WritableImage img = name.startsWith("gallery-full") ? fullPage() : scene.snapshot(null);
         int w = (int) img.getWidth();
         int h = (int) img.getHeight();
@@ -76,8 +113,9 @@ final class Capture {
             }
         }
         try {
-            Files.createDirectories(dir);
-            ImageIO.write(out, "png", dir.resolve(name + ".png").toFile());
+            Path file = dir.resolve(name + ".png");
+            Files.createDirectories(file.getParent());
+            ImageIO.write(out, "png", file.toFile());
             LOG.info("Captured " + name);
         } catch (IOException e) {
             LOG.warning("Couldn't write capture " + name + ": " + e.getMessage());

@@ -31,6 +31,11 @@ public final class BuildInfo {
         return value("msaClientId");
     }
 
+    /** the Discord application id baked into this build, if any (it is public) */
+    public static Optional<String> discordApplicationId() {
+        return value("discordApplicationId");
+    }
+
     /** a CurseForge API key baked into this build, if any (never logged) */
     public static Optional<String> curseForgeApiKey() {
         return value("curseForgeApiKey");

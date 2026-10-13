@@ -39,8 +39,8 @@ public final class CommandPalette {
     private static final Logger LOG = Logger.getLogger(CommandPalette.class.getName());
     private static final int MAX_RESULTS = 60;
     private static final int MAX_MODS = 600;
-    private static final List<String> SETTINGS = List.of("accounts", "appearance", "java", "downloads", "content",
-        "privacy", "updates", "storage", "about");
+    private static final List<String> SETTINGS = List.of("accounts", "appearance", "java", "performance",
+        "downloads", "content", "privacy", "updates", "storage", "advanced", "about");
 
     /** something the palette can do; {@code keywords} are matched as well as the title */
     public record Command(String group, String title, String subtitle, String icon, String shortcut, String keywords,

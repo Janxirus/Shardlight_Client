@@ -1,7 +1,8 @@
 name: Release (draft)
 
-# Run by hand from the Actions tab. Builds the Windows installer, the Windows app folder and the
-# portable zip from main, writes SHA-256 checksums, and creates a DRAFT GitHub release with them.
+# Run by hand from the Actions tab. Builds the Windows installer, the Windows app folder, the macOS disk image,
+# the Linux .deb and .rpm and the portable zip from main, writes SHA-256 checksums, and creates a DRAFT GitHub
+# release with them. Windows and macOS files are signed when the signing secrets exist (docs/RELEASING.md).
 # Nothing is published until a maintainer reviews the draft and presses "Publish release".
 on:
   workflow_dispatch:
@@ -15,6 +16,7 @@ permissions:
 
 env:
   SHARDLIGHT_MSA_CLIENT_ID: ${{ vars.SHARDLIGHT_MSA_CLIENT_ID }}
+  SHARDLIGHT_DISCORD_APP_ID: ${{ vars.SHARDLIGHT_DISCORD_APP_ID }}
   SHARDLIGHT_UPDATE_MANIFEST_URL: ${{ vars.SHARDLIGHT_UPDATE_MANIFEST_URL }}
   SHARDLIGHT_UPDATE_PUBLIC_KEY: ${{ vars.SHARDLIGHT_UPDATE_PUBLIC_KEY }}
   SHARDLIGHT_CURSEFORGE_API_KEY: ${{ secrets.SHARDLIGHT_CURSEFORGE_API_KEY }}
@@ -71,6 +73,36 @@ jobs:
           $ver = "${{ needs.check.outputs.version }}"
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path "launcher-app/build/jpackage/image/Shardlight Client" -DestinationPath "dist/ShardlightClient-$ver-windows-x64.zip"
+      - name: Shardlight pictures in the installer
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem launcher-app/build/jpackage/installer/*.msi | Select-Object -First 1
+          ./tools/release/set_msi_images.ps1 -Msi $msi.FullName -Banner packaging/windows/banner.bmp -Dialog packaging/windows/dialog.bmp
+      - name: Is there a signing certificate?
+        id: sign
+        shell: pwsh
+        env:
+          CERT: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:CERT -and $env:CERT_PASSWORD) {
+            "enabled=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "enabled=false" >> $env:GITHUB_OUTPUT
+            Write-Host "::notice title=Windows signing skipped::No code-signing certificate is configured, so the MSI is not signed (docs/RELEASING.md)."
+          }
+      - name: Sign the MSI
+        if: steps.sign.outputs.enabled == 'true'
+        shell: pwsh
+        env:
+          CERT: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: ./tools/release/sign_windows.ps1 -Folder launcher-app/build/jpackage/installer
+      - name: Name the installer
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.check.outputs.version }}"
           Copy-Item launcher-app/build/jpackage/installer/*.msi "dist/ShardlightClient-$ver-windows-x64.msi"
       - uses: actions/upload-artifact@v4
         with:
@@ -101,9 +133,17 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  installers:
+    name: macOS and Linux installers
+    needs: check
+    uses: ./.github/workflows/installers.yml
+    secrets: inherit
+    with:
+      release: true
+
   draft:
     name: Create the draft release
-    needs: [check, windows, portable]
+    needs: [check, windows, portable, installers]
     runs-on: ubuntu-latest
     permissions:
       contents: write

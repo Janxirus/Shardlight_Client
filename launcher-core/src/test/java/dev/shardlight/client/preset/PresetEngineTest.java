@@ -512,7 +512,7 @@ class PresetEngineTest {
     void vanillaVideoSettingsOnlyWithOptIn() throws Exception {
         Project p = project("ui");
         Path options = game(p).resolve("options.txt");
-        String original = "version:4189\nrenderDistance:16\ngraphicsMode:1\nlang:en_us\nresourcePacks:[\"vanilla\"]\n";
+        String original = "version:4189\nrenderDistance:16\ngraphicsPreset:\"fancy\"\nlang:en_us\nresourcePacks:[\"vanilla\"]\n";
         Files.writeString(options, original);
         engine.apply(p, Preset.ULTRA_PERFORMANCE);
         assertEquals(original, Files.readString(options), "untouched without the opt-in");
@@ -525,7 +525,7 @@ class PresetEngineTest {
         assertTrue(r.filesWritten().contains("options.txt"));
         OptionsTxt o = OptionsTxt.read(options);
         assertEquals("8", o.get("renderDistance").orElseThrow());
-        assertEquals("0", o.get("graphicsMode").orElseThrow());
+        assertEquals("\"custom\"", o.get("graphicsPreset").orElseThrow());
         assertEquals("\"false\"", o.get("renderClouds").orElseThrow());
         assertEquals("0.75", o.get("entityDistanceScaling").orElseThrow());
         assertEquals("false", o.get("enableVsync").orElseThrow());
@@ -536,9 +536,23 @@ class PresetEngineTest {
         engine.revertLast(q);
         OptionsTxt back = OptionsTxt.read(options);
         assertEquals("16", back.get("renderDistance").orElseThrow());
-        assertEquals("1", back.get("graphicsMode").orElseThrow());
+        assertEquals("\"fancy\"", back.get("graphicsPreset").orElseThrow());
         assertTrue(back.get("maxFps").isEmpty(), "keys that weren't there are removed again");
         assertEquals("en_us", back.get("lang").orElseThrow());
+    }
+
+    @Test
+    void vanillaVideoSettingsAreIgnoredForVersionsWhoseKeysWereNotChecked() throws Exception {
+        Project p = projects.create("old" + System.nanoTime(), "1.21.4", LoaderType.FABRIC, "0.16.10");
+        Path options = game(p).resolve("options.txt");
+        Files.createDirectories(options.getParent());
+        String original = "version:4189\nrenderDistance:16\n";
+        Files.writeString(options, original);
+        engine.setApplyVanillaVideoSettings(p, true);
+        assertFalse(engine.vanillaVideoAvailable(reload(p)));
+        assertTrue(engine.preview(reload(p), Preset.ULTRA_PERFORMANCE).isEmpty());
+        engine.apply(reload(p), Preset.ULTRA_PERFORMANCE);
+        assertEquals(original, Files.readString(options), "options.txt of an unchecked version is never touched");
     }
 
     @Test
@@ -614,6 +628,23 @@ class PresetEngineTest {
         JsonObject rec = readJson(game(p).resolve(PresetEngine.RECORD_FILE));
         assertTrue(rec.getAsJsonObject("adaptiveQuality").get("enabled").getAsBoolean());
         assertFalse(rec.getAsJsonObject("adaptiveQuality").get("implementedInGame").getAsBoolean());
+
+        // the file the mod will read, as documented in docs/ADAPTIVE_QUALITY.md
+        JsonObject file = readJson(game(p).resolve(PresetEngine.ADAPTIVE_FILE));
+        assertEquals(1, file.get("schemaVersion").getAsInt());
+        assertTrue(file.get("enabled").getAsBoolean());
+        assertEquals(90, file.get("targetFps").getAsInt());
+        assertTrue(file.get("writtenBy").getAsString().startsWith("Shardlight Client "));
+        engine.setAdaptiveQuality(reload(p), false, 90);
+        assertFalse(readJson(game(p).resolve(PresetEngine.ADAPTIVE_FILE)).get("enabled").getAsBoolean(),
+            "turning it off updates the file the mod reads");
+    }
+
+    @Test
+    void adaptiveQualityLeavesNoFileWhileItHasNeverBeenTurnedOn() throws Exception {
+        Project p = project("ui");
+        engine.setAdaptiveQuality(p, false, 60);
+        assertFalse(Files.exists(game(p).resolve(PresetEngine.ADAPTIVE_FILE)));
     }
 
     @Test
@@ -686,7 +717,7 @@ class PresetEngineTest {
             assertTrue(I18n.has(d.labelKey()), d.labelKey());
             assertTrue(I18n.has(d.descriptionKey()), d.descriptionKey());
             if (d.target() == Target.VANILLA) {
-                assertTrue(I18n.english(d.descriptionKey()).contains("verify on 26.3"), d.key());
+                assertFalse(I18n.english(d.descriptionKey()).contains("verify on"), d.key() + " still says it needs verifying");
             }
         }
         assertTrue(I18n.has(PresetEngine.ULTRA_QUALITY_WARNING_KEY));

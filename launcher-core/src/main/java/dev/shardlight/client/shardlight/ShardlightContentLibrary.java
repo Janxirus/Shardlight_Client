@@ -4,11 +4,15 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.google.gson.annotations.SerializedName;
+import dev.shardlight.client.catalog.CatalogFile;
+import dev.shardlight.client.catalog.CatalogProvider;
+import dev.shardlight.client.catalog.CatalogVersion;
 import dev.shardlight.client.download.DownloadManager;
 import dev.shardlight.client.download.DownloadRequest;
 import dev.shardlight.client.error.ErrorCode;
 import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.i18n.I18n;
+import dev.shardlight.client.loader.LoaderType;
 import dev.shardlight.client.net.HttpService;
 import dev.shardlight.client.storage.AppPaths;
 import dev.shardlight.client.task.CancellationToken;
@@ -71,16 +75,24 @@ public final class ShardlightContentLibrary {
     private final DownloadManager downloads;
     private final ShardlightCatalog catalog;
     private final URI githubApi;
+    private final CatalogProvider modrinth;
     private final ReentrantLock lock = new ReentrantLock();
 
-    /** a library talking to the real GitHub API */
+    /** a library talking to the real GitHub API, and to Modrinth for modules that have a Modrinth project */
+    public ShardlightContentLibrary(AppPaths paths, HttpService http, DownloadManager downloads, ShardlightCatalog catalog,
+                                    CatalogProvider modrinth) {
+        this(paths, http, downloads, catalog, DEFAULT_GITHUB_API, modrinth);
+    }
+
+    /** a library with GitHub only (tests that don't need Modrinth) */
     public ShardlightContentLibrary(AppPaths paths, HttpService http, DownloadManager downloads, ShardlightCatalog catalog) {
-        this(paths, http, downloads, catalog, DEFAULT_GITHUB_API);
+        this(paths, http, downloads, catalog, DEFAULT_GITHUB_API, null);
     }
 
     /** a library with another GitHub API base (tests point it at a local server) */
     public ShardlightContentLibrary(AppPaths paths, HttpService http, DownloadManager downloads, ShardlightCatalog catalog,
-                                    URI githubApi) {
+                                    URI githubApi, CatalogProvider modrinth) {
+        this.modrinth = modrinth;
         this.paths = Objects.requireNonNull(paths);
         this.http = http;
         this.downloads = downloads;
@@ -389,30 +401,100 @@ public final class ShardlightContentLibrary {
         }
     }
 
-    // ---------------------------------------------------------------- GitHub releases
+    // ---------------------------------------------------------------- downloads (Modrinth, GitHub releases)
 
     /**
-     * Download the jar of a module's latest GitHub release into the library and return it (the existing item
-     * when that jar was imported before). Empty when the release has no jar asset. A missing or private
-     * repository (HTTP 404) becomes {@link ErrorCode#NOT_FOUND} with the friendly
-     * {@code shardlight.download.notPublished} message; the jar is validated like an import.
+     * Download the newest jar of a module into the library and return it (the existing item when that jar was
+     * imported before). Two sources are tried in this order: the module's Modrinth project (when the catalog
+     * names one) and its latest GitHub release. Empty when a source answered but had no usable jar, or when the
+     * module has no source at all. When every source answers "not there" (a private repository, no Modrinth
+     * project yet) the error is {@link ErrorCode#NOT_FOUND} with the {@code shardlight.download.notPublished}
+     * message; when a source could not be reached, its own error (network, rate limit) is reported instead, so
+     * "not published" is never claimed without an answer. The jar is validated like an import.
      */
-    public Optional<LibraryItem> downloadLatestRelease(String moduleId, ProgressListener progress, CancellationToken cancel)
+    public Optional<LibraryItem> downloadLatest(String moduleId, ProgressListener progress, CancellationToken cancel)
         throws LauncherException {
         CancellationToken c = cancel == null ? CancellationToken.NONE : cancel;
         ProgressListener p = progress == null ? ProgressListener.NONE : progress;
         ShardlightModule module = catalog.module(moduleId)
             .orElseThrow(() -> new LauncherException(ErrorCode.NOT_FOUND, "shardlight.module.unknown", String.valueOf(moduleId)));
-        Optional<ShardlightModule.Source> source = module.githubRelease();
-        if (source.isEmpty()) {
+        Optional<ShardlightModule.Source> github = module.githubRelease();
+        boolean viaModrinth = modrinth != null && module.modrinthSlug() != null && !module.modrinthSlug().isBlank();
+        if (!viaModrinth && github.isEmpty()) {
             return Optional.empty();
         }
         if (http == null || downloads == null) {
             throw LauncherException.internal("library has no network services");
         }
         String moduleName = I18n.tr(module.nameKey());
+        LauncherException unreachable = null;
+        if (viaModrinth) {
+            try {
+                return fromModrinth(module, moduleName, p, c);
+            } catch (LauncherException e) {
+                if (isNotPublished(e)) {
+                    LOG.info("No Modrinth project answers for " + module.id());
+                } else if (e.code() == ErrorCode.NETWORK || e.code() == ErrorCode.HTTP_STATUS || e.code() == ErrorCode.RATE_LIMITED) {
+                    LOG.info("Modrinth could not be asked about " + module.id() + ": " + e.code());
+                    unreachable = e;
+                } else {
+                    throw e;
+                }
+            }
+        }
+        if (github.isPresent()) {
+            try {
+                return fromGithubRelease(module, github.get(), moduleName, p, c);
+            } catch (LauncherException e) {
+                if (!isNotPublished(e)) {
+                    throw e;
+                }
+                LOG.info("No GitHub release answers for " + module.id());
+            }
+        }
+        if (unreachable != null) {
+            throw unreachable;
+        }
+        throw new LauncherException(ErrorCode.NOT_FOUND, "shardlight.download.notPublished", moduleName);
+    }
+
+    private static boolean isNotPublished(LauncherException e) {
+        return e.code() == ErrorCode.NOT_FOUND && "shardlight.download.notPublished".equals(e.messageKey());
+    }
+
+    private Optional<LibraryItem> fromModrinth(ShardlightModule module, String moduleName, ProgressListener p,
+                                               CancellationToken c) throws LauncherException {
+        p.stage("shardlight.stage.checkModrinth");
+        List<CatalogVersion> versions;
+        try {
+            versions = modrinth.versions(module.modrinthSlug(), null, LoaderType.FABRIC, c);
+        } catch (LauncherException e) {
+            if (e.code() == ErrorCode.NOT_FOUND) {
+                throw new LauncherException(ErrorCode.NOT_FOUND, "shardlight.download.notPublished", moduleName);
+            }
+            throw e;
+        }
+        // newest first from the catalog; prefer the most stable channel, then the newest
+        Optional<CatalogVersion> best = versions.stream()
+            .filter(v -> v.gameVersions().stream().anyMatch(module::supportsMinecraft))
+            .filter(v -> v.primaryFile().filter(f -> f.downloadable() && f.fileName() != null
+                && f.fileName().toLowerCase(Locale.ROOT).endsWith(".jar")).isPresent())
+            .min(Comparator.comparingInt(CatalogVersion::channelRank));
+        if (best.isEmpty()) {
+            throw new LauncherException(ErrorCode.NOT_FOUND, "shardlight.download.notPublished", moduleName);
+        }
+        CatalogFile f = best.get().primaryFile().orElseThrow();
+        HashAlgo algo = f.sha512() != null && !f.sha512().isBlank() ? HashAlgo.SHA512
+            : f.sha1() != null && !f.sha1().isBlank() ? HashAlgo.SHA1 : null;
+        String hash = algo == HashAlgo.SHA512 ? f.sha512() : algo == HashAlgo.SHA1 ? f.sha1() : null;
+        return Optional.of(downloadJar(module, moduleName, f.url(), f.fileName(), f.size(), algo, hash,
+            best.get().versionNumber(), p, c));
+    }
+
+    private Optional<LibraryItem> fromGithubRelease(ShardlightModule module, ShardlightModule.Source source, String moduleName,
+                                                    ProgressListener p, CancellationToken c) throws LauncherException {
         p.stage("shardlight.stage.checkRelease");
-        URI api = HttpService.uri(githubApi, "repos/" + source.get().repo() + "/releases/latest", null);
+        URI api = HttpService.uri(githubApi, "repos/" + source.repo() + "/releases/latest", null);
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Accept", "application/vnd.github+json");
         headers.put("X-GitHub-Api-Version", "2022-11-28");
@@ -425,9 +507,9 @@ public final class ShardlightContentLibrary {
         }
         r.requireOk();
         GitHubRelease release = r.json(GitHubRelease.class);
-        Optional<GitHubAsset> asset = pickAsset(release, source.get().assetPattern());
+        Optional<GitHubAsset> asset = pickAsset(release, source.assetPattern());
         if (asset.isEmpty()) {
-            LOG.info("The latest " + source.get().repo() + " release has no usable jar asset");
+            LOG.info("The latest " + source.repo() + " release has no usable jar asset");
             return Optional.empty();
         }
         GitHubAsset a = asset.get();
@@ -437,16 +519,25 @@ public final class ShardlightContentLibrary {
         } catch (URISyntaxException e) {
             throw new LauncherException(ErrorCode.INVALID_DATA, e, "error.invalidResponse", api.getHost());
         }
+        String digest = a.digest == null ? "" : a.digest.trim().toLowerCase(Locale.ROOT);
+        boolean hasSha256 = digest.startsWith("sha256:") && SHA256.matcher(digest.substring(7)).matches();
+        return Optional.of(downloadJar(module, moduleName, url, a.name, a.size, hasSha256 ? HashAlgo.SHA256 : null,
+            hasSha256 ? digest.substring(7) : null, release.tagName == null ? "" : release.tagName, p, c));
+    }
+
+    /** download one module jar, verify its hash when the source gave one, validate it and add it to the library */
+    private LibraryItem downloadJar(ShardlightModule module, String moduleName, URI url, String name, long size, HashAlgo algo,
+                                    String hash, String versionLabel, ProgressListener p, CancellationToken c)
+        throws LauncherException {
         http.validate(url);
         Path stage = newStage();
         try {
-            String fileName = PathSafety.sanitizeFileName(a.name);
+            String fileName = PathSafety.sanitizeFileName(name);
             Path target = stage.resolve(fileName);
-            DownloadRequest req = new DownloadRequest(url, List.of(), target, null, null, a.size, moduleName + " " +
-                (release.tagName == null ? "" : release.tagName), false, false);
-            String digest = a.digest == null ? "" : a.digest.trim().toLowerCase(Locale.ROOT);
-            if (digest.startsWith("sha256:") && SHA256.matcher(digest.substring(7)).matches()) {
-                req = req.withHash(HashAlgo.SHA256, digest.substring(7));
+            DownloadRequest req = new DownloadRequest(url, List.of(), target, null, null, size, moduleName + " " + versionLabel,
+                false, false);
+            if (algo != null && hash != null) {
+                req = req.withHash(algo, hash.trim().toLowerCase(Locale.ROOT));
             }
             downloads.downloadAll(I18n.tr("shardlight.download.group", moduleName), List.of(req),
                 "shardlight.stage.download", p, c);
@@ -461,7 +552,7 @@ public final class ShardlightContentLibrary {
                 throw new LauncherException(ErrorCode.INVALID_DATA, "shardlight.download.wrongModule", fileName, moduleName);
             }
             c.check();
-            return Optional.of(commit(List.of(cand)).get(0).item());
+            return commit(List.of(cand)).get(0).item();
         } finally {
             FileOps.deleteTree(stage);
         }

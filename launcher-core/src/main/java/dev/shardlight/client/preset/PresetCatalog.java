@@ -19,8 +19,8 @@ import java.util.Optional;
  * {@code PartyConfig}, Companion 1.2 {@code CompanionConfig}) are used, with the ranges the mods accept
  * (their own sanitizing and settings sliders). BALANCED is always the mod's own default.
  *
- * <p>Vanilla video options use the {@code options.txt} names verified for Minecraft 1.21.x; they still need
- * verifying on 26.3 and are only written with the project's opt-in.
+ * <p>Vanilla video options use the {@code options.txt} names listed in {@link VanillaOptions}, checked against
+ * the Minecraft 26.3 client; they are only written with the project's opt-in and only for a checked version.
  */
 public final class PresetCatalog {
     private static final List<SettingDef> SETTINGS;
@@ -84,8 +84,12 @@ public final class PresetCatalog {
         t.bool(Target.COMPANION, "centreGuides", "decorations", Cost.LOW, true, false, true, true, true);
 
         // ------------------------------------------------------------ Minecraft video options (options.txt, opt-in)
-        // names verified for 1.21.x; verify on 26.3
-        t.num(Target.VANILLA, "graphicsMode", Kind.INT, "video", Cost.HIGH, Constraint.oneOf(0, 1, 2), 1, 0, 0, 1, 2);
+        // keep in step with preset/vanilla-options-26.3.txt (VanillaOptionsTest)
+        // Minecraft 26 replaced graphicsMode (0, 1, 2) with the graphicsPreset name. Balanced keeps the game's own
+        // Fancy; every other preset sets individual options, so the game is told it is Custom rather than a named
+        // preset whose values these settings no longer match.
+        t.add(Target.VANILLA, "graphicsPreset", Kind.STRING, "video", Cost.LOW, false,
+            Constraint.oneOf("fast", "fancy", "fabulous", "custom"), "fancy", "custom", "custom", "custom", "custom");
         t.num(Target.VANILLA, "renderDistance", Kind.INT, "video", Cost.HIGH, Constraint.range(2, 32), 12, 8, 10, 16, 24);
         t.num(Target.VANILLA, "simulationDistance", Kind.INT, "video", Cost.HIGH, Constraint.range(5, 32), 12, 6, 8, 12, 16);
         t.num(Target.VANILLA, "particles", Kind.INT, "video", Cost.MEDIUM, Constraint.oneOf(0, 1, 2), 0, 2, 1, 0, 0);
