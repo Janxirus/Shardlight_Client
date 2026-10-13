@@ -345,7 +345,29 @@ public final class AppContext {
                 steps.add("p4-" + id + suffix);
             }
         }
+        // Part 6: update preview, drop confirmation, move dialog and Storage
+        for (String suffix : List.of("", "-light")) {
+            for (String id : CapturePart6.VIEWS) {
+                steps.add("p6-" + id + suffix);
+            }
+        }
+        // CAPTURE_ONLY=<prefix>: only the views whose name starts with it (keeps a re-shoot short)
+        String only = System.getenv("CAPTURE_ONLY");
+        if (only != null && !only.isBlank()) {
+            steps.removeIf(s -> !s.startsWith(only));
+        }
         return steps;
+    }
+
+    private boolean showPart6Capture(String raw) {
+        if (!raw.startsWith("p6-")) {
+            return false;
+        }
+        boolean light = raw.endsWith("-light");
+        captureLook(light ? "light" : "dark", 1);
+        shell.setCollapsed(false);
+        overlay().clearToasts();
+        return CapturePart6.show(this, raw.substring(3, light ? raw.length() - "-light".length() : raw.length()));
     }
 
     private static List<String> part4Views() {
@@ -580,7 +602,7 @@ public final class AppContext {
             overlay().closeTop();
         }
         overlay().closePopover();
-        if (showPart3Capture(id) || showPart4Capture(id) || showShellCapture(id)) {
+        if (showPart3Capture(id) || showPart4Capture(id) || showPart6Capture(id) || showShellCapture(id)) {
             return;
         }
         if (id.startsWith("project-") && PROJECT_TABS.contains(id.substring(8))) {

@@ -117,6 +117,11 @@ public final class StorageSection {
         return new VBox(4, top, bar);
     }
 
+    /** the clean-up question with a list already known (the screenshots) */
+    public static Overlay.Dialog previewCleanup(AppContext ctx, DiskUsage.CleanupPlan plan) {
+        return new StorageSection(ctx).confirmCleanup(plan);
+    }
+
     // ---- clean-up ------------------------------------------------------------------------------------
 
     private void findUnused() {

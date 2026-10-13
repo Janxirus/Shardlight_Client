@@ -58,7 +58,7 @@ public final class ProjectMoveDialog {
         var projects = ctx.services().projects();
         Label now = UiKit.label(projects.gameDir(project).toString(), "mono");
         now.setWrapText(true);
-        HBox nowRow = new HBox(8, UiKit.chip(external ? I18n.tr("ui.projectPage.settings") : I18n.tr("ui.move.here"), external ? "accent" : "info"), now);
+        HBox nowRow = new HBox(8, UiKit.chip(external ? I18n.tr("ui.move.outside") : I18n.tr("ui.move.here"), external ? "accent" : "info"), now);
         nowRow.setAlignment(Pos.CENTER_LEFT);
         VBox current = new VBox(4, UiKit.label(I18n.tr("ui.move.current"), "caption", "faint"), nowRow);
 
