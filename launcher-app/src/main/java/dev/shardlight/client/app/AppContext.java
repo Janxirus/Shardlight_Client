@@ -300,9 +300,21 @@ public final class AppContext {
         services.settings().addListener(st -> Fx.ui(() -> {
             UiSettings.setReducedMotion(st.appearance.reducedMotion);
             ThemeManager.apply(s, st.appearance);
+            fitMinimumSize();
             shell.setCollapsed(st.appearance.sidebarCollapsed);
             applyTitleBar();
         }));
+    }
+
+    /**
+     * The smallest window is the smallest the layouts were designed for, in interface units: 68.6 x 45.7 em (960 x 640
+     * px at 100%). It grows with the interface size setting so a larger size never squeezes a page; on a small screen
+     * it stops at what the screen can show.
+     */
+    void fitMinimumSize() {
+        javafx.geometry.Rectangle2D screen = javafx.stage.Screen.getPrimary().getVisualBounds();
+        stage.setMinWidth(Math.min(ThemeManager.em(68.57), screen.getWidth()));
+        stage.setMinHeight(Math.min(ThemeManager.em(45.71), screen.getHeight()));
     }
 
     void afterShow() {
@@ -336,6 +348,9 @@ public final class AppContext {
 
     /** the pages, tabs, sections and dialogs --capture saves, in order */
     List<String> captureSteps() {
+        if (Boolean.getBoolean("shardlight.captureMatrix")) {
+            return matrixSteps();
+        }
         List<String> steps = new ArrayList<>(List.of("home", "library"));
         for (String tab : PROJECT_TABS) {
             steps.add("project-" + tab);
@@ -386,6 +401,40 @@ public final class AppContext {
         }
         return steps;
     }
+
+    /**
+     * --capture-matrix: every view once in each look (dark, light and high contrast, at 100% and 150%). A step is
+     * "m/<theme>/<scale>/<view>"; the picture is saved as "<theme>-<scale>/<view>.png".
+     */
+    private List<String> matrixSteps() {
+        List<String> views = new ArrayList<>();
+        part3Views().forEach(v -> views.add("p3-" + v));
+        part4Views().forEach(v -> views.add("p4-" + v));
+        CapturePart6.VIEWS.forEach(v -> views.add("p6-" + v));
+        CapturePart7.VIEWS.forEach(v -> views.add("p7-" + v));
+        views.addAll(List.of("gallery", "palette", "notifications", "collapsed"));
+        String only = System.getenv("CAPTURE_ONLY");
+        if (only != null && !only.isBlank()) {
+            views.removeIf(v -> !v.startsWith(only));
+        }
+        List<String> steps = new ArrayList<>();
+        // CAPTURE_LOOKS=dark-100,light-150: only those looks (keeps a re-shoot short)
+        String looks = System.getenv("CAPTURE_LOOKS");
+        for (String theme : List.of("dark", "light", "contrast")) {
+            for (String scale : List.of("100", "150")) {
+                if (looks != null && !looks.isBlank() && !List.of(looks.split(",")).contains(theme + "-" + scale)) {
+                    continue;
+                }
+                for (String v : views) {
+                    steps.add("m/" + theme + "/" + scale + "/" + v);
+                }
+            }
+        }
+        return steps;
+    }
+
+    private String lockedTheme;
+    private double lockedScale = 1;
 
     private boolean showPart6Capture(String raw) {
         if (!raw.startsWith("p6-")) {
@@ -576,12 +625,18 @@ public final class AppContext {
 
     /** show the app in {@code theme} (dark, light or contrast) at {@code scale} for --capture, not saved */
     private void captureLook(String theme, double scale) {
+        if (lockedTheme != null) {
+            // a --capture-matrix step: the look is the step's, whatever the view would normally pick
+            theme = lockedTheme;
+            scale = lockedScale;
+        }
         LauncherSettings.Appearance a = dev.shardlight.client.util.Json.copy(services.settings().get().appearance,
             LauncherSettings.Appearance.class);
         a.theme = theme.equals("light") ? "light" : "dark";
         a.highContrast = theme.equals("contrast");
         a.scale = scale;
         ThemeManager.apply(scene, a);
+        fitMinimumSize();
     }
 
     private boolean showShellCapture(String id) {
@@ -637,6 +692,12 @@ public final class AppContext {
     private static final List<String> PROJECT_TABS = ProjectPage.TABS;
 
     void showForCapture(String id) {
+        if (id.startsWith("m/")) {
+            String[] parts = id.split("/", 4);
+            lockedTheme = parts[1];
+            lockedScale = Integer.parseInt(parts[2]) / 100.0;
+            id = parts[3];
+        }
         while (overlay().hasOpenDialog()) {
             overlay().closeTop();
         }

@@ -9,7 +9,14 @@ import javafx.animation.ScaleTransition;
 import javafx.animation.TranslateTransition;
 import javafx.beans.property.DoubleProperty;
 import javafx.scene.Node;
+import javafx.stage.Stage;
 import javafx.util.Duration;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
  * Every animation in the launcher goes through here, so timing and easing stay consistent and Reduce motion
@@ -48,7 +55,45 @@ public final class Motion {
     /** how far pages, panels and toasts travel as they enter, in pixels */
     public static final double ENTER_OFFSET = 8;
 
+    /** every endless animation, so they can all be held while the window is minimised */
+    private static final Set<Animation> ENDLESS = Collections.newSetFromMap(new WeakHashMap<>());
+    /** the ones that were running when the window was minimised, to resume when it comes back */
+    private static final Set<Animation> HELD = new HashSet<>();
+    private static volatile boolean suspended;
+
     private Motion() {
+    }
+
+    /** true while the window is minimised: nothing animates and timers that only update the screen do nothing */
+    public static boolean suspended() {
+        return suspended;
+    }
+
+    /** hold every endless animation while {@code stage} is minimised, and carry on when it is restored */
+    public static void watchWindow(Stage stage) {
+        stage.iconifiedProperty().addListener((o, was, minimised) -> setSuspended(minimised));
+    }
+
+    static synchronized void setSuspended(boolean hold) {
+        if (suspended == hold) {
+            return;
+        }
+        suspended = hold;
+        if (hold) {
+            for (Animation a : List.copyOf(ENDLESS)) {
+                if (a.getStatus() == Animation.Status.RUNNING) {
+                    a.pause();
+                    HELD.add(a);
+                }
+            }
+        } else {
+            for (Animation a : HELD) {
+                if (a.getStatus() == Animation.Status.PAUSED) {
+                    a.play();
+                }
+            }
+            HELD.clear();
+        }
     }
 
     public static boolean reduced() {
@@ -239,6 +284,10 @@ public final class Motion {
         AnimationTimer timer = new AnimationTimer() {
             @Override
             public void handle(long now) {
+                if (suspended) {
+                    last[0] = 0;
+                    return;
+                }
                 if (last[0] != 0 && !self[0].paused && !reduced()) {
                     angle.set(angle.get() + degreesPerSecond * (now - last[0]) / 1e9);
                 }
@@ -262,14 +311,20 @@ public final class Motion {
 
     /** endless animations stop once their node is no longer in a scene */
     private static Animation loop(Node node, Animation a) {
+        synchronized (Motion.class) {
+            ENDLESS.add(a);
+        }
         node.sceneProperty().addListener((o, was, now) -> {
             if (now == null) {
                 a.stop();
-            } else if (a.getStatus() != Animation.Status.RUNNING) {
+                synchronized (Motion.class) {
+                    HELD.remove(a);
+                }
+            } else if (a.getStatus() != Animation.Status.RUNNING && !suspended) {
                 a.play();
             }
         });
-        if (node.getScene() != null) {
+        if (node.getScene() != null && !suspended) {
             a.play();
         }
         return a;

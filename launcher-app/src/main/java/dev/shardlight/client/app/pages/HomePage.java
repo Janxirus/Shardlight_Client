@@ -2,6 +2,7 @@ package dev.shardlight.client.app.pages;
 
 import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.flows.SignInDialog;
+import dev.shardlight.client.app.ui.Art;
 import dev.shardlight.client.app.ui.Fx;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Page;
@@ -20,6 +21,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
@@ -56,9 +58,48 @@ public final class HomePage implements Page {
         this.ctx = ctx;
         root.getStyleClass().addAll("home", "page-column");
         StackPane.setAlignment(root, Pos.TOP_CENTER);
+        view.getChildren().add(0, new Backdrop());
         ctx.onProjectsChanged(this::refreshIfShown);
         ctx.onAccountsChanged(this::refreshIfShown);
         ctx.play().onStateChanged(this::refreshIfShown);
+    }
+
+    /**
+     * Soft facets behind the top of the page. The picture is transparent, so it follows the dark and light window; it
+     * is as wide as the page, keeps its shape, and takes no room of its own.
+     */
+    private static final class Backdrop extends Region {
+        private final ImageView picture = new ImageView(Art.hero());
+        private final Region fade = new Region();
+
+        Backdrop() {
+            picture.setPreserveRatio(true);
+            picture.setSmooth(true);
+            fade.getStyleClass().add("home-backdrop-fade");
+            getStyleClass().add("home-backdrop");
+            getChildren().addAll(picture, fade);
+            setMouseTransparent(true);
+            setFocusTraversable(false);
+        }
+
+        @Override
+        protected double computePrefWidth(double height) {
+            return 0;
+        }
+
+        @Override
+        protected double computePrefHeight(double width) {
+            return 0;
+        }
+
+        @Override
+        protected void layoutChildren() {
+            double w = getWidth();
+            picture.setFitWidth(w);
+            double h = picture.getLayoutBounds().getHeight();
+            picture.relocate(0, 0);
+            fade.resizeRelocate(0, 0, w, h);
+        }
     }
 
     @Override

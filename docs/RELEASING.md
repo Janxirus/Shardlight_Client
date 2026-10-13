@@ -96,16 +96,67 @@ ever offered.
 2. Run the manual test pass in [TESTING.md](TESTING.md) on the build from `main`.
 3. In **Actions > Release (draft) > Run workflow**, pick `main` and type the version to confirm. The
    workflow refuses other branches, a mismatched version and a tag that already exists. It builds and
-   tests on Windows and Linux, then creates a **draft** release `vX.Y.Z` with the MSI, the Windows app
-   folder zip, the portable zip and `SHA256SUMS.txt`.
+   tests on Windows and Linux, then creates a **draft** release `vX.Y.Z` with the Windows MSI and app
+   folder zip, the macOS disk image (`.dmg`, Apple silicon), the Linux `.deb` and `.rpm`, the portable zip
+   and `SHA256SUMS.txt`. Each package is started once with `--capture` before it is accepted.
 4. Check the draft's files and notes, then press **Publish release**.
 5. Sign and upload the update manifest (section 2) so existing players are told about it.
 
-The MSI is not code-signed yet, so Windows SmartScreen warns on first run. Signing it needs a
-code-signing certificate, which only the publisher can obtain; add it to the Windows job when there is
-one. macOS builds would need an Apple Developer ID to be signed and notarised.
+Without signing certificates the MSI and the disk image are unsigned, so Windows SmartScreen and macOS
+Gatekeeper warn on first run. Section 4 below turns signing on; it needs certificates that only the
+publisher can obtain. Intel Macs use the portable zip (it carries the Intel macOS JavaFX files and needs a
+Java 21 runtime); the disk image is built on Apple silicon.
 
-## 4. Rolling back
+## 4. Code signing
+
+Signing is automatic: CI signs when the secrets below exist and skips it, with a notice in the run summary,
+when they don't. Nothing else changes, so you can add the certificates at any time. **Never paste a
+certificate, password or token into an issue, a pull request or a chat**; add them in the repository's
+**Settings > Secrets and variables > Actions**. The certificate files are decoded into a temporary file or
+keychain on the runner and deleted at the end of the job.
+
+### Windows (the MSI)
+
+| Name | Kind | What it is |
+|---|---|---|
+| `WINDOWS_CERTIFICATE_PFX_BASE64` | secret | your code-signing certificate with its private key, as a `.pfx` file, encoded as base64 |
+| `WINDOWS_CERTIFICATE_PASSWORD` | secret | the password of that `.pfx` file |
+| `WINDOWS_TIMESTAMP_URL` | variable, optional | a timestamp server; the default is `http://timestamp.digicert.com` |
+
+Getting the certificate: buy a **code-signing certificate** from a certificate authority (an organisation
+validated certificate, or an EV certificate if you want SmartScreen to trust the installer at once; EV
+certificates usually come on a hardware token that CI cannot use, so check with the authority that you
+can export a `.pfx`). Export it with its private key as `.pfx`, then encode it, for example in
+PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("certificate.pfx")) | Set-Clipboard`, and
+paste the result into the secret. `tools/release/sign_windows.ps1` signs every `.msi` with SHA-256 and a
+timestamp and then verifies the signature. A cloud signing service (Azure Trusted Signing, for example) is
+not wired in; it would replace that one script.
+
+### macOS (the disk image)
+
+| Name | Kind | What it is |
+|---|---|---|
+| `MACOS_CERTIFICATE_P12_BASE64` | secret | your **Developer ID Application** certificate with its private key, exported as `.p12`, encoded as base64 (`base64 -i certificate.p12 | pbcopy`) |
+| `MACOS_CERTIFICATE_PASSWORD` | secret | the password you chose when exporting the `.p12` |
+| `MACOS_SIGNING_IDENTITY` | variable | the certificate's full name, for example `Developer ID Application: Your Name (ABCDE12345)` |
+| `APPLE_ID` | secret | the Apple ID used for notarisation |
+| `APPLE_APP_SPECIFIC_PASSWORD` | secret | an app-specific password made at appleid.apple.com (not the Apple ID password) |
+| `APPLE_TEAM_ID` | variable | the 10-character team id from developer.apple.com > Membership |
+
+Getting the certificate: join the Apple Developer Program, then in Xcode (Settings > Accounts > Manage
+Certificates) or at developer.apple.com create a **Developer ID Application** certificate, and export it
+from Keychain Access (certificate and private key together) as `.p12`. With the first three set, the app
+inside the disk image is signed with the hardened runtime and the entitlements in
+`packaging/macos/entitlements.plist` (the Java runtime needs them). With the last three also set, the disk
+image is sent to Apple for notarisation and the ticket is stapled to it, so Gatekeeper opens it without a
+warning. Signed but not notarised still warns.
+
+### Update manifest
+
+Signing the installers is separate from signing the update manifest (section 2): the manifest has its own
+Ed25519 key and needs no certificate.
+
+## 5. Rolling back
 
 Players keep their data folder across versions, and every project's files carry a schema version: a
 newer launcher migrates them (keeping a `.pre-migration` copy of `settings.json`), and an older launcher

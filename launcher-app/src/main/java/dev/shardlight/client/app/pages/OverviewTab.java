@@ -5,6 +5,7 @@ import dev.shardlight.client.app.flows.PlayFlow;
 import dev.shardlight.client.app.flows.ProjectActions;
 import dev.shardlight.client.app.ui.Cards;
 import dev.shardlight.client.app.ui.Fx;
+import dev.shardlight.client.app.ui.Fields;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
@@ -86,7 +87,7 @@ final class OverviewTab {
 
         root.getChildren().add(modules(p));
 
-        TextArea notes = new TextArea(p.notes == null ? "" : p.notes);
+        TextArea notes = Fields.tabLeaves(new TextArea(p.notes == null ? "" : p.notes));
         notes.setPrefRowCount(3);
         notes.setWrapText(true);
         notes.setPromptText(I18n.tr("ui.projectPage.notesPrompt"));

@@ -18,10 +18,10 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Cover art for a project, used by the hero, project cards and the project page. Until a project has a picture of
- * its own, art is generated from its name and the colour of its template: the same project always looks the same
- * and two projects almost never look alike. A picture the player chose (the project icon file) is used instead,
- * cropped to fill.
+ * Cover art for a project, used by the hero, project cards and the project page. A picture the player chose (the
+ * project icon file) is used first, cropped to fill. Otherwise the project gets the cover of its template (see
+ * {@link Art}); a project with a template that has no cover gets art generated from its name and the colour of
+ * its template: the same project always looks the same and two projects almost never look alike.
  */
 public final class ProjectArt extends Region {
     /** the look of one project's generated art */
@@ -60,7 +60,10 @@ public final class ProjectArt extends Region {
 
     /** art of {@code width} x {@code height} (the preferred size; it grows to fill its parent). */
     public static ProjectArt of(Project p, Path projectDir, double width, double height, double radiusEm) {
-        ProjectArt art = new ProjectArt(palette(p), picture(p, projectDir), radiusEm);
+        Image own = picture(p, projectDir);
+        // a picture the player chose first, then the template's own cover; art is drawn from the name only for a template with no cover
+        Image shown = own != null ? own : Art.cover(p.template, width <= 0 ? 1000 : width).orElse(null);
+        ProjectArt art = new ProjectArt(palette(p), shown, radiusEm);
         art.setPrefSize(width, height);
         art.setMinHeight(height);
         art.setMaxWidth(Double.MAX_VALUE);

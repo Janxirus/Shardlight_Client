@@ -304,14 +304,29 @@ public final class ShardlightPage implements Page {
     private Node themeTile(Project p, String id, String name, String sub, ShardlightTheme t) {
         Node picture;
         if (t != null) {
-            Image logo = new Image(getClass().getResource("/app/themes/" + t.id().toLowerCase(java.util.Locale.ROOT) + ".png")
-                .toExternalForm(), ThemeManager.em(5) * 2, 0, true, false);
-            ImageView v = new ImageView(logo);
-            v.setFitWidth(ThemeManager.em(5));
-            v.setFitHeight(ThemeManager.em(5));
-            v.setPreserveRatio(true);
-            v.setSmooth(false);
-            picture = v;
+            String key = t.id().toLowerCase(java.util.Locale.ROOT);
+            // a real in-game screenshot of the theme when one is bundled (docs/THEME_PREVIEWS.md), else the pack's logo
+            java.net.URL shot = getClass().getResource("/app/themes/preview/" + key + ".png");
+            if (shot != null) {
+                ImageView v = new ImageView(new Image(shot.toExternalForm(), ThemeManager.em(11.3) * 2, 0, true, true));
+                v.setFitWidth(ThemeManager.em(11.3));
+                v.setPreserveRatio(true);
+                v.setSmooth(true);
+                javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(ThemeManager.em(11.3), ThemeManager.em(11.3) * 9 / 16);
+                clip.setArcWidth(ThemeManager.em(0.9));
+                clip.setArcHeight(ThemeManager.em(0.9));
+                v.setClip(clip);
+                picture = v;
+            } else {
+                Image logo = new Image(getClass().getResource("/app/themes/" + key + ".png")
+                    .toExternalForm(), ThemeManager.em(5) * 2, 0, true, false);
+                ImageView v = new ImageView(logo);
+                v.setFitWidth(ThemeManager.em(5));
+                v.setFitHeight(ThemeManager.em(5));
+                v.setPreserveRatio(true);
+                v.setSmooth(false);
+                picture = v;
+            }
         } else {
             picture = Icons.of(Icons.SPARKLE, 32);
             picture.getStyleClass().add("faint");

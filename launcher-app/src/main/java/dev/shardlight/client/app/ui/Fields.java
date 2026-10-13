@@ -24,6 +24,21 @@ import java.util.function.DoubleFunction;
 
 /** Input components: search field, number field with steppers, slider with a value bubble, labelled field. */
 public final class Fields {
+    /**
+     * A text area normally keeps Tab for itself (it types a tab character), so the keyboard can't leave it. This makes
+     * Tab and Shift+Tab move to the next and previous control, like in every other field; Ctrl+Tab still works too.
+     */
+    public static javafx.scene.control.TextArea tabLeaves(javafx.scene.control.TextArea area) {
+        area.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
+            if (e.getCode() == javafx.scene.input.KeyCode.TAB && !e.isControlDown() && !e.isAltDown() && !e.isMetaDown()) {
+                e.consume();
+                javafx.event.Event.fireEvent(area, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
+                    javafx.scene.input.KeyCode.TAB, e.isShiftDown(), true, false, false));
+            }
+        });
+        return area;
+    }
+
     private Fields() {
     }
 

@@ -14,6 +14,7 @@ import java.util.logging.Logger;
  *   --data-dir PATH      keep all launcher data in PATH (portable use)
  *   --capture DIR        render every page to DIR/*.png and exit (documentation, visual checks)
  *   --capture-size WxH   window size for --capture (default 1360x860)
+ *   --capture-matrix     with --capture: every view in dark, light and high contrast at 100% and 150%, in one folder per look
  *   --lang TAG           use this language for this run, for example de or en-XA (a test language)
  *   --page ID            open this page first (home, library, discover, shardlight, multiplayer, downloads, settings)
  * </pre>
@@ -44,6 +45,10 @@ public final class Main {
             + "; Java " + System.getProperty("java.version") + " on " + System.getProperty("os.name"));
         ShardlightApp.configure(paths, a);
         Application.launch(ShardlightApp.class, args);
+        if (Capture.failed) {
+            System.err.println("Accessibility findings: see accessibility-report.txt in the capture folder");
+            System.exit(1);
+        }
     }
 
     /** parsed command line */
@@ -63,6 +68,7 @@ public final class Main {
                     case "--capture" -> { capture = next; i++; }
                     case "--page" -> { page = next; i++; }
                     case "--lang" -> { lang = next; i++; }
+                    case "--capture-matrix" -> System.setProperty("shardlight.captureMatrix", "true");
                     case "--capture-size" -> {
                         if (next != null && next.matches("\\d+x\\d+")) {
                             w = Integer.parseInt(next.substring(0, next.indexOf('x')));

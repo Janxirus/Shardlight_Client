@@ -184,7 +184,8 @@ public final class UiKit {
 
     /** an empty state with a title: icon, title, one sentence, one action (may be null) */
     public static VBox emptyState(String icon, String title, String body, Node action) {
-        VBox v = empty(Icons.of(icon, 40), body, action);
+        // the launcher's own illustration when there is one for this icon, else the plain icon
+        VBox v = empty(Art.emptyIllustration(icon, 11.4).map(n -> (Node) n).orElseGet(() -> Icons.of(icon, 40)), body, action);
         v.getChildren().add(1, label(title, "h3"));
         return v;
     }

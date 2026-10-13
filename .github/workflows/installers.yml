@@ -1,0 +1,179 @@
+name: Installers
+
+# macOS (.dmg) and Linux (.deb and .rpm) packages. Called by Build (every pull request) and by Release (draft).
+# Each job installs or mounts the package it made and starts the app inside it once with --capture, which
+# draws every page and exits: if that works, the package runs.
+#
+# macOS code signing and notarisation happen only when the signing secrets exist (docs/RELEASING.md). Without
+# them the job still builds an unsigned .dmg and says so in the run summary.
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: 'true when called by the release workflow (artifact names without the commit)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  SHARDLIGHT_MSA_CLIENT_ID: ${{ vars.SHARDLIGHT_MSA_CLIENT_ID }}
+  SHARDLIGHT_DISCORD_APP_ID: ${{ vars.SHARDLIGHT_DISCORD_APP_ID }}
+  SHARDLIGHT_UPDATE_MANIFEST_URL: ${{ vars.SHARDLIGHT_UPDATE_MANIFEST_URL }}
+  SHARDLIGHT_UPDATE_PUBLIC_KEY: ${{ vars.SHARDLIGHT_UPDATE_PUBLIC_KEY }}
+  SHARDLIGHT_CURSEFORGE_API_KEY: ${{ secrets.SHARDLIGHT_CURSEFORGE_API_KEY }}
+
+jobs:
+  macos:
+    name: macOS disk image
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Is there a signing certificate?
+        id: sign
+        env:
+          CERT: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ vars.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$CERT" ] && [ -n "$CERT_PASSWORD" ] && [ -n "$IDENTITY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=macOS signing skipped::No Developer ID certificate is configured, so this disk image is not signed (docs/RELEASING.md)."
+            echo "macOS signing: **skipped** (no certificate configured)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM" ]; then
+            echo "notarize=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "notarize=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import the signing certificate
+        if: steps.sign.outputs.enabled == 'true'
+        env:
+          CERT: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/shardlight-build.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "$CERT" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Build the disk image
+        env:
+          IDENTITY: ${{ vars.MACOS_SIGNING_IDENTITY }}
+        run: |
+          chmod +x gradlew
+          args=()
+          if [ "${{ steps.sign.outputs.enabled }}" = "true" ]; then
+            args+=("-PmacSigningIdentity=$IDENTITY" "-PmacKeychain=$KEYCHAIN")
+          fi
+          ./gradlew :launcher-app:jpackageInstaller "${args[@]}" --stacktrace
+          ls -la launcher-app/build/jpackage/installer
+
+      - name: Notarise and staple
+        if: steps.sign.outputs.enabled == 'true' && steps.sign.outputs.notarize == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          dmg="$(ls launcher-app/build/jpackage/installer/*.dmg | head -1)"
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM" --password "$APPLE_PASSWORD" --wait
+          xcrun stapler staple "$dmg"
+          xcrun stapler validate "$dmg"
+          echo "macOS signing: **signed and notarised**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Note signed but not notarised
+        if: steps.sign.outputs.enabled == 'true' && steps.sign.outputs.notarize != 'true'
+        run: |
+          echo "macOS signing: **signed, not notarised** (no Apple ID secrets configured)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Mount the disk image and start the app inside it
+        run: |
+          dmg="$(ls launcher-app/build/jpackage/installer/*.dmg | head -1)"
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint /Volumes/ShardlightCheck
+          tools/release/prove_runs.sh "/Volumes/ShardlightCheck/Shardlight Client.app/Contents/MacOS/Shardlight Client"
+          hdiutil detach /Volumes/ShardlightCheck
+
+      - name: Name the file
+        run: |
+          ver="$(sed -n 's/^launcher_version=//p' gradle.properties | tr -d '\r')"
+          mkdir -p dist
+          cp "$(ls launcher-app/build/jpackage/installer/*.dmg | head -1)" "dist/ShardlightClient-$ver-macos-arm64.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.release && 'release-macos' || format('ShardlightClient-dmg-{0}', github.sha) }}
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  linux:
+    name: Linux .deb and .rpm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Packaging tools and a virtual display
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb rpm fakeroot binutils
+
+      - name: Build the .deb and the .rpm
+        run: |
+          chmod +x gradlew
+          ver="$(sed -n 's/^launcher_version=//p' gradle.properties | tr -d '\r')"
+          mkdir -p dist
+          ./gradlew :launcher-app:jpackageInstaller -PinstallerType=deb --stacktrace
+          cp launcher-app/build/jpackage/installer/*.deb "dist/ShardlightClient-$ver-linux-x64.deb"
+          ./gradlew :launcher-app:jpackageInstaller -PinstallerType=rpm --stacktrace
+          cp launcher-app/build/jpackage/installer/*.rpm "dist/ShardlightClient-$ver-linux-x64.rpm"
+          ls -la dist
+
+      - name: Install the .deb and start the app
+        run: |
+          sudo dpkg -i dist/*.deb
+          launcher="$(find /opt/shardlight-client/bin -maxdepth 1 -type f -perm -u+x | head -1)"
+          echo "Installed launcher: $launcher"
+          tools/release/prove_runs.sh "$launcher" xvfb
+
+      - name: Unpack the .rpm and start the app
+        run: |
+          mkdir "$RUNNER_TEMP/rpm-root"
+          (cd "$RUNNER_TEMP/rpm-root" && rpm2cpio "$GITHUB_WORKSPACE"/dist/*.rpm | cpio -idm)
+          launcher="$(find "$RUNNER_TEMP/rpm-root/opt/shardlight-client/bin" -maxdepth 1 -type f -perm -u+x | head -1)"
+          echo "Unpacked launcher: $launcher"
+          tools/release/prove_runs.sh "$launcher" xvfb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.release && 'release-linux' || format('ShardlightClient-linux-packages-{0}', github.sha) }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+          if-no-files-found: error

@@ -277,6 +277,14 @@
 .button.icon-only { -fx-padding: 0.5em; }
 .button.large { -fx-font-size: 1.071em; -fx-padding: 0.714em 1.429em; }
 .button.small { -fx-font-size: 0.857em; -fx-padding: 0.286em 0.714em; }
+/* Click targets: nothing you press is smaller than 32 x 32 px (2.286em), whatever size it looks. A small button
+ * keeps its small text and padding but not a smaller target. */
+.button, .toggle-button, .menu-button, .split-menu-button { -fx-min-height: 2.286em; }
+.button.icon-only { -fx-min-width: 2.286em; }
+/* a small button's em is its own, smaller font: 32 px is 2.667em there */
+.button.small { -fx-min-height: 2.667em; }
+.button.icon-only.small { -fx-min-width: 2.667em; }
+.check-box, .radio-button { -fx-min-height: 2.286em; }
 
 .play-button {
     -fx-background-color: linear-gradient(to right, -sl-accent 0%, -sl-accent-hover 45%, -sl-accent-2 100%);
@@ -1373,6 +1381,7 @@
 }
 
 .project-art { -fx-background-color: -sl-fill; }
+.home-backdrop-fade { -fx-background-color: linear-gradient(to bottom, transparent 0%, transparent 35%, -sl-bg 100%); }
 .hero-scrim { -fx-background-color: linear-gradient(to bottom, -sl-art-scrim-top 0%, -sl-art-scrim-bottom 100%); }
 .hero-panel, .project-header { -fx-background-radius: 1.429em; -fx-min-height: 11.4em; }
 .hero-content { -fx-padding: 1.714em; -fx-spacing: 1.143em; -fx-alignment: bottom-left; }

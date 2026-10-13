@@ -117,11 +117,28 @@ def jpackageCommon = { String type, File dest ->
                      '--win-per-user-install', '--win-upgrade-uuid', '6b0e8f8e-3c1d-4f5e-9a51-5d1b9c0a7e21']
         }
     } else if (os.contains('mac')) {
-        def icns = rootProject.file('packaging/icons/shardlight.icns')
-        if (icns.exists()) args += ['--icon', icns.absolutePath]
+        // packaging/macos holds the DMG background ("Shardlight Client-background.png") that jpackage picks up by name
+        args += ['--icon', rootProject.file('packaging/icons/shardlight.icns').absolutePath,
+                 '--resource-dir', rootProject.file('packaging/macos').absolutePath,
+                 '--mac-package-name', 'Shardlight Client',
+                 '--mac-package-identifier', 'dev.shardlight.client',
+                 '--mac-app-category', 'public.app-category.games']
+        // Signing happens only when CI passes an identity (see docs/RELEASING.md); without it the app is unsigned
+        def identity = providers.gradleProperty('macSigningIdentity').orNull
+        if (identity) {
+            args += ['--mac-sign', '--mac-signing-key-user-name', identity,
+                     '--mac-entitlements', rootProject.file('packaging/macos/entitlements.plist').absolutePath]
+            def keychain = providers.gradleProperty('macKeychain').orNull
+            if (keychain) args += ['--mac-signing-keychain', keychain]
+        }
     } else {
-        args += ['--icon', rootProject.file('packaging/icons/shardlight.png').absolutePath]
+        args += ['--icon', rootProject.file('packaging/icons/shardlight.png').absolutePath,
+                 '--linux-package-name', 'shardlight-client',
+                 '--linux-app-category', 'games',
+                 '--linux-menu-group', 'Game']
         if (type != 'app-image') args += ['--linux-shortcut']
+        if (type == 'deb') args += ['--linux-deb-maintainer', '95642531+Janxirus@users.noreply.github.com']
+        if (type == 'rpm') args += ['--linux-rpm-license-type', 'Proprietary']
     }
     return args
 }
@@ -137,10 +154,10 @@ tasks.register('jpackageImage', Exec) {
 
 tasks.register('jpackageInstaller', Exec) {
     group = 'distribution'
-    description = 'Installer for this operating system (Windows: MSI, needs WiX 3; macOS: DMG; Linux: DEB).'
+    description = 'Installer for this operating system (Windows: MSI, needs WiX 3; macOS: DMG; Linux: DEB, or RPM with -PinstallerType=rpm).'
     dependsOn 'jpackageInput'
     def os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
-    def type = os.contains('win') ? 'msi' : os.contains('mac') ? 'dmg' : 'deb'
+    def type = providers.gradleProperty('installerType').getOrElse(os.contains('win') ? 'msi' : os.contains('mac') ? 'dmg' : 'deb')
     def dest = layout.buildDirectory.dir('jpackage/installer').get().asFile
     doFirst { project.delete(dest) }
     commandLine jpackageCommon(type, dest)
