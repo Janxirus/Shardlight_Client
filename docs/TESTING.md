@@ -154,6 +154,24 @@ this is the by-hand list:
 4. **3D on a real computer**: the screenshots here use a software renderer. On Windows check the model is smooth, not
    black, and that the player head in the top bar matches.
 
+## Installers, signing and look (owner checks)
+
+The packages are built and started once in CI, but nobody has looked at them on a real computer:
+
+1. **Windows MSI**: install it, look at the welcome page and the header (they should show the Shardlight shard and
+   facets, not the Java picture; if they show the default look, the picture swap in
+   `tools/release/set_msi_images.ps1` did not find its rows and CI printed a warning). Check the Start menu entry,
+   the icon, and that uninstalling keeps your data. Unsigned installers show a SmartScreen warning.
+2. **macOS disk image** (Apple silicon): open it, the window should show the Shardlight background; drag the app to
+   Applications and start it. Unsigned builds need right-click > Open the first time.
+3. **Linux**: `sudo apt install ./ShardlightClient-*.deb` (or `sudo dnf install ./ShardlightClient-*.rpm`), start
+   Shardlight Client from the menu, remove it again.
+4. **Splash**: start the launcher; the splash should show for a moment and then the window opens.
+5. **Looks**: download the `screenshots-…` artifact from a build run and look through the dark, light and
+   high-contrast folders; they are made in software rendering, so also glance at the real app once in each.
+6. **Keyboard**: use the launcher with the keyboard only for a few minutes (Tab, Enter, Escape, Ctrl+K).
+7. **Speed and memory**: see [PERFORMANCE.md](PERFORMANCE.md) for how to measure on a real computer.
+
 ## Manual test pass before a release
 
 1. Install the MSI on a clean Windows user account. Start it from the Start menu.

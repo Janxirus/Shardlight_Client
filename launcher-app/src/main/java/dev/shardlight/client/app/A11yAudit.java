@@ -101,6 +101,70 @@ final class A11yAudit {
     }
 
     /**
+     * Finds visible controls that are drawn past the window's right or left edge: the page needs more room than the
+     * window has (the smallest window is 68.6 x 45.7 em). Only the outermost offenders are reported.
+     */
+    static List<String> overflow(javafx.scene.Scene scene) {
+        List<String> found = new ArrayList<>();
+        overflow(scene.getRoot(), scene.getWidth(), found);
+        if (!found.isEmpty() && scene.getRoot().minWidth(-1) > scene.getWidth() + 1) {
+            found.add(String.format(java.util.Locale.ROOT, "the window is narrower than the page's minimum width (%.0f of %.0f px); it is set by %s",
+                scene.getWidth(), scene.getRoot().minWidth(-1), widestMinimum(scene.getRoot())));
+        }
+        return found;
+    }
+
+    /** follows the child with the largest minimum width down the tree: the control that stops the page shrinking */
+    private static String widestMinimum(Node n) {
+        Node at = n;
+        StringBuilder path = new StringBuilder();
+        while (at instanceof Parent p) {
+            path.append(at.getClass().getSimpleName()).append(String.format(java.util.Locale.ROOT, "[%.0f] > ", at.minWidth(-1)));
+            Node best = null;
+            double widest = -1;
+            for (Node c : p.getChildrenUnmodifiable()) {
+                if (!c.isManaged() || !c.isVisible()) {
+                    continue;
+                }
+                double w = c.minWidth(-1);
+                if (w > widest) {
+                    widest = w;
+                    best = c;
+                }
+            }
+            if (best == null) {
+                break;
+            }
+            at = best;
+        }
+        return path + describe(at) + String.format(java.util.Locale.ROOT, " (%.0f px)", at.minWidth(-1));
+    }
+
+    private static void overflow(Node n, double width, List<String> found) {
+        if (!n.isVisible() || !n.isManaged() || n.getOpacity() == 0) {
+            return;
+        }
+        // content that is meant to scroll, and the area behind a dialog, may be larger than the window
+        if (n instanceof javafx.scene.control.ScrollPane || n instanceof ListCell<?> || n instanceof TableRow<?>
+            || n instanceof javafx.scene.control.TableView<?> || n instanceof javafx.scene.control.ListView<?>
+            || n.getStyleClass().contains("tab-strip") || n.getStyleClass().contains("toast-host")) {
+            return;
+        }
+        javafx.geometry.Bounds b = n.localToScene(n.getBoundsInLocal());
+        boolean out = b != null && (b.getMaxX() > width + 2 || b.getMinX() < -2);
+        if (out && (n instanceof Labeled || n instanceof Control)) {
+            found.add(String.format(java.util.Locale.ROOT, "drawn past the window edge (%.0f to %.0f of %.0f px): %s",
+                b.getMinX(), b.getMaxX(), width, describe(n)));
+            return;
+        }
+        if (n instanceof Parent p) {
+            for (Node c : List.copyOf(p.getChildrenUnmodifiable())) {
+                overflow(c, width, found);
+            }
+        }
+    }
+
+    /**
      * Presses Tab from the current focus until it comes back round, and reports if focus gets stuck or a view has
      * nothing the keyboard can reach. Needs the view to be shown.
      */

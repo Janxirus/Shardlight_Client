@@ -250,7 +250,7 @@ public final class HomePage implements Page {
             artChip(I18n.tr("ui.project.minecraft", p.minecraftVersion), Icons.CUBE),
             artChip(ProjectText.loader(p), Icons.PACKAGE),
             artChip(ProjectText.preset(p), p.preset != null && p.preset.active == Preset.ULTRA_PERFORMANCE ? Icons.BOLT : Icons.GAUGE),
-            artChip(p.hasShardlight() ? ProjectText.modules(p) : I18n.tr("ui.home.noModules"), Icons.SHARD));
+            UiKit.chipCapped(p.hasShardlight() ? ProjectText.modules(p) : I18n.tr("ui.home.noModules"), "on-art", Icons.SHARD, 24));
         chips.getStyleClass().add("chip-row");
         // real launch records only: nothing is shown for a project that was never played
         Label played = UiKit.label(p.lastPlayedAt > 0 ? ProjectText.lastPlayed(p) + "   ·   "

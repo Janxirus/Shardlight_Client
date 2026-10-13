@@ -5,6 +5,7 @@ import dev.shardlight.client.app.ui.Cards;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.ProjectText;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.ToggleSwitch;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
@@ -265,7 +266,7 @@ public final class PresetPanel {
                 int v = current instanceof Number n ? n.intValue() : 0;
                 Spinner<Integer> s = new Spinner<>(Integer.MIN_VALUE / 2, Integer.MAX_VALUE / 2, v);
                 s.setEditable(true);
-                s.setPrefWidth(110);
+                s.setPrefWidth(ThemeManager.scaled(110));
                 s.valueProperty().addListener((o, a, b) -> {
                     if (b != null && !Objects.equals(a, b)) {
                         set(p, d, b);
@@ -277,7 +278,7 @@ public final class PresetPanel {
                 double v = current instanceof Number n ? n.doubleValue() : 0;
                 Spinner<Double> s = new Spinner<>(-1e9, 1e9, v, 0.05);
                 s.setEditable(true);
-                s.setPrefWidth(110);
+                s.setPrefWidth(ThemeManager.scaled(110));
                 s.valueProperty().addListener((o, a, b) -> {
                     if (b != null && !Objects.equals(a, b)) {
                         set(p, d, b);
@@ -287,7 +288,7 @@ public final class PresetPanel {
             }
             default -> {
                 TextField f = new TextField(current == null ? "" : String.valueOf(current));
-                f.setPrefWidth(160);
+                f.setPrefWidth(ThemeManager.scaled(160));
                 f.setOnAction(e -> set(p, d, f.getText()));
                 f.focusedProperty().addListener((o, a, b) -> {
                     if (!b) {

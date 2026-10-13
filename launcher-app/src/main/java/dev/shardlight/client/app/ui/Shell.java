@@ -483,6 +483,7 @@ public final class Shell {
                 crumbs.getChildren().add(title);
             }
         }
+        crumbs.setMinWidth(trail.size() == 1 ? Region.USE_PREF_SIZE : 0);
         Node a = entry.page().actions();
         titleActions.getChildren().setAll(a == null ? new Node[0] : new Node[] {a});
     }

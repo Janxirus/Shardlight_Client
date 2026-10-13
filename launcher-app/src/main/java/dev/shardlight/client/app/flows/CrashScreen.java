@@ -4,6 +4,7 @@ import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.ui.Disclosure;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Overlay;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.diagnostics.Finding;
 import dev.shardlight.client.diagnostics.Severity;
@@ -55,7 +56,7 @@ public final class CrashScreen {
 
         VBox body = new VBox(14);
         body.getStyleClass().add("crash-screen");
-        body.setPrefWidth(620);
+        body.setPrefWidth(ThemeManager.scaled(620));
 
         Overlay.Dialog[] dialog = new Overlay.Dialog[1];
         Label what = UiKit.label(I18n.tr("ui.crash.what", exit.exitCode()), "muted");
@@ -113,7 +114,7 @@ public final class CrashScreen {
         findings.sort((a, b) -> b.severity().compareTo(a.severity()));
         Finding likely = findings.isEmpty() || findings.get(0).severity() == Severity.INFO ? null : findings.get(0);
         VBox body = new VBox(14);
-        body.setPrefWidth(620);
+        body.setPrefWidth(ThemeManager.scaled(620));
         if (likely != null) {
             VBox cause = new VBox(8);
             cause.getStyleClass().addAll("crash-cause", "known");

@@ -132,11 +132,10 @@ def jpackageCommon = { String type, File dest ->
             if (keychain) args += ['--mac-signing-keychain', keychain]
         }
     } else {
-        args += ['--icon', rootProject.file('packaging/icons/shardlight.png').absolutePath,
-                 '--linux-package-name', 'shardlight-client',
-                 '--linux-app-category', 'games',
-                 '--linux-menu-group', 'Game']
-        if (type != 'app-image') args += ['--linux-shortcut']
+        args += ['--icon', rootProject.file('packaging/icons/shardlight.png').absolutePath]
+        // the package options are not valid for a plain app folder
+        if (type != 'app-image') args += ['--linux-package-name', 'shardlight-client', '--linux-app-category', 'games',
+                                          '--linux-menu-group', 'Game', '--linux-shortcut']
         if (type == 'deb') args += ['--linux-deb-maintainer', '95642531+Janxirus@users.noreply.github.com']
         if (type == 'rpm') args += ['--linux-rpm-license-type', 'Proprietary']
     }

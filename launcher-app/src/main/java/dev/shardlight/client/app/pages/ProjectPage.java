@@ -208,7 +208,7 @@ public final class ProjectPage implements Page {
             UiKit.chip(ProjectText.loader(p), "on-art", Icons.PACKAGE),
             UiKit.chip(ProjectText.preset(p), p.preset != null && p.preset.active == Preset.ULTRA_PERFORMANCE
                 ? "warning" : "accent", Icons.BOLT),
-            UiKit.chip(p.hasShardlight() ? ProjectText.modules(p) : I18n.tr("ui.home.noModules"), "on-art", Icons.SHARD));
+            UiKit.chipCapped(p.hasShardlight() ? ProjectText.modules(p) : I18n.tr("ui.home.noModules"), "on-art", Icons.SHARD, 24));
         chips.getStyleClass().add("chip-row");
         VBox text = new VBox(name, chips);
         text.getStyleClass().add("header-text");
@@ -295,33 +295,33 @@ public final class ProjectPage implements Page {
         java.getStyleClass().add("stack-tight");
         Spinner<Integer> max = new Spinner<>(1024, 65536, p.java.maxMemoryMb, 512);
         max.setEditable(true);
-        max.setPrefWidth(120);
+        max.setPrefWidth(ThemeManager.scaled(120));
         max.valueProperty().addListener((o, a, b) -> save(x -> x.java.maxMemoryMb = b));
         java.getChildren().add(UiKit.settingRow(I18n.tr("ui.projectPage.maxMemory"), I18n.tr("ui.projectPage.maxMemoryHint"), max));
         Spinner<Integer> min = new Spinner<>(256, 65536, p.java.minMemoryMb, 256);
         min.setEditable(true);
-        min.setPrefWidth(120);
+        min.setPrefWidth(ThemeManager.scaled(120));
         min.valueProperty().addListener((o, a, b) -> save(x -> x.java.minMemoryMb = b));
         java.getChildren().add(UiKit.settingRow(I18n.tr("ui.projectPage.minMemory"), null, min));
         TextField path = text(p.java.javaPath, I18n.tr("ui.wizard.javaAuto"), v -> save(x -> x.java.javaPath = v.isBlank() ? null : v));
-        path.setPrefWidth(320);
+        path.setPrefWidth(ThemeManager.scaled(320));
         java.getChildren().add(UiKit.settingRow(I18n.tr("ui.wizard.javaPath"), I18n.tr("ui.wizard.javaHint"), path));
         TextField jvm = text(p.java.extraJvmArgs, "", v -> save(x -> x.java.extraJvmArgs = v));
-        jvm.setPrefWidth(320);
+        jvm.setPrefWidth(ThemeManager.scaled(320));
         java.getChildren().add(UiKit.settingRow(I18n.tr("ui.wizard.jvmArgs"), I18n.tr("ui.wizard.jvmArgsHint"), jvm));
         TextField gameArgs = text(p.java.extraGameArgs, "", v -> save(x -> x.java.extraGameArgs = v));
-        gameArgs.setPrefWidth(320);
+        gameArgs.setPrefWidth(ThemeManager.scaled(320));
         java.getChildren().add(UiKit.settingRow(I18n.tr("ui.projectPage.gameArgs"), null, gameArgs));
 
         VBox window = UiKit.card(UiKit.label(I18n.tr("ui.projectPage.windowTitle"), "h3"));
         window.getStyleClass().add("stack-tight");
         Spinner<Integer> w = new Spinner<>(640, 7680, p.window.width, 10);
         w.setEditable(true);
-        w.setPrefWidth(100);
+        w.setPrefWidth(ThemeManager.scaled(100));
         w.valueProperty().addListener((o, a, b) -> save(x -> x.window.width = b));
         Spinner<Integer> h = new Spinner<>(480, 4320, p.window.height, 10);
         h.setEditable(true);
-        h.setPrefWidth(100);
+        h.setPrefWidth(ThemeManager.scaled(100));
         h.valueProperty().addListener((o, a, b) -> save(x -> x.window.height = b));
         HBox size = new HBox(6, w, UiKit.label("×"), h);
         size.setAlignment(Pos.CENTER_LEFT);
@@ -391,7 +391,7 @@ public final class ProjectPage implements Page {
         });
         type.setValue(p.loader.isVanilla() ? LoaderType.VANILLA : p.loader.type);
         ComboBox<String> version = new ComboBox<>();
-        version.setPrefWidth(150);
+        version.setPrefWidth(ThemeManager.scaled(150));
         version.setAccessibleText(I18n.tr("ui.projectPage.loaderVersion"));
         Runnable loadVersions = () -> {
             LoaderType t = type.getValue();

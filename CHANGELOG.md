@@ -6,6 +6,22 @@ All notable changes to Shardlight Client. Versions follow [semantic versioning](
 
 ### Added
 
+- **Art, installers and polish** (UI overhaul, part 8):
+  - Original artwork in the shard style: a Home backdrop, a default cover for each of the nine project templates,
+    eleven empty-state illustrations, a splash screen, and the installer pictures (docs/CREDITS.md). Projects
+    without a picture of their own now show their template's cover.
+  - Installers for every system: the Windows MSI and portable zip as before, plus a macOS `.dmg` and Linux `.deb`
+    and `.rpm` built in CI. Each package is started once to prove it runs. Windows and macOS files are signed, and
+    the disk image notarised, when the signing secrets exist (docs/RELEASING.md); without them signing is skipped.
+  - The Shardlight page shows an in-game screenshot for each theme once one is bundled (docs/THEME_PREVIEWS.md);
+    until then it keeps the pack logos.
+  - Keyboard and screen readers: every button is at least 32 x 32 px, the project notes box no longer traps Tab,
+    and `--capture --capture-matrix` checks every view for unnamed icon buttons, small targets and mouse-only
+    controls (docs/ACCESSIBILITY.md).
+  - The window's smallest size grows with the interface size setting, so a larger size never squeezes a page.
+  - Nothing animates while the window is minimised.
+  - Measured start time and memory (docs/PERFORMANCE.md); CI prints them on every build.
+
 - **Extras** (UI overhaul, part 7):
   - Skins: Settings > Accounts > Skins shows your player in 3D (drag to turn, scroll to zoom), uploads a skin
     (classic or slim), switches capes, and keeps a local library of the skins you used. With Minecraft's services

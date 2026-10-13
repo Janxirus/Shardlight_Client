@@ -2,7 +2,9 @@
 # Startup time and idle memory of a built launcher (see docs/PERFORMANCE.md).
 #
 #   ./gradlew :launcher-app:installDist
-#   tools/perf/measure.sh launcher-app/build/install/shardlight-client [runs]
+#   tools/perf/measure.sh launcher-app/build/install/shardlight-client [runs]       # the jars, on the machine's Java
+#   ./gradlew :launcher-app:jpackageImage
+#   tools/perf/measure.sh "launcher-app/build/jpackage/image/Shardlight Client/bin/Shardlight Client" [runs]   # the shipped app
 #
 # Runs the app RUNS times (default 5) under a virtual display with the real JVM flags, each time with a fresh data
 # folder, and prints the median startup time (JVM start until Home is drawn), heap and resident memory after 8 s idle.
@@ -11,8 +13,14 @@ set -euo pipefail
 dir="$1"; runs="${2:-5}"
 out=$(mktemp -d)
 for i in $(seq 1 "$runs"); do
+  if [ -f "$dir" ]; then
+    # a packaged app: it has its own Java runtime and JVM flags, so only the measuring switch is added
+    JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Dshardlight.measure=$out/run$i.json" \
+      xvfb-run -a -s "-screen 0 1400x900x24" "$dir" --data-dir "$out/data$i" >"$out/log$i.txt" 2>&1 || true
+  else
   xvfb-run -a -s "-screen 0 1400x900x24" java -Xss2m ${JAVA_GC:--XX:+UseG1GC} -Dprism.lcdtext=false --enable-native-access=ALL-UNNAMED \
     -Dshardlight.measure="$out/run$i.json" -cp "$dir/lib/*" dev.shardlight.client.app.Main --data-dir "$out/data$i" >"$out/log$i.txt" 2>&1 || true
+  fi
   [ -s "$out/run$i.json" ] || { echo "run $i produced no result; log:"; tail -20 "$out/log$i.txt"; exit 1; }
 done
 python3 -I - "$out" "$runs" <<'PY'

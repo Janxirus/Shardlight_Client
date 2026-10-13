@@ -4,6 +4,7 @@ import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.content.DropItem;
 import dev.shardlight.client.content.DropKind;
@@ -113,7 +114,7 @@ public final class DropFlow {
 
     private static void showRefused(AppContext ctx, List<Refusal> refused) {
         VBox body = new VBox(8);
-        body.setPrefWidth(480);
+        body.setPrefWidth(ThemeManager.scaled(480));
         refused.forEach(r -> body.getChildren().add(refusalRow(r)));
         Button ok = UiKit.primary(I18n.tr("common.ok"), null, () -> { });
         Overlay.Dialog d = ctx.overlay().show(Overlay.modal(I18n.tr("ui.drop.refused"), body, ok), true, false);
@@ -177,7 +178,7 @@ public final class DropFlow {
         picker.valueProperty().addListener((o, a, b) -> fill.run());
 
         VBox body = new VBox(12, pickRow, rows, warnings);
-        body.setPrefWidth(540);
+        body.setPrefWidth(ThemeManager.scaled(540));
         if (!refused.isEmpty()) {
             VBox no = new VBox(8, UiKit.label(I18n.tr("ui.drop.refused"), "h3"));
             refused.forEach(r -> no.getChildren().add(refusalRow(r)));

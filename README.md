@@ -53,6 +53,8 @@ Builds come from GitHub Actions on every push. Open the latest successful
 |---|---|---|
 | `ShardlightClient-msi-…` | Windows installer | nothing else; Java is included |
 | `ShardlightClient-windows-x64-…` | Windows app folder, no installer | nothing else; Java is included |
+| `ShardlightClient-dmg-…` | macOS disk image (Apple silicon) | nothing else; Java is included |
+| `ShardlightClient-linux-packages-…` | Linux `.deb` (Debian, Ubuntu) and `.rpm` (Fedora, openSUSE) | nothing else; Java is included |
 | `ShardlightClient-portable-…` | Windows, Linux and macOS | Java 21 or newer on the computer |
 
 Release builds are made by hand from `main` and published as GitHub releases with checksums; see
@@ -94,11 +96,14 @@ You need JDK 21. Everything else comes through the Gradle wrapper.
 ./gradlew :launcher-app:run --args="--data-dir build/dev-data"   # with a throwaway data folder
 ./gradlew :launcher-app:portableZip           # the portable zip
 ./gradlew :launcher-app:jpackageImage         # app folder with its own Java (on the target OS)
-./gradlew :launcher-app:jpackageInstaller     # Windows MSI (needs WiX Toolset 3 on PATH)
+./gradlew :launcher-app:jpackageInstaller     # this OS's installer: Windows MSI (needs WiX Toolset 3 on PATH), macOS DMG, Linux DEB
+./gradlew :launcher-app:jpackageInstaller -PinstallerType=rpm   # Linux RPM (needs rpmbuild)
 ```
 
 Command line options: `--data-dir PATH`, `--page home|library|discover|shardlight|multiplayer|downloads|settings`,
 and `--capture DIR` (with `--capture-size WxH`), which opens every page, saves a PNG of each and exits.
+`--capture DIR --capture-matrix` saves every view in dark, light and high contrast at 100% and 150% (one folder
+per look) and writes `accessibility-report.txt`; see [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 
 A distributor's build can carry four optional values: the Azure client id, a CurseForge API key, and the
 update manifest URL and public key. They come from Gradle properties or environment variables at build

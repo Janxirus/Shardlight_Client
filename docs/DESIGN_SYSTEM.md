@@ -345,6 +345,20 @@ menus offer the same actions as the visible buttons (project tiles, the pinned p
 | Settings search | `SettingsPage` | Every setting is registered with a title and keywords; the search jumps to the section, scrolls to the row and marks it with `setting-found` for three seconds. Each change applies at once and shows an Undo toast |
 | Crash screen | `CrashScreen.show` | The most likely cause in plain words, the fix button from the crash analysis, the other findings collapsed, then Open log and Export diagnostics |
 
+### Pieces added in Part 8
+
+| Piece | API | Notes |
+| --- | --- | --- |
+| Artwork | `Art.hero()`, `Art.cover(template, widthPx)`, `Art.emptyIllustration(icon, widthEm)`, `Art.splash()` | Original shard-style pictures at 1x and 2x (docs/CREDITS.md). `ProjectArt` shows a project's own picture, else its template's cover, else art drawn from its name. `UiKit.emptyState(icon, ...)` shows the illustration that goes with the icon (library, search, content, downloads, servers, world, image, archive, trash, user, shard) and falls back to the icon |
+| Home backdrop | `.home-backdrop-fade` | A transparent facet picture behind the top of Home; it takes no room and fades into `-sl-bg` |
+| Click targets | stylesheet, "Click targets" | Every button, icon button, check box and radio button is at least 32 x 32 px (`2.286em`, or `2.667em` inside `.small` because its own font is smaller) |
+| Sizes in Java | `ThemeManager.scaled(px)`, `ThemeManager.em(ems)` | For the few widths layout code must set (dialog bodies): the size at 100% scaled by the interface size setting. Never a bare `setPrefWidth(480)` |
+| Multi-line fields | `Fields.tabLeaves(textArea)` | Tab and Shift+Tab leave the box instead of typing a tab |
+| Minimised window | `Motion.suspended()` | Endless animations (skeletons, shimmer, dots, the skin turn) pause while the window is minimised and resume when it is restored; a timer that only updates the screen should return early when this is true |
+| Accessibility check | `--capture --capture-matrix` | docs/ACCESSIBILITY.md |
+
+Raw colours that remain in Java are deliberate: Minecraft's own colour codes in the server MOTD, the ten built-in project icon colours (they are art), the accent preset swatches (data), and the picture-drawing code in `ShardLogo`, `ProjectArt` and `SkinPixels`.
+
 **JavaFX CSS limits.** There are no sibling combinators (`+`, `~`) and no `:not`, `:is`, `:where`,
 `:nth-child` or `:last-child`. A selector the parser cannot read makes it drop the rest of the stylesheet,
 so everything after it looks unstyled. Use a style class instead (`ruled`, `primary-split`).
@@ -361,5 +375,5 @@ so everything after it looks unstyled. Use a style class instead (`ruled`, `prim
    involved), then add the text/background pair to `DesignTokensContrastTest`.
 4. Numbers get `.tabular`; paths and versions get `.mono`.
 5. Animate with `Motion` only.
-6. Check it in the gallery and with `--capture` in dark and light, at 100% and a larger interface size, with high contrast
-   and Reduce motion on, and with the keyboard alone.
+6. Check it in the gallery and with `--capture --capture-matrix` (every view in dark, light and high contrast, at 100%
+   and 150%), with Reduce motion on, and with the keyboard alone; read `accessibility-report.txt`.

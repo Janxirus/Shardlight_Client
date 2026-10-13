@@ -779,6 +779,7 @@
     -fx-text-fill: -sl-text-3;
     -fx-font-weight: normal;
     -fx-pref-width: 12em;
+    -fx-min-width: 2.6em;
     -fx-alignment: center-left;
     -fx-cursor: text;
     -sl-icon: -sl-text-3;
@@ -1130,7 +1131,7 @@
 }
 .filter-chip > .label { -fx-text-fill: -sl-accent-fg; -fx-font-size: 0.857em; }
 .button.chip-remove { -fx-padding: 0.214em; -sl-icon: -sl-accent-fg; }
-.chip-row { -fx-hgap: 0.429em; -fx-vgap: 0.429em; }
+.chip-row { -fx-hgap: 0.429em; -fx-vgap: 0.429em; -fx-min-width: 0; }
 
 .button.loading, .button.loading:disabled { -fx-opacity: 1; }
 .button.copied { -sl-icon: -sl-success; }

@@ -4,6 +4,7 @@ import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.ui.Dialogs;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.modpack.MrpackExportOptions;
@@ -58,7 +59,7 @@ public final class ModpackExportDialog {
             new HBox(12, nameBox, versionBox),
             new VBox(4, UiKit.label(I18n.tr("ui.modpack.summary"), "strong"), summary),
             new VBox(8, UiKit.label(I18n.tr("ui.modpack.include"), "strong"), config, packs, shaders, local, localHint));
-        body.setPrefWidth(520);
+        body.setPrefWidth(ThemeManager.scaled(520));
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);
         Button export = UiKit.primary(I18n.tr("ui.modpack.export"), null, () -> { });

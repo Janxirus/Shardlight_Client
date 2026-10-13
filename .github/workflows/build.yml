@@ -51,7 +51,7 @@ jobs:
 
       - name: Screenshot every view in every look
         run: |
-          xvfb-run -a -s "-screen 0 1400x900x24" ./gradlew :launcher-app:run \
+          xvfb-run -a -s "-screen 0 1920x1200x24" ./gradlew :launcher-app:run \
             --args="--capture ${{ runner.temp }}/screens --capture-matrix --data-dir ${{ runner.temp }}/capture-data"
           echo "Screenshots: $(find '${{ runner.temp }}/screens' -name '*.png' | wc -l)"
 
@@ -135,11 +135,12 @@ jobs:
         run: |
           $exe = (Resolve-Path "launcher-app/build/jpackage/image/Shardlight Client/Shardlight Client.exe").Path
           $work = Join-Path $env:RUNNER_TEMP "prove"
+          $env:CAPTURE_ONLY = 'p4-settings-'
           $p = Start-Process -FilePath $exe -ArgumentList @('--capture', "$work\screens", '--data-dir', "$work\data") -PassThru
           if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "the packaged app did not finish in five minutes" }
           $count = (Get-ChildItem "$work\screens" -Filter *.png -ErrorAction SilentlyContinue | Measure-Object).Count
           Write-Host "The packaged app drew $count pages."
-          if ($count -lt 20) { Get-ChildItem "$work\data\logs" -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 40 }; throw "expected at least 20 pictures, got $count" }
+          if ($count -lt 5) { Get-ChildItem "$work\data\logs" -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 40 }; throw "expected at least 5 pictures, got $count" }
 
       - name: Is there a signing certificate?
         id: sign

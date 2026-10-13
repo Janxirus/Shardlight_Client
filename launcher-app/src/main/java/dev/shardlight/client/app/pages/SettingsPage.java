@@ -141,13 +141,13 @@ public final class SettingsPage implements Page {
         nav.getStyleClass().add("settings-nav");
         nav.setPadding(new Insets(4, 12, 4, 0));
         VBox side = new VBox(12, search, nav);
-        side.setMinWidth(230);
+        side.setMinWidth(ThemeManager.scaled(230));
         side.setPrefWidth(Region.USE_COMPUTED_SIZE);
-        side.setMaxWidth(320);
+        side.setMaxWidth(ThemeManager.scaled(320));
         side.setPadding(new Insets(0, 12, 0, 0));
         side.getStyleClass().add("settings-side");
         content.setPadding(new Insets(4, 8, 24, 16));
-        content.setMaxWidth(860);
+        content.setMaxWidth(ThemeManager.scaled(860));
         scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("content-scroll");
@@ -513,7 +513,7 @@ public final class SettingsPage implements Page {
         scale.setMajorTickUnit(0.1);
         scale.setMinorTickCount(0);
         scale.setSnapToTicks(true);
-        scale.setPrefWidth(220);
+        scale.setPrefWidth(ThemeManager.scaled(220));
         scale.setAccessibleText(I18n.tr("ui.settings.scale"));
         Label scaleValue = UiKit.label(Math.round(scale.getValue() * 100) + "%", "muted");
         scale.valueProperty().addListener((o, x, v) -> scaleValue.setText(Math.round(v.doubleValue() * 100) + "%"));
@@ -647,7 +647,7 @@ public final class SettingsPage implements Page {
         mem.setMinorTickCount(1);
         mem.setSnapToTicks(true);
         mem.setBlockIncrement(512);
-        mem.setPrefWidth(260);
+        mem.setPrefWidth(ThemeManager.scaled(260));
         mem.setAccessibleText(I18n.tr("ui.settings.memory"));
         Label memValue = UiKit.label(memText(j.maxMemoryMb), "muted");
         mem.valueProperty().addListener((o, a, v) -> memValue.setText(memText((int) (Math.round(v.doubleValue() / 512) * 512))));
@@ -789,13 +789,13 @@ public final class SettingsPage implements Page {
         heading("downloads");
         Spinner<Integer> concurrent = new Spinner<>(1, 16, Math.max(1, Math.min(16, s.downloads.maxConcurrent)));
         concurrent.setEditable(true);
-        concurrent.setPrefWidth(100);
+        concurrent.setPrefWidth(ThemeManager.scaled(100));
         concurrent.setAccessibleText(I18n.tr("ui.settings.concurrent"));
         concurrent.valueProperty().addListener((o, a, v) -> change(I18n.tr("ui.settings.concurrent"), String.valueOf(v),
             st -> st.downloads.maxConcurrent, (st, x) -> st.downloads.maxConcurrent = x, v));
         Spinner<Integer> retries = new Spinner<>(0, 10, Math.max(0, Math.min(10, s.downloads.maxRetries)));
         retries.setEditable(true);
-        retries.setPrefWidth(100);
+        retries.setPrefWidth(ThemeManager.scaled(100));
         retries.setAccessibleText(I18n.tr("ui.settings.retries"));
         retries.valueProperty().addListener((o, a, v) -> change(I18n.tr("ui.settings.retries"), String.valueOf(v),
             st -> st.downloads.maxRetries, (st, x) -> st.downloads.maxRetries = x, v));

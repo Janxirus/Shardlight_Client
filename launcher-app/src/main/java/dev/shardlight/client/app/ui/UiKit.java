@@ -86,7 +86,7 @@ public final class UiKit {
         Tooltip tip = new Tooltip(text);
         tip.setShowDelay(TOOLTIP_DELAY);
         tip.setWrapText(true);
-        tip.setMaxWidth(380);
+        tip.setMaxWidth(ThemeManager.scaled(380));
         Tooltip.install(n, tip);
     }
 
@@ -128,6 +128,16 @@ public final class UiKit {
         if (icon != null) {
             l.setGraphic(Icons.of(icon, 13));
         }
+        return l;
+    }
+
+    /** a chip whose text may be long (module lists): it stops at {@code maxEm}, cuts with an ellipsis and shows the full text as a tooltip */
+    public static Label chipCapped(String text, String variant, String icon, double maxEm) {
+        Label l = chip(text, variant, icon);
+        l.setMinWidth(0);
+        l.setMaxWidth(ThemeManager.em(maxEm));
+        l.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        tooltip(l, text);
         return l;
     }
 
@@ -312,7 +322,7 @@ public final class UiKit {
         Tooltip tip = new Tooltip();
         tip.setShowDelay(TOOLTIP_DELAY);
         tip.setWrapText(true);
-        tip.setMaxWidth(380);
+        tip.setMaxWidth(ThemeManager.scaled(380));
         Runnable update = () -> {
             Object r = c.getProperties().get(DISABLED_REASON);
             if (c.isDisabled() && r instanceof String reason) {

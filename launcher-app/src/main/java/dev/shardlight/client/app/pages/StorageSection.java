@@ -5,6 +5,7 @@ import dev.shardlight.client.app.ui.Fx;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.storage.DiskUsage;
@@ -151,7 +152,7 @@ public final class StorageSection {
             body.getChildren().add(UiKit.banner("info", I18n.tr("ui.storage.cleanupKept")));
         }
         body.getStyleClass().add("modal-lost");
-        body.setPrefWidth(520);
+        body.setPrefWidth(ThemeManager.scaled(520));
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);
         Button ok = new Button(I18n.tr("ui.storage.cleanupRun", UiKit.bytes(plan.totalBytes())));

@@ -11,6 +11,7 @@ import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.ProjectIcons;
 import dev.shardlight.client.app.ui.StepProgress;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.ToggleSwitch;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
@@ -131,7 +132,7 @@ public final class NewProjectWizard {
         VBox body = new VBox(12, progress, stepTitle, scroll);
         body.getStyleClass().add("wizard-body");
         VBox modal = Overlay.modal(I18n.tr("ui.wizard.title"), body, cancelButton, back, next);
-        modal.setPrefWidth(780);
+        modal.setPrefWidth(ThemeManager.scaled(780));
         this.dialog = ctx.overlay().show(modal, true, true);
         dialog.onClose(cancel::cancel);
         cancelButton.setOnAction(e -> dialog.close());
@@ -436,7 +437,7 @@ public final class NewProjectWizard {
         }
         ComboBox<VersionSummary> pick = new ComboBox<>();
         pick.setAccessibleText(I18n.tr("ui.wizard.versionLabel"));
-        pick.setPrefWidth(260);
+        pick.setPrefWidth(ThemeManager.scaled(260));
         pick.setCellFactory(l -> versionCell());
         pick.setButtonCell(versionCell());
         List<VersionSummary> shown = versions.stream().filter(v -> showSnapshots || v.isRelease()).toList();
@@ -587,7 +588,7 @@ public final class NewProjectWizard {
             pick.setAccessibleText(I18n.tr("ui.wizard.loaderVersion"));
             pick.setCellFactory(l -> loaderCell());
             pick.setButtonCell(loaderCell());
-            pick.setPrefWidth(240);
+            pick.setPrefWidth(ThemeManager.scaled(240));
             String key = loader + "@" + minecraftVersion;
             List<LoaderVersion> list = loaderVersions.get(key);
             if (list != null) {
@@ -751,7 +752,7 @@ public final class NewProjectWizard {
         mem.setMinorTickCount(1);
         mem.setSnapToTicks(true);
         mem.setBlockIncrement(512);
-        mem.setPrefWidth(320);
+        mem.setPrefWidth(ThemeManager.scaled(320));
         mem.setAccessibleText(I18n.tr("ui.wizard.memory"));
         Label memLabel = UiKit.label(UiKit.bytes(memoryMb * 1024L * 1024L), "h3");
         mem.valueProperty().addListener((o, a, b) -> {
@@ -983,7 +984,7 @@ public final class NewProjectWizard {
 
     private static Node summaryRow(String label, String value) {
         Label l = UiKit.label(label, "muted");
-        l.setMinWidth(130);
+        l.setMinWidth(ThemeManager.scaled(130));
         Label v = UiKit.label(value == null ? "-" : value, "strong");
         v.setWrapText(true);
         HBox h = new HBox(12, l, v);

@@ -5,6 +5,7 @@ import dev.shardlight.client.app.ui.Fx;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.catalog.CatalogDependency;
 import dev.shardlight.client.catalog.CatalogFile;
@@ -167,7 +168,7 @@ public final class CatalogInstall {
                                  Runnable release) {
         VBox body = new VBox();
         body.getStyleClass().add("stack-tight");
-        body.setPrefWidth(640);
+        body.setPrefWidth(ThemeManager.scaled(640));
         body.getChildren().add(UiKit.label(I18n.tr("ui.install.into", target.name, target.minecraftVersion,
             target.loader.isVanilla() ? I18n.tr("ui.project.vanilla") : target.loader.type.displayName()), "muted"));
         boolean anyOverridable = plan.issues().stream()

@@ -43,6 +43,9 @@ import java.util.Optional;
  * remove (recoverable from the history), update from Modrinth, set the resource pack order, roll back.
  */
 final class ContentTab {
+    /** more rows than this scroll inside the table (see renderEntries) */
+    private static final int MAX_ROWS_SHOWN = 24;
+
     private final AppContext ctx;
     private final String projectId;
     private final VBox root = new VBox();
@@ -197,10 +200,13 @@ final class ContentTab {
         table.getStyleClass().add("content-table");
         table.getItems().setAll(entries);
         table.setFixedCellSize(ThemeManager.em(3.4));
-        table.prefHeightProperty().bind(javafx.beans.binding.Bindings.size(table.getItems())
-            .multiply(table.getFixedCellSize()).add(ThemeManager.em(2.8)));
-        table.minHeightProperty().bind(table.prefHeightProperty());
-        table.maxHeightProperty().bind(table.prefHeightProperty());
+        // The table is as tall as its rows up to MAX_ROWS_SHOWN; a longer list (a big modpack) scrolls inside the table,
+        // so only the rows in view are built instead of one row with controls for every mod.
+        int shown = Math.min(entries.size(), MAX_ROWS_SHOWN);
+        double height = shown * table.getFixedCellSize() + ThemeManager.em(2.8);
+        table.setPrefHeight(height);
+        table.setMinHeight(height);
+        table.setMaxHeight(height);
 
         TableColumn<ContentEntry, ContentEntry> on = entryColumn(I18n.tr("ui.content.col.on"), e -> {
             ToggleSwitch sw = new ToggleSwitch(e.enabled, I18n.tr("ui.content.enabledFor", ProjectText.entryTitle(e)));

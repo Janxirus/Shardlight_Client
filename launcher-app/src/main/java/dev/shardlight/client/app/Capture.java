@@ -71,6 +71,7 @@ final class Capture {
 
     private void audit(String step) {
         List<String> issues = new ArrayList<>(A11yAudit.scan(scene.getRoot()));
+        issues.addAll(A11yAudit.overflow(scene));
         if (Boolean.getBoolean("shardlight.tabWalk")) {
             issues.addAll(A11yAudit.tabWalk(scene));
         }

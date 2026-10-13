@@ -6,6 +6,7 @@ import dev.shardlight.client.app.ui.Fx;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.project.Project;
@@ -78,7 +79,7 @@ public final class ProjectMoveDialog {
             body.getChildren().add(back);
         }
         body.getChildren().addAll(problem, size, UiKit.banner("info", I18n.tr("ui.move.safety")));
-        body.setPrefWidth(560);
+        body.setPrefWidth(ThemeManager.scaled(560));
 
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);

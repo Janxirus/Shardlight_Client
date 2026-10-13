@@ -69,7 +69,10 @@ public final class Art {
 
     /** the splash picture: dark facets, the shard and the name */
     public static Image splash() {
-        return load("splash", hiDpi());
+        // shown once at start-up, so it is not kept in the cache (the memory goes back after the splash closes)
+        String name = "splash" + (hiDpi() ? "@2x" : "");
+        URL url = Art.class.getResource("/app/art/" + name + ".png");
+        return new Image((url != null ? url : Art.class.getResource("/app/art/splash.png")).toExternalForm(), false);
     }
 
     private static synchronized Image load(String name, boolean twoX) {

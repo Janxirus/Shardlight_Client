@@ -6,6 +6,7 @@ import dev.shardlight.client.app.ui.Disclosure;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Tasks;
+import dev.shardlight.client.app.ui.ThemeManager;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.modpack.UpdateAction;
@@ -59,7 +60,7 @@ public final class ModpackUpdateFlow {
     /** the preview dialog; also used by the screenshots */
     public static Overlay.Dialog preview(AppContext ctx, Project p, Path file, UpdatePlan plan) {
         VBox body = new VBox(12);
-        body.setPrefWidth(620);
+        body.setPrefWidth(ThemeManager.scaled(620));
         body.getChildren().add(header(plan));
         CheckBox sure = null;
         if (!plan.samePack()) {
@@ -97,7 +98,7 @@ public final class ModpackUpdateFlow {
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("content-scroll");
         scroll.setPrefViewportHeight(250);
-        scroll.setMaxHeight(300);
+        scroll.setMaxHeight(ThemeManager.scaled(300));
         body.getChildren().add(scroll);
         body.getChildren().add(UiKit.label(I18n.tr("ui.update.safety"), "faint", "small"));
 

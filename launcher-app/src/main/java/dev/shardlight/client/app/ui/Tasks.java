@@ -53,11 +53,11 @@ public final class Tasks {
         Label stage = UiKit.label(I18n.tr("ui.task.starting"), "strong");
         Label detail = UiKit.label("", "muted", "small");
         detail.setWrapText(false);
-        detail.setMaxWidth(460);
+        detail.setMaxWidth(ThemeManager.scaled(460));
         ProgressBar bar = UiKit.progress(-1);
         Label count = UiKit.label("", "faint", "small");
         VBox body = new VBox(8, stage, bar, detail, count);
-        body.setPrefWidth(480);
+        body.setPrefWidth(ThemeManager.scaled(480));
         Button cancelButton = new Button(I18n.tr("common.cancel"));
         cancelButton.setCancelButton(true);
         cancelButton.setVisible(cancellable);

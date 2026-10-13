@@ -31,7 +31,7 @@ public final class Dialogs {
         field.setAccessibleText(label);
         Label error = UiKit.label("", "danger-text", "small");
         VBox body = new VBox(8, UiKit.label(label, "small"), field, error);
-        body.setPrefWidth(440);
+        body.setPrefWidth(ThemeManager.scaled(440));
         Button cancel = new Button(I18n.tr("common.cancel"));
         cancel.setCancelButton(true);
         Button confirm = UiKit.primary(okText, null, () -> { });
@@ -60,7 +60,7 @@ public final class Dialogs {
     public static void options(Overlay overlay, String title, String intro, List<Option> options, String okText,
                                boolean danger, Consumer<List<Boolean>> ok) {
         VBox body = new VBox(10);
-        body.setPrefWidth(480);
+        body.setPrefWidth(ThemeManager.scaled(480));
         if (intro != null && !intro.isBlank()) {
             body.getChildren().add(UiKit.label(intro, "muted"));
         }
