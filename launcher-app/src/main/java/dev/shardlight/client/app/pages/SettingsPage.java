@@ -10,6 +10,7 @@ import dev.shardlight.client.app.ui.Fx;
 import dev.shardlight.client.app.ui.Fields;
 import dev.shardlight.client.app.ui.Icons;
 import dev.shardlight.client.app.ui.Motion;
+import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.Page;
 import dev.shardlight.client.app.ui.Tasks;
 import dev.shardlight.client.app.ui.ThemeManager;
@@ -49,6 +50,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -74,8 +76,6 @@ public final class SettingsPage implements Page {
         "storage", "advanced", "about");
     /** older section names, each now a part of Advanced */
     private static final List<String> ADVANCED_PARTS = List.of("content", "privacy", "discord", "updates");
-    /** languages with a full translation; "" follows the system */
-    private static final List<String> LANGUAGES = List.of("", "en");
     private static final List<String> ACCENTS = DesignTokens.ACCENT_PRESETS;
 
     /** one searchable setting: the section it lives in and the anchor the page scrolls to */
@@ -524,27 +524,7 @@ public final class SettingsPage implements Page {
             }
         });
 
-        ComboBox<String> language = new ComboBox<>();
-        language.getItems().setAll(LANGUAGES);
-        language.setConverter(new javafx.util.StringConverter<>() {
-            @Override
-            public String toString(String tag) {
-                return tag == null || tag.isEmpty() ? I18n.tr("ui.settings.languageSystem")
-                    : Locale.forLanguageTag(tag).getDisplayName(Locale.forLanguageTag(tag));
-            }
-
-            @Override
-            public String fromString(String string) {
-                return string;
-            }
-        });
-        language.setValue(LANGUAGES.contains(a.language) ? a.language : "");
-        language.setAccessibleText(I18n.tr("ui.settings.language"));
-        language.setOnAction(e -> {
-            String tag = language.getValue() == null ? "" : language.getValue();
-            change(I18n.tr("ui.settings.language"), I18n.tr("ui.settings.languageRestart"), st -> st.appearance.language,
-                (st, v) -> st.appearance.language = v, tag);
-        });
+        Node language = languagePicker(a);
 
         content.getChildren().add(UiKit.card(
             row("theme", I18n.tr("ui.settings.theme"), I18n.tr("ui.settings.themeAbout"), theme),
@@ -559,6 +539,64 @@ public final class SettingsPage implements Page {
                 flag(I18n.tr("ui.settings.compact"), st -> st.appearance.compact, (st, v) -> st.appearance.compact = v)),
             row("scale", I18n.tr("ui.settings.scale"), I18n.tr("ui.settings.scaleAbout"), new HBox(10, scale, scaleValue)),
             row("language", I18n.tr("ui.settings.language"), I18n.tr("ui.settings.languageAbout"), language)));
+    }
+
+    /**
+     * The language picker: the system language, English and every translation file found, and a button that opens the
+     * folder to drop new ones into. The two test languages show only when asked for (docs/LANGUAGES.md).
+     */
+    private Node languagePicker(LauncherSettings.Appearance a) {
+        List<I18n.Language> found = new ArrayList<>(I18n.available());
+        boolean tests = Boolean.getBoolean("shardlight.testLanguages") || System.getenv("SHARDLIGHT_TEST_LANGUAGES") != null
+            || I18n.testLanguages().stream().anyMatch(l -> l.tag().equals(a.language));
+        if (tests) {
+            found.addAll(I18n.testLanguages());
+        }
+        Map<String, String> names = new HashMap<>();
+        List<String> tags = new ArrayList<>();
+        tags.add("");
+        for (I18n.Language l : found) {
+            tags.add(l.tag());
+            names.put(l.tag(), l.name());
+        }
+        ComboBox<String> language = new ComboBox<>();
+        language.getItems().setAll(tags);
+        language.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(String tag) {
+                return tag == null || tag.isEmpty() ? I18n.tr("ui.settings.languageSystem") : names.getOrDefault(tag, tag);
+            }
+
+            @Override
+            public String fromString(String string) {
+                return string;
+            }
+        });
+        language.setValue(tags.contains(a.language) ? a.language : "");
+        language.setAccessibleText(I18n.tr("ui.settings.language"));
+        language.setOnAction(e -> {
+            String tag = language.getValue() == null ? "" : language.getValue();
+            if (tag.equals(a.language == null ? "" : a.language)) {
+                return;
+            }
+            change(I18n.tr("ui.settings.language"), language.getConverter().toString(tag), st -> st.appearance.language,
+                (st, v) -> st.appearance.language = v, tag);
+            ctx.overlay().toast("info", I18n.tr("ui.settings.languageRestart"),
+                new Overlay.Action(I18n.tr("ui.settings.restartNow"), ctx::restart));
+        });
+        Button folder = UiKit.button(I18n.tr("ui.settings.languageAdd"), Icons.FOLDER, this::openLanguages);
+        HBox box = new HBox(8, language, folder);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
+    }
+
+    /** make the folder translation files go in (with a README and the English files to copy) and show it */
+    private void openLanguages() {
+        Path dir = ctx.services().paths().languages();
+        Fx.run(() -> {
+            I18n.exportTemplate(dir);
+            return dir;
+        }, d -> ctx.openFolder(d), err -> ctx.overlay().toast("danger", Tasks.message(err)));
     }
 
     /** a small mock-up drawn with the live tokens, so theme, accent, size, motion and contrast show at once */

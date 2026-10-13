@@ -14,6 +14,7 @@ import java.util.logging.Logger;
  *   --data-dir PATH      keep all launcher data in PATH (portable use)
  *   --capture DIR        render every page to DIR/*.png and exit (documentation, visual checks)
  *   --capture-size WxH   window size for --capture (default 1360x860)
+ *   --lang TAG           use this language for this run, for example de or en-XA (a test language)
  *   --page ID            open this page first (home, library, discover, shardlight, multiplayer, downloads, settings)
  * </pre>
  * The main class doesn't extend Application so JavaFX can run from the class path (portable zip).
@@ -26,6 +27,10 @@ public final class Main {
         LaunchArgs a = LaunchArgs.parse(args);
         if (a.dataDir() != null) {
             System.setProperty("shardlight.home", Path.of(a.dataDir()).toAbsolutePath().toString());
+        }
+        if (a.lang() != null && !a.lang().isBlank()) {
+            // this run only: the language is not saved (see docs/LANGUAGES.md)
+            System.setProperty("shardlight.language", a.lang());
         }
         AppPaths paths = AppPaths.defaults();
         try {
@@ -42,11 +47,12 @@ public final class Main {
     }
 
     /** parsed command line */
-    public record LaunchArgs(String dataDir, String captureDir, int captureWidth, int captureHeight, String page) {
+    public record LaunchArgs(String dataDir, String captureDir, int captureWidth, int captureHeight, String page, String lang) {
         static LaunchArgs parse(String[] args) {
             String data = null;
             String capture = null;
             String page = null;
+            String lang = null;
             int w = 1360;
             int h = 860;
             for (int i = 0; i < args.length; i++) {
@@ -56,6 +62,7 @@ public final class Main {
                     case "--data-dir" -> { data = next; i++; }
                     case "--capture" -> { capture = next; i++; }
                     case "--page" -> { page = next; i++; }
+                    case "--lang" -> { lang = next; i++; }
                     case "--capture-size" -> {
                         if (next != null && next.matches("\\d+x\\d+")) {
                             w = Integer.parseInt(next.substring(0, next.indexOf('x')));
@@ -66,7 +73,7 @@ public final class Main {
                     default -> { }
                 }
             }
-            return new LaunchArgs(data, capture, w, h, page);
+            return new LaunchArgs(data, capture, w, h, page, lang);
         }
     }
 }

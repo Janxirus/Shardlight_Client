@@ -73,7 +73,9 @@ public final class AppContext {
         this.stage = stage;
         this.host = host;
         LauncherSettings.Appearance a = services.settings().get().appearance;
-        applyLanguage(a.language);
+        I18n.setExternalDirectory(services.paths().languages());
+        String forced = System.getProperty("shardlight.language");
+        applyLanguage(forced != null && !forced.isBlank() ? forced : a.language);
         UiSettings.setReducedMotion(a.reducedMotion);
         ThemeManager.setScale(a.scale);
         this.shell = new Shell(ThemeManager.accent(a));
@@ -270,6 +272,26 @@ public final class AppContext {
 
     static void applyLanguage(String tag) {
         I18n.setLocale(tag == null || tag.isBlank() ? Locale.getDefault() : Locale.forLanguageTag(tag));
+    }
+
+    /** start Shardlight Client again with the same command (a new language needs it); the old window closes */
+    public void restart() {
+        ProcessHandle.Info info = ProcessHandle.current().info();
+        Optional<String> command = info.command();
+        if (command.isEmpty()) {
+            overlay().toast("info", I18n.tr("ui.restart.manual"));
+            return;
+        }
+        List<String> line = new ArrayList<>();
+        line.add(command.get());
+        info.arguments().ifPresent(args -> line.addAll(List.of(args)));
+        try {
+            new ProcessBuilder(line).start();
+            Platform.exit();
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Couldn't start Shardlight Client again", e);
+            overlay().toast("info", I18n.tr("ui.restart.manual"));
+        }
     }
 
     void attach(Scene s) {
