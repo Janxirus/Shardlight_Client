@@ -1,0 +1,51 @@
+// Shardlight Client: a standalone Minecraft Java Edition launcher.
+// launcher-core holds every service (no UI code) and launcher-app is the JavaFX desktop shell.
+
+allprojects {
+    group = 'dev.shardlight'
+    version = project.launcher_version
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        testImplementation platform("org.junit:junit-bom:${junit_version}")
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 21
+        options.compilerArgs += ['-Xlint:all,-serial,-processing,-try', '-Werror']
+    }
+
+    tasks.withType(Javadoc).configureEach {
+        options.encoding = 'UTF-8'
+        options.addStringOption('Xdoclint:none', '-quiet')
+    }
+
+    tasks.named('test', Test) {
+        // tests tagged "live" or "installer" talk to the real services; they only run through liveTest (-PliveTests)
+        // and installerTest (-PinstallerTests)
+        useJUnitPlatform { excludeTags 'live', 'installer' }
+        maxParallelForks = 1
+        systemProperty 'java.awt.headless', 'true'
+        testLogging {
+            events 'failed', 'skipped'
+            exceptionFormat 'full'
+            showStandardStreams = false
+        }
+    }
+}

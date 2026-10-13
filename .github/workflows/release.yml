@@ -1,0 +1,164 @@
+name: Release (draft)
+
+# Run by hand from the Actions tab. Builds the Windows installer, the Windows app folder, the macOS disk image,
+# the Linux .deb and .rpm and the portable zip from main, writes SHA-256 checksums, and creates a DRAFT GitHub
+# release with them. Windows and macOS files are signed when the signing secrets exist (docs/RELEASING.md).
+# Nothing is published until a maintainer reviews the draft and presses "Publish release".
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type the version from gradle.properties (launcher_version) to confirm'
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  SHARDLIGHT_MSA_CLIENT_ID: ${{ vars.SHARDLIGHT_MSA_CLIENT_ID }}
+  SHARDLIGHT_DISCORD_APP_ID: ${{ vars.SHARDLIGHT_DISCORD_APP_ID }}
+  SHARDLIGHT_UPDATE_MANIFEST_URL: ${{ vars.SHARDLIGHT_UPDATE_MANIFEST_URL }}
+  SHARDLIGHT_UPDATE_PUBLIC_KEY: ${{ vars.SHARDLIGHT_UPDATE_PUBLIC_KEY }}
+  SHARDLIGHT_CURSEFORGE_API_KEY: ${{ secrets.SHARDLIGHT_CURSEFORGE_API_KEY }}
+
+jobs:
+  check:
+    name: Check the request
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        name: Version must match and come from main
+        run: |
+          version=$(sed -n 's/^launcher_version=//p' gradle.properties | tr -d '\r')
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Releases are built from main only (this run is on ${{ github.ref }})."; exit 1
+          fi
+          if [ "${{ inputs.confirm }}" != "$version" ]; then
+            echo "::error::You typed '${{ inputs.confirm }}' but gradle.properties says '$version'."; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "::error::Tag v$version already exists. Bump launcher_version first."; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows installer and app folder
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and test
+        shell: pwsh
+        run: ./gradlew.bat build --stacktrace
+      - name: Install WiX Toolset 3
+        shell: pwsh
+        run: |
+          if (-not (Get-Command candle.exe -ErrorAction SilentlyContinue)) {
+            choco install wixtoolset --no-progress -y
+            $wix = Get-ChildItem "${env:ProgramFiles(x86)}" -Directory -Filter "WiX Toolset v3*" | Select-Object -First 1
+            if ($wix) { Add-Content $env:GITHUB_PATH (Join-Path $wix.FullName 'bin') }
+          }
+      - name: App folder and MSI
+        shell: pwsh
+        run: |
+          ./gradlew.bat :launcher-app:jpackageImage :launcher-app:jpackageInstaller --stacktrace
+          $ver = "${{ needs.check.outputs.version }}"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "launcher-app/build/jpackage/image/Shardlight Client" -DestinationPath "dist/ShardlightClient-$ver-windows-x64.zip"
+      - name: Shardlight pictures in the installer
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem launcher-app/build/jpackage/installer/*.msi | Select-Object -First 1
+          ./tools/release/set_msi_images.ps1 -Msi $msi.FullName -Banner packaging/windows/banner.bmp -Dialog packaging/windows/dialog.bmp
+      - name: Is there a signing certificate?
+        id: sign
+        shell: pwsh
+        env:
+          CERT: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:CERT -and $env:CERT_PASSWORD) {
+            "enabled=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "enabled=false" >> $env:GITHUB_OUTPUT
+            Write-Host "::notice title=Windows signing skipped::No code-signing certificate is configured, so the MSI is not signed (docs/RELEASING.md)."
+          }
+      - name: Sign the MSI
+        if: steps.sign.outputs.enabled == 'true'
+        shell: pwsh
+        env:
+          CERT: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: ./tools/release/sign_windows.ps1 -Folder launcher-app/build/jpackage/installer
+      - name: Name the installer
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.check.outputs.version }}"
+          Copy-Item launcher-app/build/jpackage/installer/*.msi "dist/ShardlightClient-$ver-windows-x64.msi"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*
+          if-no-files-found: error
+
+  portable:
+    name: Portable zip
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and test
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q xvfb
+          chmod +x gradlew
+          xvfb-run -a ./gradlew build :launcher-app:portableZip --stacktrace
+          mkdir -p dist && cp launcher-app/build/distributions/*-portable.zip dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-portable
+          path: dist/*
+          if-no-files-found: error
+
+  installers:
+    name: macOS and Linux installers
+    needs: check
+    uses: ./.github/workflows/installers.yml
+    secrets: inherit
+    with:
+      release: true
+
+  draft:
+    name: Create the draft release
+    needs: [check, windows, portable, installers]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ needs.check.outputs.version }}"
+          notes="See CHANGELOG.md. Verify downloads against SHA256SUMS.txt."
+          gh release create "v$v" dist/* --draft --target "${{ github.sha }}" --title "Shardlight Client $v" --notes "$notes"

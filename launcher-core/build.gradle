@@ -1,0 +1,78 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Shardlight Client services: storage, accounts, installs, launching, catalogs, projects, presets.'
+
+dependencies {
+    api "com.google.code.gson:gson:${gson_version}"
+    // Windows Data Protection API (token encryption) through JNA; only loaded on Windows
+    implementation "net.java.dev.jna:jna-platform:${jna_version}"
+    testImplementation "com.google.code.gson:gson:${gson_version}"
+}
+
+// Version info and the distributor's settings the launcher reads at runtime. The distributor values come
+// from Gradle properties (-Pshardlight.msaClientId=...) or environment variables (SHARDLIGHT_MSA_CLIENT_ID).
+// Only the Microsoft client id has a default, the project's own app id in gradle.properties (it is public);
+// the other values are empty in a plain developer build. See docs/SIGN_IN.md and docs/RELEASING.md.
+def distributorValue = { String prop, String env, String fallback = '' ->
+    def v = project.findProperty(prop) ?: System.getenv(env) ?: fallback
+    return v.toString().trim()
+}
+
+tasks.named('processResources') {
+    def values = [
+        version          : project.version.toString(),
+        msaClientId      : distributorValue('shardlight.msaClientId', 'SHARDLIGHT_MSA_CLIENT_ID',
+                                       project.findProperty('default_msa_client_id') ?: ''),
+        discordApplicationId: distributorValue('shardlight.discordApplicationId', 'SHARDLIGHT_DISCORD_APP_ID',
+                                       project.findProperty('default_discord_application_id') ?: ''),
+        curseForgeApiKey : distributorValue('shardlight.curseForgeApiKey', 'SHARDLIGHT_CURSEFORGE_API_KEY'),
+        updateManifestUrl: distributorValue('shardlight.updateManifestUrl', 'SHARDLIGHT_UPDATE_MANIFEST_URL'),
+        updatePublicKey  : distributorValue('shardlight.updatePublicKey', 'SHARDLIGHT_UPDATE_PUBLIC_KEY'),
+    ]
+    // the API key changes the jar but must never appear in build logs or caches as a plain input name
+    inputs.property('distributorValuesHash', values.toString().hashCode())
+    filesMatching('shardlight-client-build.properties') {
+        expand(values)
+    }
+}
+
+// Contract tests against the real Modrinth, CurseForge, GitHub and Mojang services. They are never part of
+// `./gradlew build`; CI runs them with `./gradlew :launcher-core:liveTest -PliveTests` in a separate job.
+if (project.hasProperty('liveTests')) {
+    tasks.register('liveTest', Test) {
+        group = 'verification'
+        description = 'Runs the tests tagged "live" against the real services.'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform { includeTags 'live' }
+        maxParallelForks = 1
+        outputs.upToDateWhen { false }
+        testLogging {
+            events 'passed', 'failed', 'skipped'
+            exceptionFormat 'full'
+            showStandardStreams = true
+        }
+    }
+}
+
+// Runs the real Forge and NeoForge installers (see LoaderInstallersLiveTest). Heavy: it downloads the game, a Java
+// runtime and the loader libraries, so CI runs it as its own job with
+// `./gradlew :launcher-core:installerTest -PinstallerTests`.
+if (project.hasProperty('installerTests')) {
+    tasks.register('installerTest', Test) {
+        group = 'verification'
+        description = 'Installs Forge and NeoForge with their real installers and checks the result.'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform { includeTags 'installer' }
+        maxParallelForks = 1
+        outputs.upToDateWhen { false }
+        testLogging {
+            events 'passed', 'failed', 'skipped'
+            exceptionFormat 'full'
+            showStandardStreams = true
+        }
+    }
+}

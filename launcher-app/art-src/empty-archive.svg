@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+<defs><radialGradient id="g1"><stop offset="0" stop-color="#7c6cf2" stop-opacity="0.22"/><stop offset="1" stop-color="#7c6cf2" stop-opacity="0"/></radialGradient></defs>
+<circle cx="80.0" cy="62.0" r="66.0" fill="url(#g1)"/>
+<polygon points="36.0,52.0 124.0,52.0 36.0,104.0" fill="#897bf3"/>
+<polygon points="124.0,52.0 124.0,104.0 36.0,104.0" fill="#6b5dd0"/>
+<polygon points="30.0,36.0 130.0,36.0 30.0,56.0" fill="#a79cf6"/>
+<polygon points="130.0,36.0 130.0,56.0 30.0,56.0" fill="#877dd3"/>
+<polygon points="66.0,66.0 94.0,66.0 66.0,74.0" fill="#e8eefa"/>
+<polygon points="94.0,66.0 94.0,74.0 66.0,74.0" fill="#c6cbd7"/>
+<polygon points="80.0,6.0 74.0,13.4 80.0,15.6" fill="#5dcabe"/>
+<polygon points="74.0,13.4 76.7,20.4 80.0,15.6" fill="#37b4a7"/>
+<polygon points="74.0,13.4 76.7,20.4 80.0,30.0" fill="#24766d"/>
+<polygon points="80.0,6.0 86.0,13.4 80.0,15.6" fill="#6ccfc4"/>
+<polygon points="86.0,13.4 83.3,20.4 80.0,15.6" fill="#4fb4a9"/>
+<polygon points="86.0,13.4 83.3,20.4 80.0,30.0" fill="#306e67"/>
+<polygon points="80.0,15.6 76.7,20.4 80.0,30.0 83.3,20.4" fill="#3ca095"/>
+<polygon points="80.0,6.0 79.0,14.4 80.0,24.6 81.0,14.4" fill="#ffffff" fill-opacity="0.55"/>
+</svg>
