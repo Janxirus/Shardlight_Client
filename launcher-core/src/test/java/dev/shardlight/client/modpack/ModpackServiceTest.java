@@ -103,7 +103,9 @@ class ModpackServiceTest {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (ZipOutputStream out = new ZipOutputStream(bos)) {
             for (Map.Entry<String, byte[]> e : entries.entrySet()) {
-                out.putNextEntry(new ZipEntry(e.getKey()));
+                ZipEntry entry = new ZipEntry(e.getKey());
+                entry.setTime(0); // a fixed time keeps the bytes, and their hash, the same on every call
+                out.putNextEntry(entry);
                 out.write(e.getValue());
                 out.closeEntry();
             }

@@ -8,10 +8,9 @@ on Modrinth (and CurseForge, with a key), and puts frame rate first: every proje
 The four Shardlight mods (UI, Map, Party, Companion) and their 15 theme packs are optional. The launcher
 works without any of them, and a project only gets the modules you pick for it.
 
-> **Status: 0.1.0 preview.** The launcher builds, runs and is covered by about 590 automated tests, but it
-> has not launched a real game yet. Signing in needs an Azure app that Microsoft has approved for
-> Minecraft (see [Sign-in](#sign-in)), and that approval is not in place. See
-> [docs/TESTING.md](docs/TESTING.md) for what has and hasn't been checked.
+> **Status: 0.1.0 preview.** The launcher builds, runs and is covered by about 760 automated tests. Mojang has
+> approved the project's Azure app, so you can sign in with a Microsoft account and play (see [Sign-in](#sign-in)).
+> See [docs/TESTING.md](docs/TESTING.md) for what has and hasn't been checked by hand.
 
 ![Home page](docs/images/home.png)
 
@@ -29,7 +28,7 @@ works without any of them, and a project only gets the modules you pick for it.
 | **Worlds and backups** | Back up a world or a whole project, restore a backup (a safety backup of whatever it replaces is made first), and move worlds to the trash instead of deleting them. |
 | **Playing** | Launch with the right Java, arguments and memory, watch the game's log live, track play time, and explain crashes in plain words with a fix where one is known. The diagnostics zip for bug reports masks tokens, your player name, home folder and server addresses, leaves out account files, worlds and screenshots, and is never uploaded. |
 | **Multiplayer** | Each project's server list (read and written in the game's own `servers.dat`), with ping, player count and the server's message. |
-| **Accounts** | Microsoft sign-in in your browser (device code). The launcher never sees your password; tokens live in the operating system's secret store. Game ownership is checked; there is no offline or cracked mode. |
+| **Accounts** | Microsoft sign-in in your browser or on your phone (device code, with a QR code). The launcher never sees your password; tokens live in the operating system's secret store. Switch accounts from the sidebar. Game ownership is checked; there is no cracked mode, only single-player offline for accounts confirmed to own the game in the last 30 days. |
 | **Updates** | Optional, signed update checks. The launcher downloads a new version and verifies it, but never installs anything without you. |
 
 Every page has light and dark themes, a reduced-motion switch, keyboard focus rings and a UI scale.
@@ -69,9 +68,13 @@ launcher, for example on a USB drive.
 
 Minecraft accounts sign in through Microsoft. A launcher can only do that with an Azure application id
 that Microsoft has approved for Minecraft's services. Builds of this repository use the project's own
-app (`default_msa_client_id` in `gradle.properties`); sign-in works once Mojang has approved it. A build
+app (`default_msa_client_id` in `gradle.properties`), which Mojang has approved. A build
 without an id shows "Microsoft sign-in is not set up" and can install, organise and prepare projects but
-not start the game. [docs/SIGN_IN.md](docs/SIGN_IN.md) walks through registering an app, asking for
+not start the game.
+
+A sign-in is renewed in the background when the launcher opens, and a saved Minecraft session is only reused
+while it has at least four hours left, so it doesn't run out in the middle of a play session. Without internet,
+an account confirmed to own the game in the last 30 days can still start single-player (multiplayer stays off). [docs/SIGN_IN.md](docs/SIGN_IN.md) walks through registering an app, asking for
 access and configuring the id.
 
 ## Where your data lives

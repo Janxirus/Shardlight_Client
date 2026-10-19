@@ -9,4 +9,6 @@ final class AccountsFile {
     /** the account used for launching, or null */
     String selectedId;
     List<Account> accounts = new ArrayList<>();
+    /** secret-store keys a sign-out couldn't delete; retried at the next start (key names only, never values) */
+    List<String> pendingSecretDeletes = new ArrayList<>();
 }

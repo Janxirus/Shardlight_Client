@@ -16,7 +16,9 @@ import java.util.logging.Logger;
  * account = the key), through Apple's {@code /usr/bin/security} tool. Secrets never appear on a command
  * line: writing starts {@code security -i} and sends the {@code add-generic-password} command on its
  * standard input. Values are stored base64-encoded (see {@link SecretEncoding}) so they are always safe
- * inside the quoted command and {@code security} never hex-encodes them on the way back.
+ * inside the quoted command and {@code security} never hex-encodes them on the way back. A value too long for one
+ * interactive command line is split over extra items ({@code <key>.part<n>}), and the main item then holds only
+ * {@code shardlight-parts:<count>}.
  */
 public final class MacKeychainSecretStore implements SecretStore {
     private static final Logger LOG = Logger.getLogger(MacKeychainSecretStore.class.getName());
@@ -29,6 +31,10 @@ public final class MacKeychainSecretStore implements SecretStore {
     /** {@code security -i} reads commands into a fixed buffer; longer lines would be cut */
     static final int MAX_COMMAND_LENGTH = 4000;
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
+    /** marks a main item whose value is spread over part items */
+    static final String PARTS_PREFIX = "shardlight-parts:";
+    /** at most this many part items per value (about 200 KB), so a damaged count can't make us read forever */
+    static final int MAX_PARTS = 64;
 
     private final ProcessRunner runner;
     private final Path tool;
@@ -76,14 +82,21 @@ public final class MacKeychainSecretStore implements SecretStore {
         Redactor.register(value);
         String encoded = SecretEncoding.encode(value);
         Redactor.register(encoded);
-        String command = addCommand(key, encoded);
-        if (command.length() > MAX_COMMAND_LENGTH) {
-            throw new SecretStoreException(name(), "value too long for the Keychain (" + value.length() + " characters)");
-        }
         synchronized (lock) {
-            ProcessRunner.Result r = run(List.of(tool.toString(), "-i"), command);
-            if (!r.ok()) {
-                throw new SecretStoreException(name(), "add-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
+            ProcessRunner.Result r;
+            String command = addCommand(key, encoded);
+            if (command.length() <= MAX_COMMAND_LENGTH) {
+                r = add(key, encoded);
+                deleteParts(key, 0);
+            } else {
+                List<String> parts = split(key, encoded);
+                // remove the old value first: rewriting parts its marker still points to could leave a mix of
+                // old and new parts if a write fails; a missing value just means signing in again
+                delete(key);
+                for (int i = 0; i < parts.size(); i++) {
+                    add(partKey(key, i), parts.get(i));
+                }
+                r = add(key, PARTS_PREFIX + parts.size());
             }
             // "security -i" may report a failed command only on stderr: read the value back to be sure
             Optional<String> back = get(key);
@@ -93,17 +106,86 @@ public final class MacKeychainSecretStore implements SecretStore {
         }
     }
 
+    /** one {@code add-generic-password} through {@code security -i}; {@code stored} is the raw item value */
+    private ProcessRunner.Result add(String account, String stored) {
+        ProcessRunner.Result r = run(List.of(tool.toString(), "-i"), addCommand(account, stored));
+        if (!r.ok()) {
+            throw new SecretStoreException(name(), "add-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
+        }
+        return r;
+    }
+
+    /** {@code encoded} cut into pieces whose add command for a part item fits one interactive line */
+    static List<String> split(String key, String encoded) {
+        int room = MAX_COMMAND_LENGTH - addCommand(partKey(key, MAX_PARTS - 1), "x").length() + 1;
+        if (room < 256) {
+            throw new IllegalArgumentException("key too long to split a value over parts: " + key);
+        }
+        List<String> parts = new java.util.ArrayList<>();
+        for (int i = 0; i < encoded.length(); i += room) {
+            parts.add(encoded.substring(i, Math.min(encoded.length(), i + room)));
+        }
+        if (parts.size() > MAX_PARTS) {
+            throw new SecretStoreException(I18n.tr("auth.store.mac"), "value too long for the Keychain (" + encoded.length() + " characters)");
+        }
+        return parts;
+    }
+
+    static String partKey(String key, int index) {
+        return SecretStore.requireValidKey(key + ".part" + index);
+    }
+
+    /**
+     * delete part items {@code from} and up: count the ones there, then remove them last first, so a delete
+     * that fails partway leaves the remaining parts in one unbroken run that a later delete still finds
+     */
+    private void deleteParts(String key, int from) {
+        int end = from;
+        try {
+            while (end < MAX_PARTS && find(partKey(key, end)).isPresent()) {
+                end++;
+            }
+        } catch (IllegalArgumentException e) {
+            return; // a key this long never had parts
+        }
+        for (int i = end - 1; i >= from; i--) {
+            ProcessRunner.Result r = run(deleteCommand(partKey(key, i)), null);
+            if (!r.ok() && r.exitCode() != ERR_NOT_FOUND) {
+                throw new SecretStoreException(name(), "delete-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
+            }
+        }
+    }
+
     @Override
     public Optional<String> get(String key) {
         SecretStore.requireValidKey(key);
-        ProcessRunner.Result r = run(findCommand(key), null);
-        if (r.exitCode() == ERR_NOT_FOUND) {
+        Optional<String> raw = find(key);
+        if (raw.isEmpty()) {
             return Optional.empty();
         }
-        if (!r.ok()) {
-            throw new SecretStoreException(name(), "find-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
+        String stored = raw.get();
+        if (stored.startsWith(PARTS_PREFIX)) {
+            int count;
+            try {
+                count = Integer.parseInt(stored.substring(PARTS_PREFIX.length()).strip());
+            } catch (NumberFormatException e) {
+                return Optional.empty();
+            }
+            if (count < 1 || count > MAX_PARTS) {
+                return Optional.empty();
+            }
+            StringBuilder joined = new StringBuilder();
+            for (int i = 0; i < count; i++) {
+                Optional<String> part = find(partKey(key, i));
+                if (part.isEmpty()) {
+                    LOG.warning("A saved secret in the Keychain is incomplete (part " + i + " of " + count + " is missing)");
+                    return Optional.empty();
+                }
+                joined.append(part.get());
+            }
+            stored = joined.toString();
         }
-        Optional<String> value = SecretEncoding.decode(r.stdout());
+        Optional<String> value = SecretEncoding.decode(stored);
         value.ifPresent(Redactor::register);
         return value;
     }
@@ -112,11 +194,25 @@ public final class MacKeychainSecretStore implements SecretStore {
     public void delete(String key) {
         SecretStore.requireValidKey(key);
         synchronized (lock) {
+            // parts first: while the marker is there a failed delete can be retried and still finds them
+            deleteParts(key, 0);
             ProcessRunner.Result r = run(deleteCommand(key), null);
             if (!r.ok() && r.exitCode() != ERR_NOT_FOUND) {
                 throw new SecretStoreException(name(), "delete-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
             }
         }
+    }
+
+    /** the raw value of one item (line end removed), or empty when it isn't in the Keychain */
+    private Optional<String> find(String account) {
+        ProcessRunner.Result r = run(findCommand(account), null);
+        if (r.exitCode() == ERR_NOT_FOUND) {
+            return Optional.empty();
+        }
+        if (!r.ok()) {
+            throw new SecretStoreException(name(), "find-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
+        }
+        return Optional.of(r.stdout().replaceAll("[\r\n]+$", ""));
     }
 
     // ---------------------------------------------------------------- command construction

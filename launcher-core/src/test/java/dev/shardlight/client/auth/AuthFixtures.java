@@ -115,6 +115,7 @@ public final class AuthFixtures implements AutoCloseable {
                 + "\"roles\":[],\"metadata\":{},\"access_token\":\"" + nextMcToken + "\",\"expires_in\":86400,\"token_type\":\"Bearer\"}"));
         });
         server.handle("/mcs/entitlements/mcstore", ex -> TestHttpServer.respond(ex, 200, "application/json", bytes(entitlementsJson)));
+        server.handle("/mcs/entitlements/license", ex -> TestHttpServer.respond(ex, 200, "application/json", bytes(entitlementsJson)));
         server.handle("/mcs/minecraft/profile", ex -> {
             String p = profileJson;
             if (p == null) {

@@ -160,8 +160,8 @@ class SecretStoreTest {
         String expectedLine = "add-generic-password -U -s \"Shardlight Client\" -a \"msa.refresh.abc\" -w \""
             + SecretEncoding.encode(TOKEN) + "\"\n";
         assertEquals(expectedLine, add.stdin());
-        assertEquals(List.of(Path.of("/usr/bin/security").toString(), "find-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc", "-w"),
-            tool.calls.get(1).command());
+        assertTrue(tool.calls.stream().anyMatch(c -> c.command().equals(List.of(Path.of("/usr/bin/security").toString(),
+            "find-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc", "-w"))));
         for (FakeTools.Call c : tool.calls) {
             for (String arg : c.command()) {
                 assertFalse(arg.contains(TOKEN), "secret on a command line: " + c.command());
@@ -172,9 +172,10 @@ class SecretStoreTest {
             }
         }
 
+        int before = tool.calls.size();
         s.delete("msa.refresh.abc");
-        assertEquals(List.of(Path.of("/usr/bin/security").toString(), "delete-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc"),
-            tool.calls.get(tool.calls.size() - 1).command());
+        assertTrue(tool.calls.subList(before, tool.calls.size()).stream().anyMatch(c -> c.command().equals(
+            List.of(Path.of("/usr/bin/security").toString(), "delete-generic-password", "-s", "Shardlight Client", "-a", "msa.refresh.abc"))));
         assertEquals(Optional.empty(), s.get("msa.refresh.abc"));
         s.delete("msa.refresh.abc"); // not found is fine
         assertTrue(s.isPersistent());
@@ -223,9 +224,74 @@ class SecretStoreTest {
     }
 
     @Test
-    void keychainRefusesValuesTooLongForInteractiveMode() {
-        MacKeychainSecretStore s = new MacKeychainSecretStore(new FakeTools.Security(), Path.of("/usr/bin/security"));
-        assertThrows(SecretStoreException.class, () -> s.put("k", "x".repeat(4000)));
+    void keychainSplitsValuesTooLongForOneInteractiveLine() {
+        FakeTools.Security tool = new FakeTools.Security();
+        MacKeychainSecretStore s = new MacKeychainSecretStore(tool, Path.of("/usr/bin/security"));
+        String longValue = "M.C5_" + "x".repeat(9000) + "\u00e9";
+        s.put("msa.refresh.abc", longValue);
+        assertEquals(Optional.of(longValue), s.get("msa.refresh.abc"));
+        assertTrue(tool.items.size() > 1, "spread over part items");
+        for (FakeTools.Call c : tool.calls) {
+            if (c.stdin() != null) {
+                assertTrue(c.stdin().length() <= MacKeychainSecretStore.MAX_COMMAND_LENGTH, "every line fits");
+            }
+        }
+
+        s.put("msa.refresh.abc", "short");
+        assertEquals(Optional.of("short"), s.get("msa.refresh.abc"));
+        assertEquals(1, tool.items.size(), "old parts are removed");
+
+        s.put("msa.refresh.abc", longValue);
+        s.delete("msa.refresh.abc");
+        assertTrue(tool.items.isEmpty(), "delete removes the parts too");
+        assertEquals(Optional.empty(), s.get("msa.refresh.abc"));
+    }
+
+    @Test
+    void keychainSurvivesAMissingPart() {
+        FakeTools.Security tool = new FakeTools.Security();
+        MacKeychainSecretStore s = new MacKeychainSecretStore(tool, Path.of("/usr/bin/security"));
+        s.put("k", "y".repeat(8000));
+        tool.items.keySet().removeIf(id -> id.endsWith("k.part1"));
+        assertEquals(Optional.empty(), s.get("k"));
+    }
+
+    @Test
+    void keychainNeverMixesOldAndNewParts() {
+        FakeTools.Security tool = new FakeTools.Security();
+        MacKeychainSecretStore s = new MacKeychainSecretStore(tool, Path.of("/usr/bin/security"));
+        s.put("k", "a".repeat(9000));
+        // the second write stops after its first part, as if the Keychain refused the rest
+        int[] adds = {0};
+        ProcessRunner failing = (command, stdin, timeout) -> {
+            if (stdin != null && stdin.startsWith("add-generic-password") && ++adds[0] > 1) {
+                return new ProcessRunner.Result(1, "", "refused");
+            }
+            return tool.run(command, stdin, timeout);
+        };
+        MacKeychainSecretStore t = new MacKeychainSecretStore(failing, Path.of("/usr/bin/security"));
+        assertThrows(SecretStoreException.class, () -> t.put("k", "b".repeat(9000)));
+        assertEquals(Optional.empty(), s.get("k"), "no value rather than a mix of two");
+    }
+
+    @Test
+    void keychainDeleteThatFailsPartwayCanBeFinishedLater() {
+        FakeTools.Security tool = new FakeTools.Security();
+        MacKeychainSecretStore s = new MacKeychainSecretStore(tool, Path.of("/usr/bin/security"));
+        s.put("k", "y".repeat(9000));
+        int parts = tool.items.size() - 1;
+        assertTrue(parts > 2);
+        int[] deletes = {0};
+        ProcessRunner failing = (command, stdin, timeout) -> {
+            if (command.contains("delete-generic-password") && ++deletes[0] > 1) {
+                return new ProcessRunner.Result(51, "", "User interaction is not allowed.");
+            }
+            return tool.run(command, stdin, timeout);
+        };
+        assertThrows(SecretStoreException.class, () -> new MacKeychainSecretStore(failing, Path.of("/usr/bin/security")).delete("k"));
+        assertTrue(tool.items.size() > 1, "only some parts went");
+        s.delete("k");
+        assertTrue(tool.items.isEmpty(), "the retry removes every part that was left");
     }
 
     @Test
@@ -249,10 +315,11 @@ class SecretStoreTest {
             "account", "mc.session.abc"), tool.calls.get(0).command());
         assertEquals(SecretEncoding.encode(TOKEN), tool.calls.get(0).stdin(), "the value goes to stdin, without a newline");
         assertEquals(List.of(Path.of("/usr/bin/secret-tool").toString(), "lookup", "service", "shardlight-client", "account", "mc.session.abc"),
-            tool.calls.get(1).command());
+            tool.calls.get(1).command(), "a store is read back to check it was kept");
+        int before = tool.calls.size();
         s.delete("mc.session.abc");
         assertEquals(List.of(Path.of("/usr/bin/secret-tool").toString(), "clear", "service", "shardlight-client", "account", "mc.session.abc"),
-            tool.calls.get(2).command());
+            tool.calls.get(before).command());
         assertEquals(Optional.empty(), s.get("mc.session.abc"));
         for (FakeTools.Call c : tool.calls) {
             assertTrue(c.command().stream().noneMatch(a -> a.contains(TOKEN)));
@@ -275,10 +342,14 @@ class SecretStoreTest {
         assertFalse(broken.isUsable());
         assertThrows(SecretStoreException.class, () -> broken.get("k"), "an error on stderr isn't 'not found'");
 
+        assertTrue(ok.calls.stream().noneMatch(c -> c.command().contains("store")),
+            "the startup check only reads, so the keyring never asks to be unlocked just for opening the launcher");
+
         FakeTools.SecretTool forgetful = new FakeTools.SecretTool();
         forgetful.forgetful = true;
-        assertFalse(new LinuxSecretServiceStore(forgetful, Path.of("/usr/bin/secret-tool")).isUsable(),
-            "a lookup round trip must work");
+        LinuxSecretServiceStore keepsNothing = new LinuxSecretServiceStore(forgetful, Path.of("/usr/bin/secret-tool"));
+        assertThrows(SecretStoreException.class, () -> keepsNothing.put("k", "value"),
+            "a store that keeps nothing is caught when writing");
     }
 
     @Test

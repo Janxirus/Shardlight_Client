@@ -2,7 +2,8 @@
 
 Shardlight Client signs players in with their Microsoft account, the same way the official launcher does,
 and checks that the account owns Minecraft: Java Edition. The launcher **never sees or stores a password**
-and has **no offline or cracked mode**.
+and has **no cracked mode**: without internet, only an account confirmed to own the game in the last 30 days
+can start single-player (see step 5).
 
 This page is for whoever builds and distributes Shardlight Client. Sign-in needs a Microsoft
 application (an Azure "client ID") that the distributor registers and that Mojang approves for
@@ -36,18 +37,24 @@ sign-in call fails with `AUTH_NOT_CONFIGURED`.
    | 2148916227 | account suspended by Xbox | can't sign in |
 
 3. **Minecraft services**: `authentication/login_with_xbox` returns the Minecraft access token (valid for
-   24 hours). `entitlements/mcstore` lists purchases, and `minecraft/profile` returns the player's name,
+   24 hours). `entitlements/license` lists purchases (the older `entitlements/mcstore` is asked when that
+   one is missing), and `minecraft/profile` returns the player's name,
    UUID and skin.
    * A profile means the account can play, including Xbox Game Pass accounts that have no store
      entitlement.
    * No profile and no entitlement: "this Microsoft account doesn't own Minecraft: Java Edition".
    * An entitlement but no profile: the player must first choose a profile name at
      https://www.minecraft.net/msaprofile.
-4. **Later launches** reuse the stored Minecraft token while it has more than 5 minutes left. After
-   that, the launcher refreshes the Microsoft token with the stored refresh token (Microsoft may hand
+4. **Later launches** reuse the stored Minecraft token while it has more than 4 hours left, so it stays
+   valid for a whole play session (the game checks it whenever the player joins a server). The token is read
+   again after the downloads, right before the game starts. Otherwise the launcher refreshes the Microsoft token with the stored refresh token (Microsoft may hand
    out a new one, which replaces the old one immediately) and repeats steps 2 and 3. If the refresh
-   token was revoked or expired, the account stays in the list marked "sign in again". If the computer
-   is offline, nothing is deleted.
+   token was revoked or expired, or the account signed in with a different app ID than the one set now, the
+   account stays in the list marked "sign in again". If the computer is offline, nothing is deleted.
+5. **Offline play**: when Microsoft can't be reached for the session (no internet, or Minecraft services
+   busy or down), an account whose ownership was confirmed in the last 30 days is offered "Play offline".
+   The game starts under the account's own name and UUID with a placeholder token, so single-player works
+   and Minecraft keeps multiplayer off.
 
 ## 1. Register the application (Microsoft Entra)
 
@@ -75,6 +82,9 @@ sign-in call fails with `AUTH_NOT_CONFIGURED`.
    and `offline_access` are requested when the player signs in.
 
 ## 2. Request Minecraft API access
+
+> The project's own app (`default_msa_client_id` in `gradle.properties`) is approved, and sign-in and play work
+> with it. This section is for anyone who builds the launcher with an app of their own.
 
 New applications can't call `api.minecraftservices.com` until Mojang approves them. Until then,
 `login_with_xbox` answers HTTP 403 "Invalid app registration", and the launcher says the app has to be

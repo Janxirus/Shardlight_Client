@@ -15,6 +15,7 @@ import dev.shardlight.client.launch.GameExit;
 import dev.shardlight.client.launch.GameProcess;
 import dev.shardlight.client.launch.LaunchOptions;
 import dev.shardlight.client.launch.LaunchPlan;
+import dev.shardlight.client.launch.LaunchService;
 import dev.shardlight.client.project.Project;
 import dev.shardlight.client.task.CancellationToken;
 import dev.shardlight.client.task.ProgressListener;
@@ -109,6 +110,14 @@ public final class PlayFlow {
      * an error, try again with the same options.
      */
     public void play(Project project, LaunchOptions options) {
+        play(project, options, false);
+    }
+
+    /**
+     * Start {@code project}; with {@code offline} the game starts single-player only, without contacting Microsoft,
+     * for an account whose ownership was confirmed recently (see {@code AccountService#canPlayOffline}).
+     */
+    private void play(Project project, LaunchOptions options, boolean offline) {
         if (isRunning(project.id)) {
             confirmStop(project);
             return;
@@ -141,10 +150,29 @@ public final class PlayFlow {
                 });
             }
         };
+        // set when Microsoft couldn't be reached for the session, the one failure playing offline gets around
+        AtomicBoolean sessionFailed = new AtomicBoolean();
         Fx.run(() -> {
-            progress.stage("ui.play.stage.session");
-            var session = ctx.services().accounts().session(accountId, cancel);
-            LaunchPlan plan = ctx.services().launches().prepare(project, session, options, progress, cancel);
+            var accounts = ctx.services().accounts();
+            var launches = ctx.services().launches();
+            LaunchPlan plan;
+            if (offline) {
+                plan = launches.prepareWithSession(project, c -> accounts.offlineSession(accountId), options, progress, cancel);
+            } else {
+                // check the account first so a dead sign-in shows up before any download, then read the session
+                // again once everything is installed: a long first download must not leave the game an old token
+                LaunchService.SessionSource session = c -> {
+                    progress.stage("ui.play.stage.session");
+                    try {
+                        return accounts.session(accountId, c);
+                    } catch (LauncherException e) {
+                        sessionFailed.set(true);
+                        throw e;
+                    }
+                };
+                session.get(cancel);
+                plan = launches.prepareWithSession(project, session, options, progress, cancel);
+            }
             progress.stage("ui.play.stage.starting");
             cancel.check();
             return ctx.services().launches().start(plan);
@@ -157,7 +185,7 @@ public final class PlayFlow {
                 ctx.overlay().toast("info", I18n.tr("ui.play.cancelled", project.name));
                 fire();
             } else {
-                failed(project, options, Tasks.unwrap(err));
+                failed(project, options, accountId, offline, sessionFailed.get(), Tasks.unwrap(err));
             }
         });
     }
@@ -257,7 +285,24 @@ public final class PlayFlow {
             p == null ? null : p.minecraftVersion, g.startedAt()));
     }
 
-    private void failed(Project project, LaunchOptions options, Throwable err) {
+    private void failed(Project project, LaunchOptions options, String accountId, boolean offline, boolean sessionFailed,
+                        Throwable err) {
+        if (!offline && sessionFailed && isOutage(err)
+            && options.quickPlayServer() == null && ctx.services().accounts().canPlayOffline(accountId)) {
+            // Microsoft can't be reached, but the account is a confirmed owner: single-player still works
+            fire();
+            Button playOffline = UiKit.primary(I18n.tr("ui.play.offline.play"), Icons.PLAY, () -> { });
+            Button close = new Button(I18n.tr("common.close"));
+            close.setCancelButton(true);
+            Overlay.Dialog d = ctx.overlay().show(Overlay.modal(I18n.tr("ui.play.offline.title"),
+                UiKit.label(I18n.tr("ui.play.offline.message", project.name)), close, playOffline), true, false);
+            close.setOnAction(e -> d.close());
+            playOffline.setOnAction(e -> {
+                d.close();
+                play(project, options, true);
+            });
+            return;
+        }
         if (err instanceof LauncherException le && le.code() == ErrorCode.AUTH_EXPIRED) {
             fire();
             Button signIn = UiKit.primary(I18n.tr("ui.play.signInAgain"), Icons.USER, () -> { });
@@ -275,8 +320,20 @@ public final class PlayFlow {
         failures.put(project.id, new Failure(err, options));
         fire();
         ctx.overlay().toast("danger", I18n.tr("ui.play.failedToast", project.name, Tasks.message(err)),
-            new Overlay.Action(I18n.tr("ui.state.retry"), () -> play(project, options)),
+            new Overlay.Action(I18n.tr("ui.state.retry"), () -> play(project, options, offline)),
             new Overlay.Action(I18n.tr("ui.play.details"), () -> showError(project)));
+    }
+
+    /** true for no internet, or Microsoft busy or down after its retries (429, 5xx) */
+    static boolean isOutage(Throwable err) {
+        if (!(err instanceof LauncherException le)) {
+            return false;
+        }
+        return switch (le.code()) {
+            case NETWORK, RATE_LIMITED -> true;
+            case HTTP_STATUS -> le.args().length > 1 && le.args()[1] instanceof Integer status && status >= 500;
+            default -> false;
+        };
     }
 
     /** tell the player how a game ended: a short note, or for a crash what was found and what to do */

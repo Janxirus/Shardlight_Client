@@ -449,6 +449,16 @@ public final class SettingsPage implements Page {
             if (!a.ownsGame) {
                 row.getChildren().add(UiKit.chip(I18n.tr("ui.settings.noGame"), "warning"));
             }
+            // whether the saved sign-in still works needs the OS secret store, which can be slow: fill it in later
+            HBox signInState = new HBox(8);
+            signInState.setAlignment(Pos.CENTER_LEFT);
+            row.getChildren().add(signInState);
+            Fx.run(() -> accounts.hasSavedSignIn(a.id), saved -> {
+                if (!saved && accounts.isSignInConfigured()) {
+                    signInState.getChildren().setAll(UiKit.chip(I18n.tr("ui.settings.signInExpired"), "warning"),
+                        UiKit.button(I18n.tr("ui.play.signInAgain"), null, () -> SignInDialog.show(ctx, x -> render())));
+                }
+            }, err -> { });
             row.getChildren().add(UiKit.button(I18n.tr("ui.settings.signOut"), null, () -> ctx.overlay().confirm(
                 I18n.tr("ui.settings.signOutTitle", a.username), I18n.tr("ui.settings.signOutMessage"), List.of(),
                 I18n.tr("ui.settings.signOut"), false, () -> Tasks.quiet(ctx.overlay(), () -> {

@@ -38,7 +38,8 @@ yourself with the commands above; they need a network that can reach those servi
 ## First sign-in and first launch check
 
 Needs a Microsoft account that owns Minecraft: Java Edition, and a build whose Azure app Mojang has approved
-([SIGN_IN.md](SIGN_IN.md)). Until then, step 3 shows the waiting screen and nothing further can be checked.
+([SIGN_IN.md](SIGN_IN.md)); the project's own app is approved. The owner has signed in and played a real game with it
+(October 2026). Repeat this check before each release.
 
 1. Start the launcher with a fresh data folder (`--data-dir <empty folder>`, or delete the old one).
 2. On the welcome screens press **Sign in** (or **Accounts > Add account** later). A code such as `K7QD-M2XP` and
@@ -56,7 +57,9 @@ Needs a Microsoft account that owns Minecraft: Java Edition, and a build whose A
    The Downloads page shows the game, libraries, assets and a Java runtime installing with a progress ring.
 6. Press **Play**. Expected: the Play bar goes through Preparing, Starting, Running; a Minecraft window opens at the
    title screen within a minute or two. Open a world: your player name is your Minecraft name and your skin loads
-   (the session is the real one; the launcher has no offline mode).
+   (the session is the real one).
+   Leave the game open for a while and join a server: it must not say "Invalid session" (the launcher only
+   reuses a session with at least four hours left).
 7. Open a world, then quit the game. The Play bar returns to Play, the project shows the play time, and Logs has
    `latest.log`. If the game closes by itself, the crash screen opens with the likely cause.
 8. Repeat steps 5 to 7 with a **Fabric** project and Fabric API from Discover. Then add **Shardlight UI** (needs
@@ -122,8 +125,8 @@ layout with sample data, not behaviour with real data.
 
 ## The ten end-to-end acceptance cases
 
-None of these has been run against a real game yet, because sign-in needs an Azure app approved for
-Minecraft (docs/SIGN_IN.md) and Minecraft can't run in the build environment.
+Sign-in and a vanilla launch now work with the approved app; the cases below have not all been checked by hand
+yet, and Minecraft can't run in the build environment, so the automated part stops at the stand-in game.
 
 | # | Case | Automated part | Still needs a person |
 |---|---|---|---|

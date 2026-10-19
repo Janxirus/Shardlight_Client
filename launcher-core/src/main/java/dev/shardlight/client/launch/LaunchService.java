@@ -117,10 +117,29 @@ public final class LaunchService {
      */
     public LaunchPlan prepare(Project project, MinecraftSession session, LaunchOptions options, ProgressListener progress,
                               CancellationToken cancel) throws LauncherException {
+        if (session == null) {
+            throw new LauncherException(ErrorCode.AUTH_FAILED, "install.launch.noSession");
+        }
+        return prepareWithSession(project, c -> session, options, progress, cancel);
+    }
+
+    /** where {@link #prepareWithSession} gets the player's session from, asked once everything is installed */
+    @FunctionalInterface
+    public interface SessionSource {
+        MinecraftSession get(CancellationToken cancel) throws LauncherException;
+    }
+
+    /**
+     * Like {@link #prepare(Project, MinecraftSession, LaunchOptions, ProgressListener, CancellationToken)}, but the
+     * session is asked for only after the downloads, right before the command is built. A first start can spend
+     * a long time downloading, and the game must not start with a token that ran out meanwhile.
+     */
+    public LaunchPlan prepareWithSession(Project project, SessionSource sessions, LaunchOptions options,
+                                         ProgressListener progress, CancellationToken cancel) throws LauncherException {
         ProgressListener p = progress == null ? ProgressListener.NONE : progress;
         CancellationToken c = cancel == null ? CancellationToken.NONE : cancel;
         LaunchOptions o = options == null ? LaunchOptions.NONE : options;
-        if (session == null) {
+        if (sessions == null) {
             throw new LauncherException(ErrorCode.AUTH_FAILED, "install.launch.noSession");
         }
         Project current = projects.get(project.id).orElseThrow(() ->
@@ -158,6 +177,11 @@ public final class LaunchService {
         }
         LaunchPreparation.prepare(installed, gameDir, nativesDir, c);
 
+        MinecraftSession session = sessions.get(c);
+        if (session == null) {
+            throw new LauncherException(ErrorCode.AUTH_FAILED, "install.launch.noSession");
+        }
+        c.check();
         Redactor.register(session.accessToken());
         LaunchContext ctx = new LaunchContext(installed, runtime, gameDir, nativesDir, session, current.java.minMemoryMb,
             current.java.maxMemoryMb, current.java.extraJvmArgs, current.java.extraGameArgs, current.window.width,
