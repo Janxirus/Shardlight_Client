@@ -19,6 +19,8 @@ public final class Account {
     /** whether the last entitlement check found Minecraft: Java Edition */
     public boolean ownsGame;
     public long entitlementCheckedAt;
+    /** the Microsoft app id the account signed in with; its saved sign-in only renews with that same id */
+    public String clientId;
 
     @Override
     public String toString() {

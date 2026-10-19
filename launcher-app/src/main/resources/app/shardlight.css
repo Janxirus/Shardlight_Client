@@ -1527,6 +1527,9 @@
 .signin-code-row { -fx-spacing: 0.571em; -fx-alignment: center-left; }
 .signin-waiting { -fx-spacing: 0.571em; -fx-alignment: center-left; }
 .signin-steps { -fx-spacing: 0.286em; }
+.signin-qr { -fx-spacing: 0.857em; -fx-alignment: center-left; }
+.signin-qr-text { -fx-alignment: center-left; }
+.signin-qr-code { -fx-background-color: white; -fx-background-radius: 0.429em; -fx-padding: 0.429em; }
 .signin-success { -fx-spacing: 1.143em; -fx-alignment: center-left; }
 .signin-who { -fx-spacing: 0.143em; }
 .signin-status { -fx-spacing: 0.429em; -fx-alignment: center-left; }

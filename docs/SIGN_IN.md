@@ -76,6 +76,9 @@ sign-in call fails with `AUTH_NOT_CONFIGURED`.
 
 ## 2. Request Minecraft API access
 
+> The project's own app (`default_msa_client_id` in `gradle.properties`) is approved, and sign-in and play work
+> with it. This section is for anyone who builds the launcher with an app of their own.
+
 New applications can't call `api.minecraftservices.com` until Mojang approves them. Until then,
 `login_with_xbox` answers HTTP 403 "Invalid app registration", and the launcher says the app has to be
 approved first.

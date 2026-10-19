@@ -8,6 +8,7 @@ import dev.shardlight.client.app.ui.Motion;
 import dev.shardlight.client.app.ui.Overlay;
 import dev.shardlight.client.app.ui.PlayerHead;
 import dev.shardlight.client.app.ui.ProgressRing;
+import dev.shardlight.client.app.ui.QrCode;
 import dev.shardlight.client.app.ui.Tasks;
 import dev.shardlight.client.app.ui.UiKit;
 import dev.shardlight.client.auth.DeviceCode;
@@ -15,6 +16,9 @@ import dev.shardlight.client.error.ErrorCode;
 import dev.shardlight.client.error.LauncherException;
 import dev.shardlight.client.i18n.I18n;
 import dev.shardlight.client.task.CancellationToken;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -22,8 +26,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.function.Consumer;
 
 /**
@@ -40,6 +46,8 @@ public final class SignInDialog {
     private final HBox actions;
     private final Overlay.Dialog dialog;
     private final Button closeButton = new Button();
+    /** ticks the "code expires in" line while the code is shown */
+    private Timeline countdown;
 
     private SignInDialog(AppContext ctx, Consumer<Account> done) {
         this.ctx = ctx;
@@ -56,7 +64,15 @@ public final class SignInDialog {
 
     private void close() {
         cancel.cancel();
+        stopCountdown();
         dialog.close();
+    }
+
+    private void stopCountdown() {
+        if (countdown != null) {
+            countdown.stop();
+            countdown = null;
+        }
     }
 
     /** open the sign-in dialog; {@code done} gets the signed-in account (not called on cancel or failure) */
@@ -67,7 +83,13 @@ public final class SignInDialog {
         }
         SignInDialog d = new SignInDialog(ctx, done);
         d.gettingCode();
-        Fx.run(() -> ctx.services().accounts().signIn(code -> Fx.ui(() -> d.code(code)), d.cancel), account -> {
+        Fx.run(() -> {
+            var accounts = ctx.services().accounts();
+            Account signedIn = accounts.signIn(code -> Fx.ui(() -> d.code(code)), d.cancel);
+            // whoever just signed in is who the player wants to play as (also after "Sign in again" with another account)
+            accounts.select(signedIn.id);
+            return signedIn;
+        }, account -> {
             d.success(account);
             ctx.accountsChanged();
             if (done != null) {
@@ -103,6 +125,7 @@ public final class SignInDialog {
     }
 
     private void setBody(Node... nodes) {
+        stopCountdown();
         body.getChildren().setAll(nodes);
         Motion.enter(body, Motion.Speed.MEDIUM, Motion.ENTER_OFFSET);
     }
@@ -126,26 +149,39 @@ public final class SignInDialog {
         codeLabel.setAccessibleText(I18n.tr("ui.signin.codeAccessible", String.join(" ", code.userCode().split(""))));
         Button copy = UiKit.button(I18n.tr("ui.signin.copy"), Icons.COPY, () -> { });
         copy.setOnAction(e -> {
-            javafx.scene.input.ClipboardContent c = new javafx.scene.input.ClipboardContent();
-            c.putString(code.userCode());
-            javafx.scene.input.Clipboard.getSystemClipboard().setContent(c);
+            copyCode(code);
             UiKit.copied(copy);
             ctx.overlay().toast("success", I18n.tr("ui.signin.copied"));
         });
         HBox codeRow = new HBox(codeLabel, copy);
         codeRow.getStyleClass().add("signin-code-row");
         String shown = code.verificationUri().getHost() + code.verificationUri().getPath();
-        Button open = UiKit.primary(I18n.tr("ui.signin.openPage", shown.replaceFirst("^www\\.", "")), Icons.EXTERNAL,
-            () -> ctx.openUrl(code.verificationUri().toString()));
+        // one click: the code goes to the clipboard and the page opens, so the player only has to paste it
+        Button open = UiKit.primary(I18n.tr("ui.signin.copyAndOpen", shown.replaceFirst("^www\\.", "")), Icons.EXTERNAL, () -> {
+            copyCode(code);
+            ctx.overlay().toast("success", I18n.tr("ui.signin.copiedAndOpened"));
+            ctx.openUrl(code.verificationUri().toString());
+        });
         ProgressRing ring = new ProgressRing(-1);
         ring.getStyleClass().add("small");
-        HBox waiting = new HBox(ring, new VBox(UiKit.label(I18n.tr("ui.signin.waiting"), "muted"),
-            UiKit.label(I18n.tr("ui.signin.expires", Math.max(1, code.expiresInSeconds() / 60)), "faint", "small")));
+        Instant expiresAt = Instant.now().plusSeconds(Math.max(1, code.expiresInSeconds()));
+        Label expires = UiKit.label(expiresText(expiresAt), "faint", "small");
+        HBox waiting = new HBox(ring, new VBox(UiKit.label(I18n.tr("ui.signin.waiting"), "muted"), expires));
         waiting.getStyleClass().add("signin-waiting");
         VBox steps = new VBox(UiKit.label(I18n.tr("ui.signin.step1", shown.replaceFirst("^www\\.", "")), "strong"),
             UiKit.label(I18n.tr("ui.signin.step2"), "muted"));
         steps.getStyleClass().add("signin-steps");
-        VBox content = new VBox(steps, codeRow, open, waiting, UiKit.label(I18n.tr("ui.signin.privacy"), "faint", "small"));
+        VBox content = new VBox(steps, codeRow, open, waiting);
+        Node qr = QrCode.of(code.verificationUri().toString(), 112);
+        if (qr != null) {
+            VBox phone = new VBox(UiKit.label(I18n.tr("ui.signin.phone"), "faint", "small"));
+            phone.getStyleClass().add("signin-qr-text");
+            HBox.setHgrow(phone, javafx.scene.layout.Priority.ALWAYS);
+            HBox qrRow = new HBox(qr, phone);
+            qrRow.getStyleClass().add("signin-qr");
+            content.getChildren().add(qrRow);
+        }
+        content.getChildren().add(UiKit.label(I18n.tr("ui.signin.privacy"), "faint", "small"));
         content.getStyleClass().add("signin-content");
         if (!ctx.services().accounts().remembersSignIn()) {
             content.getChildren().add(UiKit.banner("warning", I18n.tr("ui.signin.notRemembered")));
@@ -154,6 +190,24 @@ public final class SignInDialog {
         closeButton.setText(I18n.tr("common.cancel"));
         setActions(closeButton);
         open.requestFocus();
+        countdown = new Timeline(new KeyFrame(Duration.seconds(1), e -> expires.setText(expiresText(expiresAt))));
+        countdown.setCycleCount(Animation.INDEFINITE);
+        countdown.play();
+    }
+
+    private static void copyCode(DeviceCode code) {
+        javafx.scene.input.ClipboardContent c = new javafx.scene.input.ClipboardContent();
+        c.putString(code.userCode());
+        javafx.scene.input.Clipboard.getSystemClipboard().setContent(c);
+    }
+
+    /** "Code expires in 14:32", or that it ran out (the poll then reports the expiry) */
+    static String expiresText(Instant expiresAt) {
+        long left = Math.max(0, java.time.Duration.between(Instant.now(), expiresAt).toSeconds());
+        if (left == 0) {
+            return I18n.tr("ui.signin.expired");
+        }
+        return I18n.tr("ui.signin.expiresIn", String.format(java.util.Locale.ROOT, "%d:%02d", left / 60, left % 60));
     }
 
     private void success(Account account) {

@@ -362,7 +362,10 @@ class MicrosoftAuthServiceTest {
         assertEquals("XBL3.0 x=" + AuthFixtures.UHS + ";" + AuthFixtures.XSTS_MC_TOKEN, json(mc).get("identityToken").getAsString());
 
         // e) + f) entitlements and profile with the bearer token
-        assertEquals("Bearer " + AuthFixtures.MC_TOKEN, lastRequest("/mcs/entitlements/mcstore").header("Authorization"));
+        TestHttpServer.Recorded licence = lastRequest("/mcs/entitlements/license");
+        assertEquals("Bearer " + AuthFixtures.MC_TOKEN, licence.header("Authorization"));
+        assertTrue(licence.query().startsWith("requestId="), licence.query());
+        assertEquals(0, fx.server.hits("/mcs/entitlements/mcstore"), "the older endpoint is only a fallback");
         assertEquals("GET", lastRequest("/mcs/minecraft/profile").method());
         assertEquals("Bearer " + AuthFixtures.MC_TOKEN, lastRequest("/mcs/minecraft/profile").header("Authorization"));
 
@@ -460,11 +463,20 @@ class MicrosoftAuthServiceTest {
 
     @Test
     void entitlementOutageDoesNotBlockAPlayerWithAProfile() throws Exception {
-        fx.server.text("/mcs/entitlements/mcstore", 503, "busy");
+        fx.server.text("/mcs/entitlements/license", 503, "busy");
         assertTrue(auth.loginToMinecraft(msa(), CancellationToken.NONE).ownsGame());
         fx.profileJson = null;
         LauncherException e = assertThrows(LauncherException.class, () -> auth.loginToMinecraft(msa(), CancellationToken.NONE));
         assertEquals(ErrorCode.HTTP_STATUS, e.code(), "an outage isn't reported as 'not owned'");
+    }
+
+    @Test
+    void olderEntitlementEndpointIsAskedWhenTheLicenceOneIsMissing() throws Exception {
+        fx.server.text("/mcs/entitlements/license", 404, "");
+        fx.entitlementsJson = AuthFixtures.entitlements(true);
+        assertTrue(auth.loginToMinecraft(msa(), CancellationToken.NONE).ownsGame());
+        assertEquals(1, fx.server.hits("/mcs/entitlements/mcstore"));
+        assertEquals("Bearer " + AuthFixtures.MC_TOKEN, lastRequest("/mcs/entitlements/mcstore").header("Authorization"));
     }
 
     @Test

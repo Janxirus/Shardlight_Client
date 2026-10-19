@@ -387,10 +387,21 @@ public final class MicrosoftAuthService {
         return new McToken(token, clock.instant().plusSeconds(expiresIn));
     }
 
-    /** true when the store lists Minecraft: Java Edition ({@code product_minecraft} or {@code game_minecraft}) */
+    /**
+     * True when the account's licences list Minecraft: Java Edition ({@code product_minecraft} or
+     * {@code game_minecraft}). Asks {@code entitlements/license}, the endpoint Mojang's own launcher uses, and
+     * falls back to the older {@code entitlements/mcstore} when that one isn't answered.
+     */
     private boolean hasJavaEntitlement(String mcToken, CancellationToken cancel) throws LauncherException {
-        URI uri = HttpService.uri(endpoints.minecraftServices(), "entitlements/mcstore", null);
-        HttpService.Response r = http.execute(HttpService.Request.get(uri).withHeaders(bearer(mcToken)), cancel).requireOk();
+        URI license = HttpService.uri(endpoints.minecraftServices(), "entitlements/license",
+            Map.of("requestId", java.util.UUID.randomUUID().toString()));
+        HttpService.Response r = http.execute(HttpService.Request.get(license).withHeaders(bearer(mcToken)), cancel);
+        if (!r.ok() && r.status() != 429 && r.status() < 500) {
+            LOG.fine("entitlements/license answered HTTP " + r.status() + "; asking entitlements/mcstore");
+            URI mcstore = HttpService.uri(endpoints.minecraftServices(), "entitlements/mcstore", null);
+            r = http.execute(HttpService.Request.get(mcstore).withHeaders(bearer(mcToken)), cancel);
+        }
+        r.requireOk();
         JsonObject o = tryParseObject(r);
         if (o == null) {
             throw badResponse("Minecraft");

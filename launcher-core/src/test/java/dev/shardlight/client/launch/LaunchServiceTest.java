@@ -170,6 +170,20 @@ class LaunchServiceTest {
     }
 
     @Test
+    void theSessionIsAskedForAfterTheDownloads() throws Exception {
+        Project p = project("late-session", "ok");
+        java.util.concurrent.atomic.AtomicInteger asked = new java.util.concurrent.atomic.AtomicInteger();
+        LaunchPlan plan = launches.prepare(p, c -> {
+            asked.incrementAndGet();
+            assertTrue(Files.isDirectory(paths.versions().resolve(VERSION)), "the game is installed before the session is read");
+            return SESSION;
+        }, LaunchOptions.NONE, null, CancellationToken.NONE);
+        assertEquals(1, asked.get());
+        List<String> cmd = plan.command().command();
+        assertEquals(TOKEN, cmd.get(cmd.indexOf("--accessToken") + 1));
+    }
+
+    @Test
     void launchesTheGameAndRecordsHowItWent() throws Exception {
         Project p = project("vanilla", "ok");
         LaunchPlan plan = launches.prepare(p, SESSION, LaunchOptions.NONE, null, CancellationToken.NONE);
@@ -293,7 +307,7 @@ class LaunchServiceTest {
     void preparingNeedsASignedInPlayer() throws Exception {
         Project p = project("nosession", "ok");
         LauncherException e = assertThrows(LauncherException.class,
-            () -> launches.prepare(p, null, LaunchOptions.NONE, null, CancellationToken.NONE));
+            () -> launches.prepare(p, (MinecraftSession) null, LaunchOptions.NONE, null, CancellationToken.NONE));
         assertNotNull(e.userMessage());
     }
 }

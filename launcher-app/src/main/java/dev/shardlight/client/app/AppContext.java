@@ -317,6 +317,9 @@ public final class AppContext {
         stage.setMinHeight(Math.min(ThemeManager.em(45.71), screen.getHeight()));
     }
 
+    /** stops the startup account maintenance when the window closes */
+    private final dev.shardlight.client.task.CancellationToken maintenance = new dev.shardlight.client.task.CancellationToken();
+
     void afterShow() {
         TaskProgress.attach(stage);
         if (!services.settings().get().firstRunDone) {
@@ -328,6 +331,8 @@ public final class AppContext {
         }
         Platform.runLater(this::applyTitleBar);
         play.checkForUpdatesQuietly();
+        // renew a sign-in that is running low (and clean up after a failed sign-out) so Play starts right away
+        Thread.ofPlatform().daemon().name("account-maintenance").start(() -> services.accounts().maintain(maintenance));
     }
 
     /** on Windows, colour the native title bar like the window: its background and primary text */
@@ -758,6 +763,7 @@ public final class AppContext {
     }
 
     void close() {
+        maintenance.cancel();
         services.close();
     }
 }

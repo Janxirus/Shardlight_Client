@@ -27,6 +27,8 @@ dependencies {
     implementation project(':launcher-core')
     // the title bar colours and taskbar progress on Windows
     implementation "net.java.dev.jna:jna-platform:${jna_version}"
+    // the QR code on the sign-in screen, for signing in on a phone
+    implementation "com.google.zxing:core:${zxing_version}"
     fxModules.each { m -> implementation("org.openjfx:javafx-${m}:${javafx_version}:${hostFx}") { transitive = false } }
     portablePlatforms.each { p ->
         fxModules.each { m -> add("javafx_${p.replace('-', '_')}", "org.openjfx:javafx-${m}:${javafx_version}:${p}") }

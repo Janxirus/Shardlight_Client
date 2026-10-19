@@ -65,11 +65,20 @@ public final class AccountService {
     private static final Logger LOG = Logger.getLogger(AccountService.class.getName());
     /** the accounts.json schema this launcher writes */
     public static final int SCHEMA_VERSION = 1;
-    /** a cached Minecraft token is reused only while it has more than this left */
-    public static final Duration REUSE_MARGIN = Duration.ofMinutes(5);
+    /**
+     * A cached Minecraft token is reused only while it has more than this left. The game checks the token
+     * whenever the player joins a server, so it has to stay valid for a whole play session, not just the start.
+     */
+    public static final Duration REUSE_MARGIN = Duration.ofHours(4);
+    /** how long a confirmed game ownership lets the player start single-player while offline */
+    public static final Duration OFFLINE_GRACE = Duration.ofDays(30);
+    /** the access token passed to the game for an offline start; Minecraft services reject it, so only single-player works */
+    public static final String OFFLINE_TOKEN = "offline";
     static final JsonMigrator MIGRATOR = new JsonMigrator("accounts.json", SCHEMA_VERSION)
         .step(0, AccountService::migrate0to1);
     private static final Pattern ID = Pattern.compile("[0-9a-f]{32}");
+    /** the only secret keys a sign-out may leave behind for a later retry */
+    private static final Pattern PENDING_KEY = Pattern.compile("(?:msa\\.refresh|mc\\.session)\\.[0-9a-f]{32}");
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final Path file;
@@ -169,6 +178,54 @@ public final class AccountService {
         } catch (LauncherException e) {
             LOG.fine("Couldn't check the saved sign-in: " + e.code());
             return false;
+        }
+    }
+
+    /**
+     * True when {@code accountId} may start the game offline (single-player only): the account was confirmed to
+     * own Minecraft within {@link #OFFLINE_GRACE}. This is not an offline or cracked mode: only an account that
+     * signed in and passed the ownership check gets it, under its own name and UUID.
+     */
+    public boolean canPlayOffline(String accountId) {
+        return account(accountId)
+            .filter(a -> a.ownsGame && a.entitlementCheckedAt > 0)
+            .map(a -> clock.millis() - a.entitlementCheckedAt <= OFFLINE_GRACE.toMillis())
+            .orElse(false);
+    }
+
+    /**
+     * What the game needs to start {@code accountId} without a network connection: the real name and UUID with
+     * a placeholder token, so single-player works and Minecraft turns multiplayer off. Throws
+     * {@link ErrorCode#AUTH_EXPIRED} when {@link #canPlayOffline} is false.
+     */
+    public MinecraftSession offlineSession(String accountId) throws LauncherException {
+        String id = normalizeId(accountId);
+        Account account = account(id).orElseThrow(AccountService::unknownAccount);
+        if (!canPlayOffline(id)) {
+            throw new LauncherException(ErrorCode.AUTH_EXPIRED, "auth.error.offlineNotAllowed", account.username);
+        }
+        LOG.info("Starting " + account.username + " offline (single-player only)");
+        return new MinecraftSession(account.username, id, OFFLINE_TOKEN, account.xuid, "msa", auth.clientId());
+    }
+
+    /**
+     * Housekeeping to run once, off the UI thread, after the launcher starts: retry deleting tokens that a
+     * sign-out couldn't remove, then renew the selected account's Minecraft session when it has less than
+     * {@link #REUSE_MARGIN} left, so Play doesn't have to wait for it. Never throws; problems are logged and
+     * show up again when the player presses Play.
+     */
+    public void maintain(CancellationToken cancel) {
+        retryPendingDeletes();
+        Optional<Account> sel = selected();
+        if (sel.isEmpty() || !auth.isConfigured() || !hasSavedSignIn(sel.get().id)) {
+            return;
+        }
+        try {
+            session(sel.get().id, cancel);
+        } catch (LauncherException e) {
+            LOG.info("Couldn't renew the sign-in in the background (" + e.code() + "); Play will try again");
+        } catch (RuntimeException e) {
+            LOG.warning("Background sign-in renewal failed: " + e);
         }
     }
 
@@ -291,15 +348,23 @@ public final class AccountService {
         sessionLock.lock();
         try {
             SecretStoreException failure = null;
+            List<String> leftBehind = new ArrayList<>();
             for (String key : List.of(refreshTokenKey(id), sessionKey(id))) {
                 try {
                     deleteSecret(key);
                 } catch (SecretStoreException e) {
                     LOG.warning("Couldn't delete a saved sign-in: " + e.getMessage());
                     failure = failure == null ? e : failure;
+                    leftBehind.add(key);
                 }
             }
             String name = mutate(f -> {
+                // remember what couldn't be deleted: once the account is gone nothing else would ever find it
+                for (String key : leftBehind) {
+                    if (!f.pendingSecretDeletes.contains(key)) {
+                        f.pendingSecretDeletes.add(key);
+                    }
+                }
                 Optional<Account> a = find(f, id);
                 f.accounts.removeIf(x -> id.equals(x.id));
                 if (id.equals(f.selectedId) || (f.selectedId != null && find(f, f.selectedId).isEmpty())) {
@@ -337,10 +402,25 @@ public final class AccountService {
         if (refreshToken.isEmpty()) {
             throw new LauncherException(ErrorCode.AUTH_EXPIRED, "auth.error.signInAgain", account.username);
         }
+        String currentClientId = auth.clientId();
+        if (account.clientId != null && !currentClientId.isEmpty() && !account.clientId.equalsIgnoreCase(currentClientId)) {
+            // a refresh token only works with the app id that issued it
+            LOG.info("The Microsoft app id changed since " + account.username + " signed in; asking to sign in again");
+            deleteQuietly(refreshTokenKey(id));
+            deleteQuietly(sessionKey(id));
+            throw new LauncherException(ErrorCode.AUTH_EXPIRED, "auth.error.appChanged", account.username);
+        }
         MsaTokens msa;
         try {
             msa = auth.refresh(refreshToken.get(), cancel);
         } catch (LauncherException e) {
+            if (e.code() == ErrorCode.AUTH_NOT_CONFIGURED && "auth.error.clientRejected".equals(e.messageKey())) {
+                // the saved sign-in came from an app id Microsoft no longer accepts for it (for example an older
+                // build's id): a fresh sign-in with the current id fixes that, a broken id fails there with its own message
+                deleteQuietly(refreshTokenKey(id));
+                deleteQuietly(sessionKey(id));
+                throw new LauncherException(ErrorCode.AUTH_EXPIRED, e, "auth.error.appChanged", account.username);
+            }
             if (e.code() == ErrorCode.AUTH_EXPIRED) {
                 // the refresh token is dead: drop it so the next attempt asks to sign in without a network round trip
                 deleteQuietly(refreshTokenKey(id));
@@ -405,6 +485,10 @@ public final class AccountService {
             a.xuid = login.xuid();
         }
         a.type = "msa";
+        String clientId = auth.clientId();
+        if (!clientId.isEmpty()) {
+            a.clientId = clientId;
+        }
         a.lastUsedAt = now;
         a.skinUrl = login.skinUrl();
         a.skinVariant = login.skinVariant();
@@ -438,6 +522,46 @@ public final class AccountService {
             });
         } catch (LauncherException e) {
             LOG.warning("Couldn't save the account list: " + e.getMessage());
+        }
+    }
+
+    /** delete the tokens an earlier sign-out couldn't remove; keys of accounts signed in again are dropped */
+    void retryPendingDeletes() {
+        List<String> pending;
+        synchronized (lock) {
+            pending = new ArrayList<>(data.pendingSecretDeletes);
+        }
+        if (pending.isEmpty()) {
+            return;
+        }
+        List<String> done = new ArrayList<>();
+        for (String key : pending) {
+            String owner = key.substring(key.lastIndexOf('.') + 1);
+            ReentrantLock sessionLock = sessionLock(owner);
+            sessionLock.lock();
+            try {
+                if (account(owner).isPresent()) {
+                    done.add(key); // signed in again since: the key holds a live token now
+                    continue;
+                }
+                deleteSecret(key);
+                done.add(key);
+            } catch (SecretStoreException | IllegalArgumentException e) {
+                LOG.warning("Still couldn't delete a saved sign-in: " + e.getMessage());
+            } finally {
+                sessionLock.unlock();
+            }
+        }
+        if (!done.isEmpty()) {
+            try {
+                mutate(f -> {
+                    f.pendingSecretDeletes.removeAll(done);
+                    return null;
+                });
+                LOG.info("Removed " + done.size() + " sign-in item(s) left behind by an earlier sign-out");
+            } catch (LauncherException e) {
+                LOG.warning("Couldn't save the account list: " + e.getMessage());
+            }
         }
     }
 
@@ -638,6 +762,13 @@ public final class AccountService {
             byId.put(id, a);
         }
         f.accounts = new ArrayList<>(byId.values());
+        if (f.pendingSecretDeletes == null) {
+            f.pendingSecretDeletes = new ArrayList<>();
+            changed = true;
+        }
+        int before = f.pendingSecretDeletes.size();
+        f.pendingSecretDeletes.removeIf(k -> k == null || !PENDING_KEY.matcher(k).matches());
+        changed |= f.pendingSecretDeletes.size() != before;
         if (f.selectedId != null && !byId.containsKey(f.selectedId)) {
             f.selectedId = f.accounts.isEmpty() ? null : f.accounts.get(0).id;
             changed = true;

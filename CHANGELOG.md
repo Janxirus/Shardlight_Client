@@ -4,7 +4,34 @@ All notable changes to Shardlight Client. Versions follow [semantic versioning](
 
 ## Unreleased
 
+### Fixed
+
+- Sign-in and play (from the October 2026 review):
+  - A saved Minecraft session is reused only while it has at least four hours left (was five minutes), so joining
+    a server late in a play session no longer fails with "Invalid session".
+  - Play reads the session after downloading, right before starting the game, so a long first install can't hand
+    the game a token that ran out meanwhile.
+  - Signing in, from "Sign in again" or "Add account", switches to that account. Signing in with a different
+    account after an expired sign-in no longer loops.
+  - Each account remembers the Microsoft app ID it signed in with. After the ID changes, or Microsoft refuses the
+    old one, the launcher asks that account to sign in again instead of saying sign-in isn't set up.
+  - Tokens a sign-out couldn't delete from the secret store are deleted at the next start.
+  - The ownership check asks `entitlements/license` (as Mojang's launcher does) and falls back to `entitlements/mcstore`.
+  - Linux: opening the launcher only reads from the Secret Service, so the keyring doesn't ask to be unlocked at
+    start; a value is read back after each write instead.
+  - macOS: values too long for one `security -i` line are split over several Keychain items instead of being
+    kept in memory only.
+
 ### Added
+
+- Sign-in and accounts:
+  - The sign-in dialog counts down until the code runs out, has one button that copies the code and opens the
+    Microsoft page, and shows a QR code for signing in on a phone.
+  - Switch accounts from the account area in the sidebar when more than one is signed in.
+  - Settings > Accounts marks accounts whose saved sign-in has expired, with a Sign in again button.
+  - The selected account's session is renewed in the background when the launcher opens.
+  - Offline single-player: when Microsoft can't be reached, an account confirmed to own Minecraft in the last 30
+    days can still start the game (multiplayer stays off).
 
 - **Art, installers and polish** (UI overhaul, part 8):
   - Original artwork in the shard style: a Home backdrop, a default cover for each of the nine project templates,

@@ -109,6 +109,14 @@ public final class PlayFlow {
      * an error, try again with the same options.
      */
     public void play(Project project, LaunchOptions options) {
+        play(project, options, false);
+    }
+
+    /**
+     * Start {@code project}; with {@code offline} the game starts single-player only, without contacting Microsoft,
+     * for an account whose ownership was confirmed recently (see {@code AccountService#canPlayOffline}).
+     */
+    private void play(Project project, LaunchOptions options, boolean offline) {
         if (isRunning(project.id)) {
             confirmStop(project);
             return;
@@ -142,9 +150,20 @@ public final class PlayFlow {
             }
         };
         Fx.run(() -> {
-            progress.stage("ui.play.stage.session");
-            var session = ctx.services().accounts().session(accountId, cancel);
-            LaunchPlan plan = ctx.services().launches().prepare(project, session, options, progress, cancel);
+            var accounts = ctx.services().accounts();
+            LaunchPlan plan;
+            if (offline) {
+                plan = ctx.services().launches().prepare(project, c -> accounts.offlineSession(accountId), options, progress, cancel);
+            } else {
+                // check the account first so a dead sign-in shows up before any download, then read the session
+                // again once everything is installed: a long first download must not leave the game an old token
+                progress.stage("ui.play.stage.session");
+                accounts.session(accountId, cancel);
+                plan = ctx.services().launches().prepare(project, c -> {
+                    progress.stage("ui.play.stage.session");
+                    return accounts.session(accountId, c);
+                }, options, progress, cancel);
+            }
             progress.stage("ui.play.stage.starting");
             cancel.check();
             return ctx.services().launches().start(plan);
@@ -157,7 +176,7 @@ public final class PlayFlow {
                 ctx.overlay().toast("info", I18n.tr("ui.play.cancelled", project.name));
                 fire();
             } else {
-                failed(project, options, Tasks.unwrap(err));
+                failed(project, options, accountId, offline, Tasks.unwrap(err));
             }
         });
     }
@@ -257,7 +276,23 @@ public final class PlayFlow {
             p == null ? null : p.minecraftVersion, g.startedAt()));
     }
 
-    private void failed(Project project, LaunchOptions options, Throwable err) {
+    private void failed(Project project, LaunchOptions options, String accountId, boolean offline, Throwable err) {
+        if (!offline && err instanceof LauncherException le && le.code() == ErrorCode.NETWORK
+            && options.quickPlayServer() == null && ctx.services().accounts().canPlayOffline(accountId)) {
+            // no internet, but the account is a confirmed owner: single-player still works
+            fire();
+            Button playOffline = UiKit.primary(I18n.tr("ui.play.offline.play"), Icons.PLAY, () -> { });
+            Button close = new Button(I18n.tr("common.close"));
+            close.setCancelButton(true);
+            Overlay.Dialog d = ctx.overlay().show(Overlay.modal(I18n.tr("ui.play.offline.title"),
+                UiKit.label(I18n.tr("ui.play.offline.message", project.name)), close, playOffline), true, false);
+            close.setOnAction(e -> d.close());
+            playOffline.setOnAction(e -> {
+                d.close();
+                play(project, options, true);
+            });
+            return;
+        }
         if (err instanceof LauncherException le && le.code() == ErrorCode.AUTH_EXPIRED) {
             fire();
             Button signIn = UiKit.primary(I18n.tr("ui.play.signInAgain"), Icons.USER, () -> { });
@@ -275,7 +310,7 @@ public final class PlayFlow {
         failures.put(project.id, new Failure(err, options));
         fire();
         ctx.overlay().toast("danger", I18n.tr("ui.play.failedToast", project.name, Tasks.message(err)),
-            new Overlay.Action(I18n.tr("ui.state.retry"), () -> play(project, options)),
+            new Overlay.Action(I18n.tr("ui.state.retry"), () -> play(project, options, offline)),
             new Overlay.Action(I18n.tr("ui.play.details"), () -> showError(project)));
     }
 

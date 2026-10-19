@@ -5,11 +5,17 @@ import dev.shardlight.client.app.AppContext;
 import dev.shardlight.client.app.flows.SignInDialog;
 import dev.shardlight.client.i18n.I18n;
 import javafx.geometry.Pos;
+import javafx.geometry.Side;
+import javafx.scene.Node;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
+import java.util.List;
 import java.util.Optional;
 
 /** The account area at the bottom of the sidebar: who is signed in, or a Sign in button. */
@@ -34,6 +40,35 @@ public final class AccountChip {
         return box;
     }
 
+    /** quick switch: the other accounts, Add account and Manage accounts; with one account straight to Settings */
+    private void openMenu(Node anchor, Account current) {
+        List<Account> all = ctx.services().accounts().accounts();
+        if (all.size() < 2) {
+            ctx.openSettings("accounts");
+            return;
+        }
+        ContextMenu menu = new ContextMenu();
+        for (Account a : all) {
+            boolean isCurrent = a.id.equals(current.id);
+            MenuItem item = new MenuItem(isCurrent ? I18n.tr("ui.account.current", a.username) : I18n.tr("ui.account.switchTo", a.username));
+            item.setDisable(isCurrent);
+            item.setOnAction(e -> Tasks.quiet(ctx.overlay(), () -> {
+                ctx.services().accounts().select(a.id);
+                return a;
+            }, x -> {
+                ctx.overlay().toast("success", I18n.tr("ui.account.switched", a.username));
+                ctx.accountsChanged();
+            }));
+            menu.getItems().add(item);
+        }
+        MenuItem add = new MenuItem(I18n.tr("ui.settings.addAccount"));
+        add.setOnAction(e -> SignInDialog.show(ctx, x -> ctx.accountsChanged()));
+        MenuItem manage = new MenuItem(I18n.tr("ui.account.manage"));
+        manage.setOnAction(e -> ctx.openSettings("accounts"));
+        menu.getItems().addAll(new SeparatorMenuItem(), add, manage);
+        menu.show(anchor, Side.TOP, 0, 0);
+    }
+
     private void refresh() {
         box.getChildren().clear();
         Optional<Account> acc = ctx.services().accounts().selected();
@@ -51,10 +86,10 @@ public final class AccountChip {
             row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("account-row");
             row.setFocusTraversable(true);
-            row.setOnMouseClicked(e -> ctx.openSettings("accounts"));
+            row.setOnMouseClicked(e -> openMenu(row, a));
             row.setOnKeyPressed(e -> {
                 if (e.getCode() == javafx.scene.input.KeyCode.ENTER || e.getCode() == javafx.scene.input.KeyCode.SPACE) {
-                    ctx.openSettings("accounts");
+                    openMenu(row, a);
                 }
             });
             row.setAccessibleText(I18n.tr("ui.account.signedInAs", a.username));

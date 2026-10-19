@@ -246,13 +246,13 @@ class AccountServiceTest {
         assertEquals(AuthFixtures.CLIENT_ID, s.clientId());
         assertFalse(s.toString().contains(AuthFixtures.MC_TOKEN));
 
-        fx.clock.advance(Duration.ofHours(23).plusMinutes(54)); // 6 minutes left
+        fx.clock.advance(Duration.ofHours(19).plusMinutes(54)); // 4 h 6 min left
         assertEquals(AuthFixtures.MC_TOKEN, accounts.session(AuthFixtures.UUID, CancellationToken.NONE).accessToken());
-        assertEquals(tokenCalls, fx.server.hits("/msa/token"), "no refresh while the token has more than 5 minutes");
+        assertEquals(tokenCalls, fx.server.hits("/msa/token"), "no refresh while the token has more than 4 hours");
         assertEquals(logins, fx.loginCount.get());
         assertEquals(fx.clock.millis(), accounts.account(AuthFixtures.UUID).orElseThrow().lastUsedAt);
 
-        fx.clock.advance(Duration.ofMinutes(2)); // 4 minutes left: renew
+        fx.clock.advance(Duration.ofMinutes(12)); // 3 h 54 min left: too little for a long play session, renew
         fx.nextMcToken = AuthFixtures.MC_TOKEN_2;
         assertEquals(AuthFixtures.MC_TOKEN_2, accounts.session(AuthFixtures.UUID, CancellationToken.NONE).accessToken());
         assertEquals(1, fx.refreshCount.get());
@@ -446,6 +446,117 @@ class AccountServiceTest {
         LauncherException e = fails(ErrorCode.SECRET_STORE_UNAVAILABLE, () -> s.signOut(AuthFixtures.UUID));
         assertEquals("auth.error.signOutSecrets", e.messageKey());
         assertTrue(s.accounts().isEmpty(), "the account is removed anyway");
+    }
+
+    @Test
+    void failedSignOutDeletesAreRetriedLater() throws Exception {
+        FlakyStore store = new FlakyStore();
+        AccountService s = new AccountService(paths, store, fx.service(), fx.clock);
+        s.signIn(shown::add, CancellationToken.NONE);
+        store.failDeletes = true;
+        assertThrows(LauncherException.class, () -> s.signOut(AuthFixtures.UUID));
+        assertTrue(store.inner.get("msa.refresh." + AuthFixtures.UUID).isPresent(), "left behind for now");
+        assertTrue(accountsJson().contains("msa.refresh." + AuthFixtures.UUID), "remembered by key name");
+
+        AccountService restarted = new AccountService(paths, store, fx.service(), fx.clock);
+        restarted.maintain(CancellationToken.NONE);
+        assertTrue(store.inner.get("msa.refresh." + AuthFixtures.UUID).isPresent(), "still failing: kept for later");
+
+        store.failDeletes = false;
+        restarted.maintain(CancellationToken.NONE);
+        assertTrue(store.inner.get("msa.refresh." + AuthFixtures.UUID).isEmpty());
+        assertTrue(store.inner.get("mc.session." + AuthFixtures.UUID).isEmpty());
+        assertFalse(accountsJson().contains("msa.refresh."), "nothing pending any more");
+    }
+
+    @Test
+    void pendingDeletesSkipAnAccountThatSignedInAgain() throws Exception {
+        FlakyStore store = new FlakyStore();
+        AccountService s = new AccountService(paths, store, fx.service(), fx.clock);
+        s.signIn(shown::add, CancellationToken.NONE);
+        store.failDeletes = true;
+        assertThrows(LauncherException.class, () -> s.signOut(AuthFixtures.UUID));
+        store.failDeletes = false;
+        s.signIn(shown::add, CancellationToken.NONE);
+        s.maintain(CancellationToken.NONE);
+        assertTrue(store.inner.get("msa.refresh." + AuthFixtures.UUID).isPresent(), "the new sign-in's token survives");
+        assertFalse(accountsJson().contains("msa.refresh."));
+    }
+
+    // ---------------------------------------------------------------- app id, offline, background renewal
+
+    @Test
+    void changedAppIdAsksToSignInAgain() throws Exception {
+        signIn();
+        assertEquals(AuthFixtures.CLIENT_ID, accounts.account(AuthFixtures.UUID).orElseThrow().clientId);
+        AccountService other = new AccountService(paths, secrets, fx.service(() -> "99999999-1111-2222-3333-444444444444"), fx.clock);
+        fx.clock.advance(Duration.ofHours(25));
+        LauncherException e = fails(ErrorCode.AUTH_EXPIRED, () -> other.session(AuthFixtures.UUID, CancellationToken.NONE));
+        assertEquals("auth.error.appChanged", e.messageKey());
+        assertEquals(0, fx.refreshCount.get(), "Microsoft would refuse it anyway");
+        assertFalse(other.hasSavedSignIn(AuthFixtures.UUID));
+        assertEquals(1, other.accounts().size(), "the account stays listed");
+    }
+
+    @Test
+    void refusedAppIdOnRenewalMeansSignInAgain() throws Exception {
+        signIn();
+        fx.clock.advance(Duration.ofHours(25));
+        fx.refreshAnswer = () -> AuthFixtures.oauthError("unauthorized_client", 700016);
+        LauncherException e = fails(ErrorCode.AUTH_EXPIRED, () -> accounts.session(AuthFixtures.UUID, CancellationToken.NONE));
+        assertEquals("auth.error.appChanged", e.messageKey());
+        assertFalse(accounts.hasSavedSignIn(AuthFixtures.UUID));
+    }
+
+    @Test
+    void offlineStartNeedsARecentOwnershipCheck() throws Exception {
+        assertFalse(accounts.canPlayOffline(AuthFixtures.UUID), "unknown account");
+        signIn();
+        assertTrue(accounts.canPlayOffline(AuthFixtures.UUID));
+        MinecraftSession s = accounts.offlineSession(AuthFixtures.UUID);
+        assertEquals(AuthFixtures.NAME, s.username());
+        assertEquals(AuthFixtures.UUID, s.uuid());
+        assertEquals(AccountService.OFFLINE_TOKEN, s.accessToken());
+        assertEquals("msa", s.userType());
+
+        fx.clock.advance(AccountService.OFFLINE_GRACE.plusHours(1));
+        assertFalse(accounts.canPlayOffline(AuthFixtures.UUID));
+        LauncherException e = fails(ErrorCode.AUTH_EXPIRED, () -> accounts.offlineSession(AuthFixtures.UUID));
+        assertEquals("auth.error.offlineNotAllowed", e.messageKey());
+    }
+
+    @Test
+    void offlineStartIsRefusedWhenTheGameIsNotOwned() throws Exception {
+        signIn();
+        fx.clock.advance(Duration.ofHours(25));
+        fx.profileJson = null;
+        fx.entitlementsJson = AuthFixtures.entitlements(false);
+        fails(ErrorCode.AUTH_NOT_OWNED, () -> accounts.session(AuthFixtures.UUID, CancellationToken.NONE));
+        assertFalse(accounts.canPlayOffline(AuthFixtures.UUID));
+    }
+
+    @Test
+    void maintainRenewsASessionThatIsRunningLow() throws Exception {
+        signIn();
+        accounts.maintain(CancellationToken.NONE);
+        assertEquals(0, fx.refreshCount.get(), "plenty left: nothing to do");
+        fx.clock.advance(Duration.ofHours(21));
+        fx.nextMcToken = AuthFixtures.MC_TOKEN_2;
+        accounts.maintain(CancellationToken.NONE);
+        assertEquals(1, fx.refreshCount.get());
+        int logins = fx.loginCount.get();
+        assertEquals(AuthFixtures.MC_TOKEN_2, accounts.session(AuthFixtures.UUID, CancellationToken.NONE).accessToken());
+        assertEquals(logins, fx.loginCount.get(), "Play reuses the renewed token");
+    }
+
+    @Test
+    void maintainNeverThrows() throws Exception {
+        accounts.maintain(CancellationToken.NONE); // no accounts
+        signIn();
+        fx.clock.advance(Duration.ofHours(25));
+        fx.refreshAnswer = () -> new AuthFixtures.Answer(503, "");
+        accounts.maintain(CancellationToken.NONE);
+        assertEquals(1, accounts.accounts().size());
     }
 
     // ---------------------------------------------------------------- secret store trouble

@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
@@ -80,16 +79,14 @@ public final class LinuxSecretServiceStore implements SecretStore {
     }
 
     /**
-     * True when a test value can be stored, looked up and cleared (the Secret Service is running and the
-     * keyring is unlocked or can be unlocked). Never throws.
+     * True when the Secret Service answers a lookup. The check only reads, and asks for an item that doesn't
+     * exist, so opening the launcher never makes the keyring ask to be unlocked; {@link #put} checks that a value
+     * was really kept. Never throws.
      */
     public boolean isUsable() {
         try {
-            String probe = UUID.randomUUID().toString();
-            put(PROBE_KEY, probe);
-            boolean ok = get(PROBE_KEY).map(probe::equals).orElse(false);
-            delete(PROBE_KEY);
-            return ok;
+            get(PROBE_KEY);
+            return true;
         } catch (SecretStoreException | IllegalArgumentException e) {
             LOG.info("The Secret Service isn't usable: " + e.getMessage());
             return false;
@@ -109,6 +106,10 @@ public final class LinuxSecretServiceStore implements SecretStore {
             ProcessRunner.Result r = run(storeCommand(key), encoded);
             if (!r.ok()) {
                 throw new SecretStoreException(name(), "secret-tool store failed (exit " + r.exitCode() + "): " + shortError(r));
+            }
+            // a misbehaving service can say yes and keep nothing: read it back so the caller can fall back
+            if (!get(key).map(value::equals).orElse(false)) {
+                throw new SecretStoreException(name(), "the Secret Service didn't keep the value");
             }
         }
     }
