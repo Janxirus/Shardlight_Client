@@ -475,7 +475,11 @@ class MicrosoftAuthServiceTest {
         fx.server.text("/mcs/entitlements/license", 404, "");
         fx.entitlementsJson = AuthFixtures.entitlements(true);
         assertTrue(auth.loginToMinecraft(msa(), CancellationToken.NONE).ownsGame());
+        assertEquals(1, fx.server.hits("/mcs/entitlements/license"));
         assertEquals(1, fx.server.hits("/mcs/entitlements/mcstore"));
+        List<String> asked = fx.server.requests().stream().map(TestHttpServer.Recorded::path)
+            .filter(path -> path.startsWith("/mcs/entitlements/")).toList();
+        assertEquals(List.of("/mcs/entitlements/license", "/mcs/entitlements/mcstore"), asked, "the licence endpoint comes first");
         assertEquals("Bearer " + AuthFixtures.MC_TOKEN, lastRequest("/mcs/entitlements/mcstore").header("Authorization"));
     }
 

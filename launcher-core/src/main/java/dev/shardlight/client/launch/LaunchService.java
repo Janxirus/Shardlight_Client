@@ -120,10 +120,10 @@ public final class LaunchService {
         if (session == null) {
             throw new LauncherException(ErrorCode.AUTH_FAILED, "install.launch.noSession");
         }
-        return prepare(project, c -> session, options, progress, cancel);
+        return prepareWithSession(project, c -> session, options, progress, cancel);
     }
 
-    /** where {@link #prepare} gets the player's session from, asked once everything is installed */
+    /** where {@link #prepareWithSession} gets the player's session from, asked once everything is installed */
     @FunctionalInterface
     public interface SessionSource {
         MinecraftSession get(CancellationToken cancel) throws LauncherException;
@@ -134,8 +134,8 @@ public final class LaunchService {
      * session is asked for only after the downloads, right before the command is built. A first start can spend
      * a long time downloading, and the game must not start with a token that ran out meanwhile.
      */
-    public LaunchPlan prepare(Project project, SessionSource sessions, LaunchOptions options, ProgressListener progress,
-                              CancellationToken cancel) throws LauncherException {
+    public LaunchPlan prepareWithSession(Project project, SessionSource sessions, LaunchOptions options,
+                                         ProgressListener progress, CancellationToken cancel) throws LauncherException {
         ProgressListener p = progress == null ? ProgressListener.NONE : progress;
         CancellationToken c = cancel == null ? CancellationToken.NONE : cancel;
         LaunchOptions o = options == null ? LaunchOptions.NONE : options;

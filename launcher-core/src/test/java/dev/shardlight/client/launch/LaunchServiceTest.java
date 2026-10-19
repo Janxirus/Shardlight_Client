@@ -173,14 +173,24 @@ class LaunchServiceTest {
     void theSessionIsAskedForAfterTheDownloads() throws Exception {
         Project p = project("late-session", "ok");
         java.util.concurrent.atomic.AtomicInteger asked = new java.util.concurrent.atomic.AtomicInteger();
-        LaunchPlan plan = launches.prepare(p, c -> {
+        java.util.Set<Path> onDiskWhenAsked = new java.util.HashSet<>();
+        LaunchPlan plan = launches.prepareWithSession(p, c -> {
             asked.incrementAndGet();
-            assertTrue(Files.isDirectory(paths.versions().resolve(VERSION)), "the game is installed before the session is read");
+            try (var files = Files.walk(paths.root())) {
+                files.filter(Files::isRegularFile).forEach(f -> onDiskWhenAsked.add(f.toAbsolutePath().normalize()));
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
             return SESSION;
         }, LaunchOptions.NONE, null, CancellationToken.NONE);
         assertEquals(1, asked.get());
         List<String> cmd = plan.command().command();
         assertEquals(TOKEN, cmd.get(cmd.indexOf("--accessToken") + 1));
+        // everything the game loads, the client jar included, was downloaded before the session was asked for
+        String classpath = cmd.get(cmd.indexOf("-cp") + 1);
+        for (String entry : classpath.split(java.io.File.pathSeparator)) {
+            assertTrue(onDiskWhenAsked.contains(Path.of(entry).toAbsolutePath().normalize()), "not there yet: " + entry);
+        }
     }
 
     @Test
@@ -307,7 +317,7 @@ class LaunchServiceTest {
     void preparingNeedsASignedInPlayer() throws Exception {
         Project p = project("nosession", "ok");
         LauncherException e = assertThrows(LauncherException.class,
-            () -> launches.prepare(p, (MinecraftSession) null, LaunchOptions.NONE, null, CancellationToken.NONE));
+            () -> launches.prepare(p, null, LaunchOptions.NONE, null, CancellationToken.NONE));
         assertNotNull(e.userMessage());
     }
 }

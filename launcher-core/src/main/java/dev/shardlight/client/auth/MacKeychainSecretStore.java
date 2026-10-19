@@ -90,10 +90,12 @@ public final class MacKeychainSecretStore implements SecretStore {
                 deleteParts(key, 0);
             } else {
                 List<String> parts = split(key, encoded);
+                // remove the old value first: rewriting parts its marker still points to could leave a mix of
+                // old and new parts if a write fails; a missing value just means signing in again
+                delete(key);
                 for (int i = 0; i < parts.size(); i++) {
                     add(partKey(key, i), parts.get(i));
                 }
-                deleteParts(key, parts.size());
                 r = add(key, PARTS_PREFIX + parts.size());
             }
             // "security -i" may report a failed command only on stderr: read the value back to be sure
@@ -133,20 +135,22 @@ public final class MacKeychainSecretStore implements SecretStore {
         return SecretStore.requireValidKey(key + ".part" + index);
     }
 
-    /** delete part items {@code from} and up, stopping at the first one that isn't there */
+    /**
+     * delete part items {@code from} and up: count the ones there, then remove them last first, so a delete
+     * that fails partway leaves the remaining parts in one unbroken run that a later delete still finds
+     */
     private void deleteParts(String key, int from) {
-        for (int i = from; i < MAX_PARTS; i++) {
-            String part;
-            try {
-                part = partKey(key, i);
-            } catch (IllegalArgumentException e) {
-                return; // a key this long never had parts
+        int end = from;
+        try {
+            while (end < MAX_PARTS && find(partKey(key, end)).isPresent()) {
+                end++;
             }
-            ProcessRunner.Result r = run(deleteCommand(part), null);
-            if (r.exitCode() == ERR_NOT_FOUND) {
-                return;
-            }
-            if (!r.ok()) {
+        } catch (IllegalArgumentException e) {
+            return; // a key this long never had parts
+        }
+        for (int i = end - 1; i >= from; i--) {
+            ProcessRunner.Result r = run(deleteCommand(partKey(key, i)), null);
+            if (!r.ok() && r.exitCode() != ERR_NOT_FOUND) {
                 throw new SecretStoreException(name(), "delete-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
             }
         }
@@ -190,11 +194,12 @@ public final class MacKeychainSecretStore implements SecretStore {
     public void delete(String key) {
         SecretStore.requireValidKey(key);
         synchronized (lock) {
+            // parts first: while the marker is there a failed delete can be retried and still finds them
+            deleteParts(key, 0);
             ProcessRunner.Result r = run(deleteCommand(key), null);
             if (!r.ok() && r.exitCode() != ERR_NOT_FOUND) {
                 throw new SecretStoreException(name(), "delete-generic-password failed (exit " + r.exitCode() + "): " + shortError(r));
             }
-            deleteParts(key, 0);
         }
     }
 

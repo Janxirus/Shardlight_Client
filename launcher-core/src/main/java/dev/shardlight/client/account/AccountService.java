@@ -63,8 +63,11 @@ import java.util.regex.Pattern;
  */
 public final class AccountService {
     private static final Logger LOG = Logger.getLogger(AccountService.class.getName());
-    /** the accounts.json schema this launcher writes */
-    public static final int SCHEMA_VERSION = 1;
+    /**
+     * the accounts.json schema this launcher writes. 2 added each account's app id and the pending secret
+     * deletes; launchers that only know 1 open the file read-only instead of dropping them on save.
+     */
+    public static final int SCHEMA_VERSION = 2;
     /**
      * A cached Minecraft token is reused only while it has more than this left. The game checks the token
      * whenever the player joins a server, so it has to stay valid for a whole play session, not just the start.
@@ -75,7 +78,7 @@ public final class AccountService {
     /** the access token passed to the game for an offline start; Minecraft services reject it, so only single-player works */
     public static final String OFFLINE_TOKEN = "offline";
     static final JsonMigrator MIGRATOR = new JsonMigrator("accounts.json", SCHEMA_VERSION)
-        .step(0, AccountService::migrate0to1);
+        .step(0, AccountService::migrate0to1); // 1 to 2 only adds optional fields
     private static final Pattern ID = Pattern.compile("[0-9a-f]{32}");
     /** the only secret keys a sign-out may leave behind for a later retry */
     private static final Pattern PENDING_KEY = Pattern.compile("(?:msa\\.refresh|mc\\.session)\\.[0-9a-f]{32}");
@@ -154,7 +157,7 @@ public final class AccountService {
 
     /** true when sign-ins survive a restart (the OS secret store works); false = memory only, warn the user */
     public boolean remembersSignIn() {
-        return secrets.isPersistent();
+        return secrets.isPersistent() && unsaved.size() == 0;
     }
 
     /**
@@ -165,7 +168,8 @@ public final class AccountService {
      */
     public boolean hasSavedSignIn(String accountId) {
         String id = normalizeId(accountId);
-        if (!ID.matcher(id).matches() || account(id).isEmpty()) {
+        Optional<Account> account = ID.matcher(id).matches() ? account(id) : Optional.empty();
+        if (account.isEmpty() || appChanged(account.get())) {
             return false;
         }
         try {
@@ -189,7 +193,11 @@ public final class AccountService {
     public boolean canPlayOffline(String accountId) {
         return account(accountId)
             .filter(a -> a.ownsGame && a.entitlementCheckedAt > 0)
-            .map(a -> clock.millis() - a.entitlementCheckedAt <= OFFLINE_GRACE.toMillis())
+            .map(a -> {
+                long age = clock.millis() - a.entitlementCheckedAt;
+                // a check dated in the future (clock turned back) doesn't count: it could otherwise last forever
+                return age >= 0 && age <= OFFLINE_GRACE.toMillis();
+            })
             .orElse(false);
     }
 
@@ -311,6 +319,13 @@ public final class AccountService {
         try {
             // read again under the lock: another thread may have renewed or signed it out meanwhile
             Account account = account(id).orElseThrow(AccountService::unknownAccount);
+            if (appChanged(account)) {
+                // tokens only work with the app id that issued them
+                LOG.info("The Microsoft app id changed since " + account.username + " signed in; asking to sign in again");
+                deleteQuietly(refreshTokenKey(id));
+                deleteQuietly(sessionKey(id));
+                throw new LauncherException(ErrorCode.AUTH_EXPIRED, "auth.error.appChanged", account.username);
+            }
             Optional<StoredSession> cached = readSecret(sessionKey(id)).flatMap(StoredSession::parse);
             // after a restart the token comes from the secret store, not from Microsoft: mask it from now on
             cached.ifPresent(c -> Redactor.register(c.accessToken()));
@@ -347,20 +362,11 @@ public final class AccountService {
         ReentrantLock sessionLock = sessionLock(id);
         sessionLock.lock();
         try {
-            SecretStoreException failure = null;
-            List<String> leftBehind = new ArrayList<>();
-            for (String key : List.of(refreshTokenKey(id), sessionKey(id))) {
-                try {
-                    deleteSecret(key);
-                } catch (SecretStoreException e) {
-                    LOG.warning("Couldn't delete a saved sign-in: " + e.getMessage());
-                    failure = failure == null ? e : failure;
-                    leftBehind.add(key);
-                }
-            }
+            List<String> keys = List.of(refreshTokenKey(id), sessionKey(id));
+            // forget the account and note its keys before deleting them: if the launcher stops or a delete fails,
+            // the next start finishes the job instead of listing an account that has lost its sign-in
             String name = mutate(f -> {
-                // remember what couldn't be deleted: once the account is gone nothing else would ever find it
-                for (String key : leftBehind) {
+                for (String key : keys) {
                     if (!f.pendingSecretDeletes.contains(key)) {
                         f.pendingSecretDeletes.add(key);
                     }
@@ -375,6 +381,18 @@ public final class AccountService {
             if (name != null) {
                 LOG.info("Signed out " + name);
             }
+            SecretStoreException failure = null;
+            List<String> deleted = new ArrayList<>();
+            for (String key : keys) {
+                try {
+                    deleteSecret(key);
+                    deleted.add(key);
+                } catch (SecretStoreException e) {
+                    LOG.warning("Couldn't delete a saved sign-in: " + e.getMessage());
+                    failure = failure == null ? e : failure;
+                }
+            }
+            clearPendingQuietly(deleted);
             if (failure != null) {
                 throw new LauncherException(ErrorCode.SECRET_STORE_UNAVAILABLE, failure, "auth.error.signOutSecrets", failure.storeName());
             }
@@ -401,14 +419,6 @@ public final class AccountService {
         refreshToken.ifPresent(Redactor::register);
         if (refreshToken.isEmpty()) {
             throw new LauncherException(ErrorCode.AUTH_EXPIRED, "auth.error.signInAgain", account.username);
-        }
-        String currentClientId = auth.clientId();
-        if (account.clientId != null && !currentClientId.isEmpty() && !account.clientId.equalsIgnoreCase(currentClientId)) {
-            // a refresh token only works with the app id that issued it
-            LOG.info("The Microsoft app id changed since " + account.username + " signed in; asking to sign in again");
-            deleteQuietly(refreshTokenKey(id));
-            deleteQuietly(sessionKey(id));
-            throw new LauncherException(ErrorCode.AUTH_EXPIRED, "auth.error.appChanged", account.username);
         }
         MsaTokens msa;
         try {
@@ -456,6 +466,12 @@ public final class AccountService {
         LOG.info("Renewed the Minecraft session for " + login.username());
         return new MinecraftSession(login.username(), id, login.accessToken(),
             login.xuid() != null ? login.xuid() : account.xuid, "msa", auth.clientId());
+    }
+
+    /** true when {@code account} signed in with another Microsoft app id than the one set now */
+    private boolean appChanged(Account account) {
+        String current = auth.clientId();
+        return account.clientId != null && !current.isEmpty() && !account.clientId.equalsIgnoreCase(current);
     }
 
     private void storeTokens(String id, MinecraftLogin login) {
@@ -534,34 +550,41 @@ public final class AccountService {
         if (pending.isEmpty()) {
             return;
         }
-        List<String> done = new ArrayList<>();
+        int removed = 0;
         for (String key : pending) {
             String owner = key.substring(key.lastIndexOf('.') + 1);
             ReentrantLock sessionLock = sessionLock(owner);
             sessionLock.lock();
             try {
-                if (account(owner).isPresent()) {
-                    done.add(key); // signed in again since: the key holds a live token now
-                    continue;
-                }
-                deleteSecret(key);
-                done.add(key);
+                // cleared while still holding the lock, so a sign-out of the same account can't slip in between
+                if (account(owner).isEmpty()) {
+                    deleteSecret(key);
+                    removed++;
+                } // else signed in again since: the key holds a live token now, just forget the entry
+                clearPendingQuietly(List.of(key));
             } catch (SecretStoreException | IllegalArgumentException e) {
                 LOG.warning("Still couldn't delete a saved sign-in: " + e.getMessage());
             } finally {
                 sessionLock.unlock();
             }
         }
-        if (!done.isEmpty()) {
-            try {
-                mutate(f -> {
-                    f.pendingSecretDeletes.removeAll(done);
-                    return null;
-                });
-                LOG.info("Removed " + done.size() + " sign-in item(s) left behind by an earlier sign-out");
-            } catch (LauncherException e) {
-                LOG.warning("Couldn't save the account list: " + e.getMessage());
-            }
+        if (removed > 0) {
+            LOG.info("Removed " + removed + " sign-in item(s) left behind by an earlier sign-out");
+        }
+    }
+
+    /** drop {@code keys} from the pending deletes; call with their accounts' session locks held */
+    private void clearPendingQuietly(List<String> keys) {
+        if (keys.isEmpty()) {
+            return;
+        }
+        try {
+            mutate(f -> {
+                f.pendingSecretDeletes.removeAll(keys);
+                return null;
+            }, false);
+        } catch (LauncherException e) {
+            LOG.warning("Couldn't save the account list: " + e.getMessage());
         }
     }
 
@@ -612,6 +635,11 @@ public final class AccountService {
 
     /** apply {@code change} to a copy, save it, swap it in, then notify listeners */
     private <T> T mutate(Change<T> change) throws LauncherException {
+        return mutate(change, true);
+    }
+
+    /** {@code notify} false: a bookkeeping change listeners can't see (the pending deletes) */
+    private <T> T mutate(Change<T> change, boolean notify) throws LauncherException {
         T result;
         synchronized (lock) {
             AccountsFile copy = Json.copy(data, AccountsFile.class);
@@ -619,7 +647,9 @@ public final class AccountService {
             save(copy);
             data = copy;
         }
-        fireChanged();
+        if (notify) {
+            fireChanged();
+        }
         return result;
     }
 

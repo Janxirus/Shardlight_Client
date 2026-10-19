@@ -147,7 +147,7 @@ class AccountServiceTest {
         assertEquals(2, secrets.size());
 
         JsonObject file = JsonParser.parseString(accountsJson()).getAsJsonObject();
-        assertEquals(1, file.get("schemaVersion").getAsInt());
+        assertEquals(AccountService.SCHEMA_VERSION, file.get("schemaVersion").getAsInt());
         assertEquals(AuthFixtures.UUID, file.get("selectedId").getAsString());
         assertEquals(AuthFixtures.NAME, file.getAsJsonArray("accounts").get(0).getAsJsonObject().get("username").getAsString());
         assertNoTokensOnDisk();
@@ -449,6 +449,32 @@ class AccountServiceTest {
     }
 
     @Test
+    void signOutSavesTheRemovalBeforeDeletingTokens() throws Exception {
+        List<String> fileWhileDeleting = new CopyOnWriteArrayList<>();
+        FlakyStore store = new FlakyStore() {
+            @Override
+            public void delete(String key) {
+                try {
+                    fileWhileDeleting.add(accountsJson());
+                } catch (Exception e) {
+                    throw new AssertionError(e);
+                }
+                super.delete(key);
+            }
+        };
+        AccountService s = new AccountService(paths, store, fx.service(), fx.clock);
+        s.signIn(shown::add, CancellationToken.NONE);
+        fileWhileDeleting.clear();
+        s.signOut(AuthFixtures.UUID);
+        assertFalse(fileWhileDeleting.isEmpty());
+        for (String json : fileWhileDeleting) {
+            assertFalse(json.contains(AuthFixtures.NAME), "the account is already gone from the file");
+            assertTrue(json.contains("msa.refresh." + AuthFixtures.UUID), "and its keys are noted, in case the launcher stops here");
+        }
+        assertFalse(accountsJson().contains("msa.refresh."), "nothing pending once the deletes worked");
+    }
+
+    @Test
     void failedSignOutDeletesAreRetriedLater() throws Exception {
         FlakyStore store = new FlakyStore();
         AccountService s = new AccountService(paths, store, fx.service(), fx.clock);
@@ -499,6 +525,16 @@ class AccountServiceTest {
     }
 
     @Test
+    void changedAppIdIsCaughtBeforeAFreshCachedSessionIsReused() throws Exception {
+        signIn();
+        AccountService other = new AccountService(paths, secrets, fx.service(() -> "99999999-1111-2222-3333-444444444444"), fx.clock);
+        assertFalse(other.hasSavedSignIn(AuthFixtures.UUID), "Settings marks it before Play is pressed");
+        LauncherException e = fails(ErrorCode.AUTH_EXPIRED, () -> other.session(AuthFixtures.UUID, CancellationToken.NONE));
+        assertEquals("auth.error.appChanged", e.messageKey());
+        assertEquals(0, secrets.size(), "the old app's tokens are dropped");
+    }
+
+    @Test
     void refusedAppIdOnRenewalMeansSignInAgain() throws Exception {
         signIn();
         fx.clock.advance(Duration.ofHours(25));
@@ -523,6 +559,13 @@ class AccountServiceTest {
         assertFalse(accounts.canPlayOffline(AuthFixtures.UUID));
         LauncherException e = fails(ErrorCode.AUTH_EXPIRED, () -> accounts.offlineSession(AuthFixtures.UUID));
         assertEquals("auth.error.offlineNotAllowed", e.messageKey());
+    }
+
+    @Test
+    void offlineStartIgnoresAnOwnershipCheckDatedInTheFuture() throws Exception {
+        signIn();
+        fx.clock.advance(Duration.ofDays(-2)); // the computer's clock was turned back
+        assertFalse(accounts.canPlayOffline(AuthFixtures.UUID));
     }
 
     @Test
@@ -562,7 +605,7 @@ class AccountServiceTest {
     // ---------------------------------------------------------------- secret store trouble
 
     /** a store whose writes or deletes can be made to fail */
-    static final class FlakyStore implements SecretStore {
+    static class FlakyStore implements SecretStore {
         final MemorySecretStore inner = new MemorySecretStore();
         volatile boolean failPuts;
         volatile boolean failDeletes;
@@ -608,6 +651,7 @@ class AccountServiceTest {
         assertEquals("Flaky store", s.secretStoreName());
         s.signIn(shown::add, CancellationToken.NONE);
         assertEquals(0, store.inner.size());
+        assertFalse(s.remembersSignIn(), "the sign-in is held in memory only, so the player is warned");
         assertEquals(AuthFixtures.MC_TOKEN, s.session(AuthFixtures.UUID, CancellationToken.NONE).accessToken());
 
         // when the store works again, renewed tokens go there
@@ -615,6 +659,7 @@ class AccountServiceTest {
         fx.clock.advance(Duration.ofHours(25));
         s.session(AuthFixtures.UUID, CancellationToken.NONE);
         assertEquals(Optional.of(AuthFixtures.MSA_REFRESH_2), store.inner.get("msa.refresh." + AuthFixtures.UUID));
+        assertTrue(s.remembersSignIn());
     }
 
     @Test
@@ -762,7 +807,7 @@ class AccountServiceTest {
         assertEquals(AuthFixtures.UUID, s.selected().orElseThrow().id);
         assertEquals("msa", s.selected().orElseThrow().type);
         JsonObject file = JsonParser.parseString(accountsJson()).getAsJsonObject();
-        assertEquals(1, file.get("schemaVersion").getAsInt());
+        assertEquals(AccountService.SCHEMA_VERSION, file.get("schemaVersion").getAsInt());
         assertEquals(AuthFixtures.UUID, file.get("selectedId").getAsString());
         assertNoTokensOnDisk();
     }
