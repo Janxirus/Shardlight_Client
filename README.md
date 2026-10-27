@@ -1,5 +1,7 @@
 # Shardlight Client
 
+[![Discord](https://img.shields.io/discord/1564370494814289980?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/FJQhr2YEAe) [![Patreon](https://img.shields.io/badge/Patreon-Janxirus-f96854?logo=patreon&logoColor=white)](https://www.patreon.com/Janxirus) [![Website](https://img.shields.io/badge/website-janxirus.github.io-8a5cff)](https://janxirus.github.io)
+
 A standalone desktop launcher for Minecraft: Java Edition. It installs and launches the game from
 Mojang's own servers, keeps every setup in its own project folder, finds mods, resource packs and shaders
 on Modrinth (and CurseForge, with a key), and puts frame rate first: every project starts on the
